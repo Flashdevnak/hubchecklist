@@ -2,7 +2,7 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-This repository is prepared for GitHub and Codex MVP development. MVP-001 contains the app skeleton only. It does **not** claim QR, OCR, Flash WebView automation, Supabase, R2, Export, or Backup features are complete yet.
+This repository is prepared for GitHub and Codex MVP development. MVP-001 contains the app skeleton only. MVP-002 adds the Supabase database/auth foundation, role model, and RLS draft. It does **not** claim QR, OCR, Flash WebView automation, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
 
 ## Final product goal
 
@@ -27,10 +27,19 @@ Staff do not know in advance how many vehicles will come each day. The system mu
 - Capacitor Android foundation
 - PWA-ready structure
 - Mobile-first CSS
+- Supabase client configuration guard
+- Supabase migration draft for Auth/Postgres roles and RLS
+
+MVP-002 database/auth foundation includes:
+
+- Supabase Free target for Auth/Postgres/Realtime/API
+- `staff`, `supervisor`, and `admin` roles
+- Tables for users, branches, responsible profiles, vehicle records, route rows, vehicle photos, edit history, backup jobs, cleanup jobs, storage snapshots, and app settings
+- RLS draft policies where staff can view/create own records, supervisors can view branch records, and admins can manage all records
+- Safe missing-env behavior that shows `Supabase ยังไม่ได้ตั้งค่า` instead of crashing
 
 Future MVPs will add:
 
-- Supabase Free for Auth/Postgres/Realtime/API
 - Cloudflare R2 Free for photos/screenshots/backups
 - Android native WebView plugin for Flash auto-fill
 - OCR phone reading
@@ -42,6 +51,27 @@ Future MVPs will add:
 ```bash
 npm install
 ```
+
+## Environment
+
+Copy `.env.example` to `.env.local` for local development.
+
+Frontend-safe values:
+
+```bash
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+Server-only placeholders must never be exposed in frontend code:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=placeholder-server-only-never-expose-to-frontend
+R2_ACCESS_KEY_ID=placeholder-server-only
+R2_SECRET_ACCESS_KEY=placeholder-server-only
+```
+
+If Supabase URL/key are missing, the app still opens and shows `Supabase ยังไม่ได้ตั้งค่า`.
 
 ## Run web dev
 
@@ -56,6 +86,12 @@ Open the URL shown by Vite. For phone testing on the same Wi-Fi, use the LAN URL
 ```bash
 npm run build
 ```
+
+## Supabase migrations
+
+MVP-002 migration files live in `supabase/migrations/`.
+
+The first migration creates the schema, indexes, update triggers, role helpers, and RLS draft policies. Apply it to a Supabase project with the Supabase CLI in a later environment setup step. This repository does not include real production secrets.
 
 ## Capacitor Android
 

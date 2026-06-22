@@ -3,6 +3,7 @@ import { pages } from '../data/pages';
 import type { AppRoute, PageDefinition } from '../types';
 import BottomNav from './BottomNav';
 import PageHeader from './PageHeader';
+import SupabaseStatusNotice from './SupabaseStatusNotice';
 
 interface AppShellProps {
   children: ReactNode;
@@ -41,6 +42,7 @@ export default function AppShell({ children, currentRoute, currentPage, onNaviga
       </aside>
 
       <main className="app-main">
+        <SupabaseStatusNotice />
         <PageHeader page={currentPage} />
         <section className="page-content">{children}</section>
       </main>

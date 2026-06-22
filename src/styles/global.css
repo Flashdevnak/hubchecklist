@@ -83,6 +83,20 @@ code, pre { white-space: pre-wrap; word-break: break-word; }
 .nav-item.active, .nav-item:hover { background: rgba(255,224,68,0.16); color: #fff; }
 
 .app-main { min-width: 0; padding: 28px 28px 96px; }
+.supabase-notice {
+  max-width: 1160px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.supabase-notice.missing { background: #fff7ed; color: #9a3412; }
+.supabase-notice.ready { background: #ecfdf3; color: var(--success); }
 .page-header {
   display: flex;
   justify-content: space-between;

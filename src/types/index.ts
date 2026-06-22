@@ -1,4 +1,21 @@
 import type { LucideIcon } from 'lucide-react';
+export type {
+  AppSetting,
+  AppUser,
+  BackupJob,
+  Branch,
+  CleanupJob,
+  EditHistory,
+  JobStatus,
+  ResponsibleProfile,
+  RouteRow,
+  StorageUsageSnapshot,
+  UserRole,
+  VehiclePhoto,
+  VehiclePhotoKind,
+  VehicleRecord,
+  VehicleRecordStatus,
+} from './database';
 
 export type AppRoute =
   | 'login'
@@ -23,39 +40,4 @@ export interface PageDefinition {
   description: string;
   nextMvp: string;
   icon: LucideIcon;
-}
-
-export interface ResponsibleProfile {
-  id: string;
-  employeeCode: string;
-  displayName: string;
-  branch: string;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type VehicleRecordStatus =
-  | 'DRAFT'
-  | 'WAITING_PHONE'
-  | 'WAITING_FLASH_SEARCH'
-  | 'FLASH_LOADED'
-  | 'NEED_REVIEW'
-  | 'READY_FOR_PHOTO'
-  | 'PENDING_PHOTO'
-  | 'COMPLETE'
-  | 'VOIDED'
-  | 'ERROR';
-
-export interface VehicleRecord {
-  id: string;
-  workDate: string;
-  branch: string;
-  responsibleEmployeeCode: string;
-  responsibleDisplayName: string;
-  vehicleBarcode: string;
-  driverPhone?: string;
-  status: VehicleRecordStatus;
-  createdAt: string;
-  updatedAt: string;
 }

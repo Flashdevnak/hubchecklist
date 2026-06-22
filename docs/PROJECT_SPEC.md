@@ -29,6 +29,35 @@ The real workflow is:
 - Photos must be compressed before cloud upload.
 - Backup/Cleanup Guard prevents unexpected cloud cost.
 
+## MVP-002 database/auth foundation
+
+MVP-002 establishes the Supabase foundation only.
+
+Implemented foundation:
+
+- Supabase client setup with safe missing-env behavior.
+- `public.users` profile table linked to `auth.users`.
+- Branch-aware role model: `staff`, `supervisor`, `admin`.
+- Tables for branches, responsible profiles, vehicle records, route rows, vehicle photos, edit history, backup jobs, cleanup jobs, storage usage snapshots, and app settings.
+- RLS draft policies:
+  - Staff can view/create their own records.
+  - Supervisors can view branch records.
+  - Admins can manage all records.
+- `.env.example` documents frontend Supabase values and server-only placeholders.
+
+Still placeholders after MVP-002:
+
+- QR scan.
+- OCR phone reading.
+- Android WebView Flash automation.
+- R2 upload.
+- Photo upload.
+- Exact 21.6 export execution.
+- Backup execution.
+- Cleanup execution.
+
+The app must still open when Supabase values are missing and show `Supabase ยังไม่ได้ตั้งค่า`.
+
 ## Exact backup requirement
 
 Backup ZIP must contain:

@@ -20,6 +20,32 @@ Manual checks:
 - Confirm no horizontal overflow.
 - Confirm placeholders do not pretend to work.
 
+## MVP-002
+
+Goal: prove the Supabase database/auth foundation exists without turning future workflows into fake completed features.
+
+Commands:
+
+```bash
+npm install
+npm run build
+```
+
+Static checks:
+
+- Confirm `supabase/migrations/202606230001_mvp002_schema_auth_roles_rls.sql` exists.
+- Confirm the migration creates `users`, `branches`, `responsible_profiles`, `vehicle_records`, `route_rows`, `vehicle_photos`, `edit_history`, `backup_jobs`, `cleanup_jobs`, `storage_usage_snapshots`, and `app_settings`.
+- Confirm role enum includes `staff`, `supervisor`, and `admin`.
+- Confirm RLS is enabled and policies cover staff own records, supervisor branch records, and admin manage-all access.
+- Confirm `.env.example` includes Supabase frontend variables and server-only placeholders.
+
+Manual checks:
+
+- Run the app without Supabase env values.
+- Confirm the UI shows `Supabase ยังไม่ได้ตั้งค่า`.
+- Confirm the app does not crash or claim login success.
+- Confirm QR, OCR, Android WebView, R2 upload, photo upload, export, backup, and cleanup remain placeholders.
+
 ## Future test areas
 
 ### QR scan
