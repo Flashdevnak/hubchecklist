@@ -5,16 +5,16 @@ export type {
   BackupJob,
   Branch,
   CleanupJob,
-  EditHistory,
+  EditHistory as DbEditHistory,
   JobStatus,
   ResponsibleProfile,
-  RouteRow,
+  RouteRow as DbRouteRow,
   StorageUsageSnapshot,
   UserRole,
   VehiclePhoto,
   VehiclePhotoKind,
-  VehicleRecord,
-  VehicleRecordStatus,
+  VehicleRecord as DbVehicleRecord,
+  VehicleRecordStatus as DbVehicleRecordStatus,
 } from './database';
 
 export type AppRoute =
@@ -122,4 +122,104 @@ export interface ValidationResult {
   isValid: boolean;
   error?: string;
   warning?: string;
+}
+
+export type VehicleRecordStatus = 'READY_FOR_PHOTO' | 'NEED_REVIEW' | 'VOIDED';
+
+export type ChecklistType = 'NORMAL_ROUTE' | 'MULTI_DROP';
+
+export interface RouteRow {
+  id: string;
+  recordId: string;
+  index: number;
+  branchName?: string;
+  date?: string;
+  expectedArrivalTime?: string;
+  actualArrivalTime?: string;
+  inboundScanner?: string;
+  expectedDepartureTime?: string;
+  actualDepartureTime?: string;
+  outboundScanner?: string;
+  duration?: string;
+  distance?: string;
+  sealNumbers?: string;
+  createdAt: string;
+}
+
+export interface VehicleRecord {
+  id: string;
+  workDate: string;
+  branch: string;
+  responsibleEmployeeCode: string;
+  responsibleDisplayName: string;
+  scannerUserId?: string;
+  scannerName?: string;
+  sourceUrl: string;
+  vehicleBarcode: string;
+  driverPhone: string;
+  driverName?: string;
+  companyName?: string;
+  routeSummary?: string;
+  firstBranch?: string;
+  lastBranch?: string;
+  plannedDepartureTime?: string;
+  actualDepartureTime?: string;
+  routeRows: RouteRow[];
+  checklistType: ChecklistType;
+  requiredPhotos: string[];
+  flashPageStatus?: string;
+  flashHtmlSnapshot?: string;
+  flashScreenshotObjectKey?: string;
+  ocrRawText?: string;
+  ocrConfidence?: number;
+  status: VehicleRecordStatus;
+  duplicateKey: string;
+  backedUp: boolean;
+  backupId?: string;
+  voidReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncStatus: 'local_only' | 'pending' | 'synced' | 'error';
+  syncMessage?: string;
+}
+
+export interface VehicleRecordDraft {
+  workDate: string;
+  branch: string;
+  responsibleEmployeeCode: string;
+  responsibleDisplayName: string;
+  sourceUrl: string;
+  vehicleBarcode: string;
+  driverPhone: string;
+  driverName?: string;
+  companyName?: string;
+  routeSummary?: string;
+  firstBranch?: string;
+  lastBranch?: string;
+  plannedDepartureTime?: string;
+  actualDepartureTime?: string;
+  routeRows: FlashProofRouteRow[];
+  flashPageStatus?: string;
+  flashHtmlSnapshot?: string;
+  ocrRawText?: string;
+  ocrConfidence?: number;
+}
+
+export interface DuplicateVehicleRecordResult {
+  exactMatches: VehicleRecord[];
+  conflictingMatches: VehicleRecord[];
+  hasExactDuplicate: boolean;
+  hasConflict: boolean;
+  message?: string;
+}
+
+export interface EditHistoryEntry {
+  id: string;
+  recordId: string;
+  fieldName: string;
+  oldValue?: string;
+  newValue?: string;
+  editedBy: string;
+  editedAt: string;
+  reason: string;
 }

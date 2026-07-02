@@ -1,27 +1,27 @@
 # QA Checklist
 
-## MVP-006 required checks
+## MVP-007 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] `npx cap sync android` passes
-- [ ] Android project exists
-- [ ] `FlashProofWebViewPlugin` native file exists
-- [ ] Plugin validates `api.flashexpress.com`
-- [ ] Plugin rejects unknown domains
-- [ ] Plugin uses `evaluateJavascript` for auto-fill/search/extraction
-- [ ] Plugin returns structured success/error result to React
-- [ ] FlashSearchPage is no longer placeholder-only
-- [ ] FlashSearchPage loads confirmed scan preview draft
-- [ ] FlashSearchPage validates `sourceUrl`, `vehicleBarcode`, and `driverPhone`
-- [ ] Android platform status is shown
-- [ ] Web/PWA fallback is honest and does not claim auto-fill
-- [ ] Web/PWA fallback has copy phone and open Flash URL actions
-- [ ] Manual raw-text parser is clearly labeled as fallback/testing only
-- [ ] No fake Flash data is displayed as real
-- [ ] Flash result draft persists only after plugin result or clearly marked manual fallback
-- [ ] Documentation explains Android WebView requirement
+- [ ] User can create vehicle record from `hubchecklist.flashProofResultDraft`
+- [ ] Vehicle record persists locally after refresh
+- [ ] App works without Supabase env keys
+- [ ] App shows `บันทึกในเครื่อง / ยังไม่ได้เชื่อม Supabase` in local-only mode
+- [ ] App does not fake Supabase sync success
+- [ ] Duplicate same workDate + branch + vehicleBarcode + driverPhone + sourceUrl is detected
+- [ ] Same barcode but different phone/route shows stronger warning
+- [ ] User can open existing duplicate
+- [ ] User can create new trip with confirmation
+- [ ] User can void record with reason
+- [ ] Voided record remains searchable
+- [ ] Basic edit writes edit history
+- [ ] VehicleChecklistPage shows created record summary
+- [ ] VehicleChecklistPage keeps photos as MVP-008 placeholder
+- [ ] Dashboard lists local vehicle records
+- [ ] Dashboard counts total, READY_FOR_PHOTO, NEED_REVIEW, and VOIDED
+- [ ] Dashboard can filter/search by barcode, phone, responsible, or status
 - [ ] Mobile layout has no horizontal overflow
 - [ ] No R2/photo/export/backup feature is falsely marked complete
 

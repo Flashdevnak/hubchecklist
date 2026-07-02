@@ -2,131 +2,72 @@
 
 ## Final Direction
 
-Hub Vehicle Proof Capture is an Android-first mobile system with PWA fallback.
+Hub Vehicle Proof Capture is an Android-first mobile system with PWA fallback. Records are created from real scans on demand. The app must not require daily vehicle import, known vehicle count, or fixed routes.
 
-The real workflow is:
-
-1. Staff login.
-2. Staff select responsible profile, such as `25845 Tui`.
-3. Staff scan QR from vehicle paper / phone screen.
-4. App extracts barcode from Flash URL.
-5. App reads driver phone by OCR or manual input.
-6. Android WebView app auto-fills phone in Flash proof page.
-7. App extracts vehicle route/status table.
-8. App creates vehicle record on demand.
-9. Staff take required photos.
-10. Supervisor exports exact 21.6 workbook + photos ZIP backup.
-11. Backup must succeed before cloud photo cleanup.
-
-## Critical Rules
-
-- Do not require daily import.
-- Do not assume number of vehicles.
-- Do not assume route is fixed every day.
-- Records are created from actual scan only.
-- Web mobile mode cannot guarantee auto-fill on external Flash page; Android WebView is required for automation.
-- Free-tier online architecture uses Supabase Free + Cloudflare R2 Free.
-- Photos must be compressed before cloud upload.
-- Backup/Cleanup Guard prevents unexpected cloud cost.
-
-## MVP-002 Database/Auth Foundation
-
-MVP-002 establishes the Supabase foundation only.
+## MVP-007 Vehicle Record Creation
 
 Implemented foundation:
 
-- Supabase client setup with safe missing-env behavior.
-- `public.users` profile table linked to `auth.users`.
-- Branch-aware role model: `staff`, `supervisor`, `admin`.
-- Tables for branches, responsible profiles, vehicle records, route rows, vehicle photos, edit history, backup jobs, cleanup jobs, storage usage snapshots, and app settings.
-- RLS draft policies where staff can view/create their own records, supervisors can view branch records, and admins can manage all records.
-- `.env.example` documents frontend Supabase values and server-only placeholders.
+- Local-first vehicle record service in `src/services/vehicleRecords.ts`
+- Record creation from `hubchecklist.flashProofResultDraft`
+- Local record persistence in `hubchecklist.vehicleRecords`
+- Edit history in `hubchecklist.vehicleRecordEditHistory`
+- Duplicate detection:
+  - Exact duplicate: same workDate + branch + vehicleBarcode + driverPhone + sourceUrl
+  - Conflict: same workDate + branch + vehicleBarcode but different phone or route summary
+- Duplicate actions:
+  - Open existing
+  - Create new trip
+  - Void wrong record
+  - Cancel
+- Void flow requires reason and never hard-deletes
+- Default checklist type:
+  - `NORMAL_ROUTE`
+  - `MULTI_DROP`
+- Required photo placeholders for MVP-008
+- Dashboard counts/search/filter
+- Basic edit page for driver phone, driver name, company, route summary, and checklist type
+- Supabase sync path is safe/optional and does not fake success
 
-## MVP-004 QR Scan UI Foundation
+Vehicle records include:
 
-MVP-004 implements the mobile QR scan UI foundation only.
+- id
+- workDate
+- branch
+- responsibleEmployeeCode
+- responsibleDisplayName
+- sourceUrl
+- vehicleBarcode
+- driverPhone
+- driverName
+- companyName
+- routeSummary
+- firstBranch
+- lastBranch
+- plannedDepartureTime
+- actualDepartureTime
+- checklistType
+- requiredPhotos
+- flashPageStatus
+- flashHtmlSnapshot
+- ocrRawText
+- ocrConfidence
+- status
+- duplicateKey
+- backedUp
+- backupId
+- voidReason
+- createdAt
+- updatedAt
 
-Implemented foundation:
+Still placeholders after MVP-007:
 
-- Full-screen-style scan page with a large camera placeholder frame.
-- Manual QR URL or raw barcode input.
-- Flash proof URL parsing from the last URL path segment.
-- `sourceUrl` and `vehicleBarcode` preview.
-- Vehicle barcode uppercase normalization.
-- Required alphanumeric validation with warning-only handling for unusual future formats.
-- Local scan draft persistence with `sourceUrl`, `vehicleBarcode`, `scannedAt`, responsible employee code, responsible display name, and branch.
-
-## MVP-005 OCR Phone Preview/Edit Foundation
-
-MVP-005 implements OCR phone text extraction and manual correction only.
-
-Implemented foundation:
-
-- ScanPreviewPage review/edit UI for `vehicleBarcode`, `sourceUrl`, responsible profile, and `driverPhone`.
-- Paper image/file input for future OCR engine integration.
-- Clear OCR status when a real OCR engine is unavailable.
-- Raw OCR text paste/test mode.
-- Thai mobile phone normalization and extraction from text.
-- Validation requiring a 10-digit phone starting with `06`, `08`, or `09`.
-- Multiple phone candidate selection.
-- Manual correction before confirm.
-- Local preview draft persistence with `sourceUrl`, `vehicleBarcode`, `driverPhone`, `ocrRawText`, `ocrConfidence`, responsible employee code, responsible display name, branch, `scannedAt`, and `phoneConfirmedAt`.
-- Explicit next-step note: Flash page opening and automatic phone fill are MVP-006.
-
-Still placeholders after MVP-005:
-
-- Production OCR engine for images.
-- Android WebView Flash automation.
-- Flash route/status extraction.
-- Supabase vehicle record creation.
-- R2 upload.
-- Photo upload.
-- Exact 21.6 export execution.
-- Backup execution.
-- Cleanup execution.
-
-## MVP-006 Android WebView Flash Automation Foundation
-
-MVP-006 implements the Android WebView automation foundation only.
-
-Implemented foundation:
-
-- Generated Capacitor Android project.
-- Native `FlashProofWebViewPlugin` registered in `MainActivity`.
-- Plugin methods:
-  - `openFlashProof(options)`
-  - `closeFlashProof()`
-  - `getLastFlashProofResult()`
-  - `isFlashProofWebViewAvailable()`
-- Strict URL validation before opening WebView.
-- Allowed only:
-  - HTTPS
-  - `api.flashexpress.com`
-  - path containing `/gw/nws/web/proof/go/`
-- WebView JavaScript enabled only inside the controlled Flash proof WebView.
-- Resilient phone input lookup and search button lookup through `evaluateJavascript`.
-- Structured success/error response bridge to React.
-- Local Flash result draft persistence under `hubchecklist.flashProofResultDraft`.
-- FlashSearchPage integration UI.
-- Browser/PWA fallback with copy phone, open Flash link, and manual raw text parser.
-
-Safety boundaries:
-
-- Browser/PWA mode must not claim it can auto-fill a cross-domain Flash page.
-- Unknown domains are rejected before WebView automation.
-- Manual fallback results are labeled as manual/testing, not real automated Flash extraction.
-- Vehicle record creation remains MVP-007.
-
-Still placeholders after MVP-006:
-
-- Physical-device verification against the live Flash DOM.
-- Hardened final route/status extraction after testing real Flash result markup.
-- Supabase vehicle record creation.
-- R2 upload.
-- Photo upload.
-- Exact 21.6 export execution.
-- Backup execution.
-- Cleanup execution.
+- Photo capture and upload
+- R2 upload
+- Exact 21.6 export
+- Backup execution
+- Cleanup execution
+- Final dashboard hardening
 
 ## Exact Backup Requirement
 

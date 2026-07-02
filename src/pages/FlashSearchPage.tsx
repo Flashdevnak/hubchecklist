@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, FileSearch, RefreshCcw, Search } from 'lucide-react';
+import { ClipboardCheck, Copy, ExternalLink, FileSearch, RefreshCcw, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
@@ -6,7 +6,10 @@ import {
   checkFlashProofWebViewAvailability,
   openFlashProofInWebView,
 } from '../services/flashProofWebView';
-import type { FlashProofResult, ScanPreviewDraft } from '../types';
+import {
+  createVehicleRecordFromFlashDraft,
+} from '../services/vehicleRecords';
+import type { DuplicateVehicleRecordResult, FlashProofResult, ScanPreviewDraft } from '../types';
 import {
   getFlashProofResultDraft,
   getScanPreviewDraft,
@@ -27,6 +30,8 @@ export default function FlashSearchPage() {
   const [actionStatus, setActionStatus] = useState('');
   const [flashResult, setFlashResult] = useState<FlashProofResult | null>(null);
   const [manualRawText, setManualRawText] = useState('');
+  const [duplicateResult, setDuplicateResult] = useState<DuplicateVehicleRecordResult | null>(null);
+  const [recordErrors, setRecordErrors] = useState<string[]>([]);
 
   useEffect(() => {
     setPreviewDraft(getScanPreviewDraft());
@@ -50,6 +55,7 @@ export default function FlashSearchPage() {
   }, [previewDraft]);
 
   const canOpenNative = Boolean(previewDraft) && !validation && platformAvailable;
+  const canCreateRecord = Boolean(flashResult?.vehicleBarcode && flashResult.driverPhone);
 
   const handleOpenFlash = async () => {
     if (!previewDraft) return;
@@ -104,6 +110,50 @@ export default function FlashSearchPage() {
     saveFlashProofResultDraft(result);
     setFlashResult(result);
     setActionStatus('บันทึกผลจากโหมดทดสอบข้อความแล้ว');
+  };
+
+  const handleCreateVehicleRecord = (forceNewTrip = false) => {
+    if (!flashResult) return;
+    const result = createVehicleRecordFromFlashDraft(flashResult, { forceNewTrip });
+    setRecordErrors(result.validationErrors);
+    setDuplicateResult(result.duplicate.hasExactDuplicate || result.duplicate.hasConflict ? result.duplicate : null);
+
+    if (result.record) {
+      setActionStatus(result.status.message);
+      window.location.hash = `/checklist?recordId=${result.record.id}`;
+      return;
+    }
+
+    if (result.validationErrors.length > 0) {
+      setActionStatus('ยังสร้างรายการรถไม่ได้ กรุณาตรวจข้อมูลที่จำเป็น');
+    } else if (result.duplicate.message) {
+      setActionStatus(result.duplicate.message);
+    }
+  };
+
+  const handleOpenExisting = () => {
+    const existing = duplicateResult?.exactMatches[0] ?? duplicateResult?.conflictingMatches[0];
+    if (!existing) return;
+    window.location.hash = `/checklist?recordId=${existing.id}`;
+  };
+
+  const handleVoidFirstConflict = () => {
+    if (!flashResult || !duplicateResult?.conflictingMatches[0]) return;
+    const reason = window.prompt('กรุณาระบุเหตุผลการ Void รายการเดิม');
+    if (!reason) return;
+    const result = createVehicleRecordFromFlashDraft(flashResult, {
+      forceNewTrip: true,
+      voidExistingId: duplicateResult.conflictingMatches[0].id,
+      voidReason: reason,
+    });
+    if (result.record) {
+      window.location.hash = `/checklist?recordId=${result.record.id}`;
+    }
+  };
+
+  const handleReplaceDraftOnly = () => {
+    setDuplicateResult(null);
+    setActionStatus('เก็บ Flash draft ล่าสุดไว้แล้ว ยังไม่ได้สร้างรายการรถใหม่');
   };
 
   if (!previewDraft) {
@@ -195,6 +245,35 @@ export default function FlashSearchPage() {
             <p className="muted-note">ยังไม่มีผลลัพธ์จริงจาก Android WebView หรือโหมดทดสอบข้อความ</p>
           )}
         </article>
+
+        {flashResult ? (
+          <article className="feature-card action-card">
+            <h2>สร้างรายการรถ</h2>
+            <PrimaryButton onClick={() => handleCreateVehicleRecord(false)} disabled={!canCreateRecord}>
+              <ClipboardCheck size={20} />
+              <span>สร้างรายการรถ</span>
+            </PrimaryButton>
+            {recordErrors.length > 0 ? (
+              <div className="scan-message danger">
+                {recordErrors.map((error) => <span key={error}>{error}</span>)}
+              </div>
+            ) : null}
+            {duplicateResult ? (
+              <div className={duplicateResult.hasConflict ? 'scan-message danger' : 'scan-message warning'}>
+                <strong>{duplicateResult.message}</strong>
+                <div className="record-action-row">
+                  <PrimaryButton variant="secondary" onClick={handleOpenExisting}>เปิดรายการเดิม</PrimaryButton>
+                  <PrimaryButton variant="secondary" onClick={handleReplaceDraftOnly}>แทนที่ draft เท่านั้น</PrimaryButton>
+                  <PrimaryButton variant="secondary" onClick={() => handleCreateVehicleRecord(true)}>สร้างเที่ยวใหม่</PrimaryButton>
+                  {duplicateResult.hasConflict ? (
+                    <PrimaryButton variant="danger" onClick={handleVoidFirstConflict}>Void รายการผิด</PrimaryButton>
+                  ) : null}
+                  <PrimaryButton variant="secondary" onClick={() => setDuplicateResult(null)}>ยกเลิก</PrimaryButton>
+                </div>
+              </div>
+            ) : null}
+          </article>
+        ) : null}
       </section>
 
       <aside className="preview-side-stack">
