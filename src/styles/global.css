@@ -336,6 +336,12 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr);
   gap: 18px;
 }
+.export-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+  gap: 18px;
+  align-items: start;
+}
 .dashboard-page {
   display: grid;
   gap: 18px;
@@ -485,6 +491,73 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   display: grid;
   gap: 12px;
   justify-items: start;
+}
+.export-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.export-filter-grid label,
+.export-toggle-grid label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 900;
+}
+.export-filter-grid input,
+.export-filter-grid select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  color: var(--text);
+}
+.export-toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+.export-toggle-grid label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+.export-toggle-grid input {
+  width: 18px;
+  height: 18px;
+}
+.export-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.export-record-list {
+  display: grid;
+  gap: 10px;
+}
+.export-record-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  min-width: 0;
+}
+.export-record-row strong,
+.export-record-row span {
+  overflow-wrap: anywhere;
+}
+.export-record-row span {
+  color: var(--muted);
+  font-weight: 800;
 }
 .scan-preview-page.single-column,
 .flash-page.single-column,
@@ -760,6 +833,7 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   .scan-preview-page,
   .flash-page,
   .record-page,
+  .export-page,
   .dashboard-control-grid,
   .dashboard-two-column {
     grid-template-columns: 1fr;

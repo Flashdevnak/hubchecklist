@@ -1,159 +1,150 @@
 # Project Specification
 
-## MVP-010 Dashboard Hardening and Operational Filters
+## MVP-011 Export XLSX/ZIP With Exact 21.6 Layout
 
-MVP-010 turns TodayDashboardPage into a local-first operations dashboard for hub supervisors. It uses existing vehicle records, photo metadata, and audit history. It does not require Supabase or R2, and it does not implement export, backup, cleanup, production storage, or billing automation.
+MVP-011 creates an offline/free export package from local records, photos, and audit history. The export is audit-ready and links workbook photo cells to exact matching photo files inside the ZIP when local image data exists.
 
-## Dashboard Data Sources
+## ZIP Structure
 
-- Vehicle records: `hubchecklist.vehicleRecords`
-- Vehicle photos: `hubchecklist.vehiclePhotos`
-- Audit history: `hubchecklist.vehicleRecordEditHistory`
-- Active responsible profile, when available, for default branch filtering
+```text
+backup.zip
+├─ workbook.xlsx
+├─ photos/
+├─ flash-screenshots/
+└─ backup-manifest.json
+```
 
-## Summary Cards
+## Workbook Sheets
 
-The top dashboard cards show:
+`workbook.xlsx` contains:
 
-- Total filtered records
-- `READY_FOR_PHOTO`
-- `PENDING_PHOTO`
-- `COMPLETE`
-- `VOIDED`
-- Edited records
-- Redo/refetch records
-- Local-only photo count
-- Uploaded photo count
+- `21.6`
+- `Route Detail`
+- `Photo Index`
+- `Edit History`
+- `Backup Manifest`
+- `Voided Records`
 
-## Filters and Search
+## 21.6 Sheet
 
-Status chips:
+The sheet name must be exactly `21.6`.
 
-- All
-- Active
-- `READY_FOR_PHOTO`
-- `PENDING_PHOTO`
-- `COMPLETE`
-- `VOIDED`
-- Edited
-- Redo/refetch
-- Duplicate warning
-- Local-only photos
-- Upload failed
+Column blocks:
 
-Search includes:
+- Main drop / รถหลักพ่วงสาขา: A:K
+- Main vehicle / รถหลัก: M:U
+- Extra vehicle / รถเสริม: W:AE
+- Extra drop / รถเสริมพ่วงสาขา: AG:AQ
 
-- `vehicleBarcode`
-- `driverPhone`
-- `driverName`
-- `companyName`
-- `routeSummary`
-- `firstBranch`
-- `lastBranch`
-- `responsibleEmployeeCode`
-- `responsibleDisplayName`
-- `status`
-- `checklistType`
-- `branch`
+Current mapping:
 
-Date filters:
+- `NORMAL_ROUTE` exports to Main vehicle M:U.
+- `MULTI_DROP` exports to Main drop A:K.
+- Extra vehicle and extra drop headers are prepared but no records are faked into those blocks until checklist type expansion exists.
 
-- Today default
-- Yesterday
-- Last 7 days
-- Custom `workDate`
-- All local records
+Photo cells:
 
-Branch filters:
+- Link to relative paths under `photos/` when the local photo data exists.
+- Show `ยังไม่มีรูป` when no photo exists.
+- Show `รูปอยู่ในเครื่อง / ไม่พบไฟล์ใน export` when metadata exists but local image data is not available or local-only photos are excluded.
+- Full-size images are not embedded to avoid huge XLSX files.
 
-- All branches
-- BNAK
-- Other branches found in local records
-- Defaults to active responsible profile branch if available
+## Photo Folder Layout
 
-## Responsible Summary
+```text
+photos/
+YYYY-MM-DD/
+employeeCode_displayName/
+vehicleBarcode_recordId/
+loadingPhoto.jpg
+dropPhotoAfterDeparture.jpg
+branchDropPhoto1.jpg
+branchDropPhoto2.jpg
+```
 
-Records are grouped by `responsibleEmployeeCode` and `responsibleDisplayName`.
+Filenames are sanitized for Windows-safe ZIP extraction.
 
-Each responsible card shows:
+## Support Sheets
 
-- Employee code
-- Display name
-- Branch
-- Total records
-- Complete
-- Pending photo
-- Voided
-- Edited
-- Last updated time
+### Route Detail
 
-Clicking a responsible card filters the record list.
+One row per route row with work date, branch, responsible profile, vehicle barcode, record ID, route index, branch name, times, scanners, duration, distance, and seal numbers.
 
-## Record Cards
+### Photo Index
 
-Each dashboard record card shows:
+One row per expected photo with:
 
-- Vehicle barcode
-- Driver phone
-- Responsible profile
-- Branch
-- Status badge
-- Checklist type
-- Route summary
-- Photo progress
-- Edited indicator
-- Redo/refetch indicator
-- Voided indicator
-- Duplicate/conflict indicator
-- Local-only/upload failed indicator
-- Last updated time
-- Actions to open checklist, edit, view history, and continue photo capture when photos are missing
+- work date
+- branch
+- responsible profile
+- vehicle barcode
+- record ID
+- checklist type
+- photo type
+- Thai photo label
+- original filename
+- exported filename
+- relative path
+- captured metadata
+- upload status
+- linked `21.6` cell
+- exists-in-ZIP flag
+- missing reason
 
-## Sorting
+### Edit History
 
-Supported sort modes:
+One row per audit entry with record ID, vehicle barcode, action type, field, old value, new value, editor, timestamp, reason, and source.
 
-- Latest updated first
-- Oldest updated first
-- Status
-- Responsible person
-- Vehicle barcode
-- Missing photos first
+### Voided Records
 
-Default sort is latest updated first.
+Voided records remain visible when included in export filters.
 
-## Operational Alerts
+### Backup Manifest
 
-Alerts are warnings only; they do not block operation.
+The sheet and `backup-manifest.json` include:
 
-Alerts include:
+- backup ID
+- exported time
+- exported by
+- filters
+- counts
+- included record IDs
+- included photo IDs
+- missing photos
+- warnings
+- app version
 
-- Records missing required photos
-- Records voided today
-- Records edited today
-- Records with upload failed
-- Records with duplicate/conflict warning
-- Records with missing responsible profile
-- Records missing driver phone
-- Records missing vehicle barcode
+## Export UI
 
-## Storage Mode Card
+ExportPage supports:
 
-The storage card shows:
+- date range
+- branch
+- responsible employee code
+- responsible display name
+- status
+- vehicle barcode
+- include voided
+- include local-only photos
+- export filename
+- preview export summary
+- included-record preview
+- missing-photo preview
+- ZIP generation and download
 
-- Supabase configured/not configured
-- R2 signed upload configured/not configured
-- Local-only photo count
-- Uploaded photo count
-- Upload failed count
-- Estimated local photo size
-- Reminder that Export/Backup will be handled in MVP-011/MVP-012
+## Data Source Rules
 
-## Still Placeholder After MVP-010
+- Use local vehicle records, vehicle photos, and audit history first.
+- Work without Supabase env keys.
+- Work without R2 signed upload endpoint.
+- Do not fake missing photos.
+- Do not fake Flash screenshots.
+- Include Flash HTML snapshots only if local snapshot data exists.
 
-- Final Excel export exact 21.6
-- Backup ZIP
+## Still Placeholder After MVP-011
+
+- Backup Reminder
 - Cleanup Guard
 - Production R2 backend
 - Storage billing automation
-- Production Supabase sync success handling
+- Cloud cleanup/delete flow

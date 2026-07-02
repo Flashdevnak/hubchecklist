@@ -2,43 +2,31 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-MVP-010 hardens the daily operations dashboard so supervisors can search, filter, group, sort, and monitor local hub work. It does **not** implement final Excel export exact 21.6, Backup ZIP, Cleanup Guard, production R2 backend, storage billing automation, or fake Flash/Supabase/R2 success.
+MVP-011 adds an offline/free XLSX + ZIP export. The export package contains `workbook.xlsx`, `photos/`, `flash-screenshots/`, and `backup-manifest.json`. It does **not** implement Cleanup Guard, production R2 backend, storage billing automation, or fake missing photos/screenshots.
 
-## MVP-010 Behavior
+## MVP-011 Behavior
 
-- Dashboard summary cards show scanned records, photo status, voided records, edited records, redo/refetch records, local photos, uploaded photos, and upload failures.
-- Responsible-person summary groups by employee code, display name, and branch; tapping a person filters the record list.
-- Mobile-friendly filter chips cover active records, statuses, edited, redo/refetch, duplicate warning, local-only photos, and upload failed.
-- Search covers vehicle barcode, driver phone/name, company, route summary, first/last branch, responsible profile, status, checklist type, and branch.
-- Date filters support today, yesterday, last 7 days, custom work date, and all local records.
-- Branch filter defaults to the active responsible profile branch when available and includes BNAK plus branches found in local records.
-- Record cards show status, responsible profile, branch, checklist type, photo progress, edit/redo/void/duplicate/storage indicators, last update time, and action buttons.
-- Sorting supports latest, oldest, status, responsible person, vehicle barcode, and missing photos first.
-- Operational alerts highlight missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible profile, missing phone, and missing barcode.
-- Storage mode card shows Supabase/R2 configuration state, photo counts, failed uploads, and estimated local photo size.
-- Empty states provide scan and responsible-profile shortcuts.
-- Dashboard runs fully from local records, photos, and audit history without requiring Supabase or R2.
+- ExportPage is a working export screen with filters for date range, branch, responsible person, status, vehicle barcode, voided records, and local-only photos.
+- Users can preview export summary, included records, missing photos, and then generate/download `backup.zip`.
+- `workbook.xlsx` includes sheets: `21.6`, `Route Detail`, `Photo Index`, `Edit History`, `Backup Manifest`, and `Voided Records`.
+- Sheet `21.6` is named exactly `21.6` and contains A:K, M:U, W:AE, and AG:AQ blocks.
+- `NORMAL_ROUTE` records export into the Main vehicle block M:U.
+- `MULTI_DROP` records export into the Main drop block A:K.
+- Extra vehicle and extra drop blocks are prepared with headers only until checklist type expansion.
+- Photo cells link to the exact relative photo path inside `photos/` when local image data exists.
+- Missing photo cells show `ยังไม่มีรูป` or `รูปอยู่ในเครื่อง / ไม่พบไฟล์ใน export`.
+- Photo Index lists every expected/exported photo and the linked 21.6 cell.
+- Route Detail lists route rows.
+- Edit History lists audit entries.
+- Voided Records keeps voided records visible when included.
+- Backup Manifest sheet and `backup-manifest.json` include counts, filters, warnings, record IDs, photo IDs, and missing photos.
+- Export uses local records/photos/audit history first and works without Supabase or R2.
 
-## Environment
+## Export Dependencies
 
-Frontend placeholders:
-
-```bash
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-VITE_R2_PUBLIC_BASE_URL=
-VITE_R2_SIGNED_UPLOAD_ENDPOINT=
-```
-
-Server-only placeholders, never expose in frontend:
-
-```bash
-SUPABASE_SERVICE_ROLE_KEY=placeholder-server-only-never-expose-to-frontend
-R2_ACCOUNT_ID=placeholder-server-only
-R2_ACCESS_KEY_ID=placeholder-server-only
-R2_SECRET_ACCESS_KEY=placeholder-server-only
-R2_BUCKET_VEHICLE_PHOTOS=placeholder-server-only
-```
+- `exceljs` creates workbook sheets and hyperlinks.
+- `jszip` creates `backup.zip`.
+- Native browser Blob download is used; no paid service or Firebase is used.
 
 ## Commands
 
@@ -61,5 +49,6 @@ npm run build
 9. MVP-009 Edit redo void audit hardening
 10. MVP-010 Dashboard hardening and operational filters
 11. MVP-011 Export XLSX/ZIP with exact 21.6 layout
+12. MVP-012 Backup Reminder + Cleanup Guard
 
-Export, backup, cleanup, production R2 backend, and storage billing automation remain future MVPs.
+Cleanup Guard, production R2 backend, and storage billing automation remain future MVPs.

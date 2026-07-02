@@ -1,28 +1,33 @@
 # QA Checklist
 
-## MVP-010 required checks
+## MVP-011 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] Dashboard shows top summary cards
-- [ ] Dashboard groups records by responsible person
-- [ ] Clicking a responsible person filters the record list
-- [ ] Status filter chips work on mobile
-- [ ] Search covers barcode, phone, route, responsible person, branch, status, and checklist type
-- [ ] Date filters support today, yesterday, last 7 days, custom date, and all local records
-- [ ] Branch filter includes BNAK and branches found in records
-- [ ] Record cards show photo progress per record
-- [ ] Record cards show edited, redo/refetch, voided, duplicate/conflict, and storage indicators
-- [ ] Record cards include open, edit, history, and continue-photo actions where applicable
-- [ ] Sorting works for latest, oldest, status, responsible person, barcode, and missing photos first
-- [ ] Operational alerts show missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible, missing phone, and missing barcode
-- [ ] Storage mode card shows Supabase/R2 config state and local/upload photo counts
-- [ ] Empty state has scan and responsible-profile shortcuts
-- [ ] Dashboard works without Supabase env keys
-- [ ] Dashboard works without R2 signed upload endpoint
+- [ ] ExportPage is no longer placeholder-only
+- [ ] User can filter export by date, branch, responsible person, status, and barcode
+- [ ] User can preview export summary before download
+- [ ] User can generate `backup.zip`
+- [ ] `backup.zip` contains `workbook.xlsx`
+- [ ] `backup.zip` contains `backup-manifest.json`
+- [ ] `backup.zip` contains `photos/` when local photos exist
+- [ ] `workbook.xlsx` contains sheet named exactly `21.6`
+- [ ] `21.6` sheet has A:K, M:U, W:AE, and AG:AQ blocks
+- [ ] `NORMAL_ROUTE` records export to M:U
+- [ ] `MULTI_DROP` records export to A:K
+- [ ] Photo cells link to the correct relative photo path when photo data exists
+- [ ] Missing photo cells show `ยังไม่มีรูป`
+- [ ] Photo Index lists photos and linked cells
+- [ ] Route Detail lists route rows
+- [ ] Edit History lists audit entries
+- [ ] Voided Records lists voided records when included
+- [ ] Backup Manifest sheet exists
+- [ ] User does not need to manually hunt for photos
+- [ ] App works without Supabase env keys
+- [ ] App works without R2 signed upload endpoint
 - [ ] Mobile layout has no horizontal overflow
-- [ ] Export/backup/cleanup remain clearly placeholder
+- [ ] Backup/Cleanup Guard remains clearly placeholder for MVP-012
 
 ## Future QA gates
 

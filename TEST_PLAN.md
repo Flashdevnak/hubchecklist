@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-010
+## MVP-011
 
-Goal: prove the dashboard is useful for daily hub supervision using local records, photos, and audit history without faking cloud sync or future export/backup features.
+Goal: prove the app can create an audit-ready offline `backup.zip` with an exact `21.6` workbook layout, support sheets, manifest, and photo links without fake cloud or missing-photo success.
 
 Commands:
 
@@ -14,33 +14,33 @@ npm run build
 
 Manual checks:
 
-- Open the dashboard with local vehicle records present.
-- Confirm summary cards show total, ready, pending, complete, voided, edited, redo/refetch, local photos, and uploaded photos.
-- Confirm responsible-person cards show totals, completion, pending photo, voided, edited, branch, and last updated time.
-- Tap a responsible-person card and confirm the record list filters.
-- Use each status chip: all, active, ready, pending, complete, voided, edited, redo/refetch, duplicate warning, local-only photos, upload failed.
-- Search by vehicle barcode, driver phone, driver name, company, route summary, first/last branch, responsible code/name, status, checklist type, and branch.
-- Test date quick filters: today, yesterday, last 7 days, all local records, and custom work date.
-- Test branch filter with BNAK and other branches found in records.
-- Test sorting by latest, oldest, status, responsible person, barcode, and missing photos first.
-- Confirm each record card shows status, checklist type, photo progress, indicators, local/upload state, and last updated time.
-- Confirm action buttons open checklist, edit record, view history, and continue photo capture when missing photos exist.
-- Confirm operational alerts count missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible, missing phone, and missing barcode.
-- Confirm storage card shows Supabase configured/not configured, R2 configured/not configured, local-only photo count, uploaded photo count, upload failed count, and estimated local size.
-- Confirm empty state shows scan and responsible-profile buttons when filters return no records.
-- Confirm dashboard remains usable on mobile widths without horizontal overflow.
-- Confirm the app opens and builds without Supabase keys and without an R2 signed upload endpoint.
-- Confirm exact 21.6 export, Backup ZIP, Cleanup Guard, production R2 backend, and storage billing automation remain placeholders.
+- Open ExportPage and confirm it is a working export UI.
+- Filter by date range, branch, responsible employee code/display name, status, barcode, include voided, and include local-only photos.
+- Preview export summary and confirm record, photo, voided, missing-photo, and warning counts.
+- Generate and download `backup.zip`.
+- Extract ZIP and confirm `workbook.xlsx`, `backup-manifest.json`, `photos/`, and `flash-screenshots/` exist.
+- Open `workbook.xlsx` and confirm sheet `21.6` is named exactly `21.6`.
+- Confirm `21.6` has Main drop A:K, Main vehicle M:U, Extra vehicle W:AE, and Extra drop AG:AQ blocks.
+- Confirm `NORMAL_ROUTE` records appear in M:U.
+- Confirm `MULTI_DROP` records appear in A:K.
+- Confirm photo cells link to matching files under `photos/YYYY-MM-DD/employeeCode_displayName/vehicleBarcode_recordId/`.
+- Confirm missing photos show `ยังไม่มีรูป`.
+- Confirm Photo Index includes each expected photo, relative path, linked 21.6 cell, existence flag, and missing reason.
+- Confirm Route Detail includes route rows.
+- Confirm Edit History includes audit entries.
+- Confirm Voided Records includes voided records when `includeVoided` is checked.
+- Confirm Backup Manifest sheet and `backup-manifest.json` include filters, counts, included record IDs, included photo IDs, missing photos, warnings, app version.
+- Confirm local-only photos are exported when local compressed image data exists and includeLocalOnlyPhotos is checked.
+- Confirm metadata-only photos without local data are reported missing, not faked.
+- Confirm Flash screenshots/html are only included when local snapshot data exists.
+- Confirm app works without Supabase env keys and without R2 signed upload endpoint.
+- Confirm mobile layout has no horizontal overflow.
+- Confirm Cleanup Guard and photo deletion are not implemented in this MVP.
 
 ## Future Test Areas
 
-### MVP-011 Export XLSX/ZIP with exact 21.6 layout
+### MVP-012 Backup Reminder + Cleanup Guard
 
-- Workbook includes exact sheet `21.6`.
-- Each photo is linked to the right vehicle row.
-- ZIP packaging remains blocked until the export layout is correct.
-
-### Backup cleanup guard
-
-- Backup ZIP includes workbook, photos, flash screenshots, manifest.
-- Cleanup blocked before backup success.
+- Remind operators to export before cleanup.
+- Block cleanup unless a valid backup package exists.
+- Do not delete cloud/local photos before backup success.

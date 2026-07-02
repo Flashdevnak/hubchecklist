@@ -17,13 +17,15 @@
     "@capacitor/android": "^6.2.1",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/core": "^6.2.1",
+    "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.11",
-    "typescript": "^5.6.3",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.108.2",
-    "lucide-react": "^0.468.0"
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
