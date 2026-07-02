@@ -143,7 +143,11 @@ export type AuditActionType =
   | 'PHOTO_RETAKE'
   | 'VOID_RECORD'
   | 'RESTORE_RECORD'
-  | 'STATUS_CHANGE';
+  | 'STATUS_CHANGE'
+  | 'BACKUP_GENERATED'
+  | 'BACKUP_CONFIRMED'
+  | 'PHOTO_CLEANUP'
+  | 'CLEANUP_SKIPPED';
 
 export type AuditSource = 'user' | 'system' | 'duplicate_flow' | 'photo_flow';
 
@@ -227,6 +231,10 @@ export interface VehiclePhoto {
   backedUp: boolean;
   backupId?: string;
   cloudDeleted: boolean;
+  localCleaned?: boolean;
+  cleanedAt?: string;
+  cleanedBy?: string;
+  cleanupJobId?: string;
   deletedAt?: string;
   deletedBy?: string;
   createdAt: string;

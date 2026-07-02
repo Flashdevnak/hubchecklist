@@ -2,31 +2,23 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-MVP-011 adds an offline/free XLSX + ZIP export. The export package contains `workbook.xlsx`, `photos/`, `flash-screenshots/`, and `backup-manifest.json`. It does **not** implement Cleanup Guard, production R2 backend, storage billing automation, or fake missing photos/screenshots.
+MVP-012 adds Backup Reminder + Cleanup Guard. It warns about estimated photo storage growth, generates backup ZIPs through the MVP-011 export service, records local backup/cleanup job history, requires user backup confirmation, and only cleans local photo payloads that are confirmed backed up. It does **not** implement production R2 delete backend, cloud cleanup success, Android final QA, app store build, or storage billing automation.
 
-## MVP-011 Behavior
+## MVP-012 Behavior
 
-- ExportPage is a working export screen with filters for date range, branch, responsible person, status, vehicle barcode, voided records, and local-only photos.
-- Users can preview export summary, included records, missing photos, and then generate/download `backup.zip`.
-- `workbook.xlsx` includes sheets: `21.6`, `Route Detail`, `Photo Index`, `Edit History`, `Backup Manifest`, and `Voided Records`.
-- Sheet `21.6` is named exactly `21.6` and contains A:K, M:U, W:AE, and AG:AQ blocks.
-- `NORMAL_ROUTE` records export into the Main vehicle block M:U.
-- `MULTI_DROP` records export into the Main drop block A:K.
-- Extra vehicle and extra drop blocks are prepared with headers only until checklist type expansion.
-- Photo cells link to the exact relative photo path inside `photos/` when local image data exists.
-- Missing photo cells show `ยังไม่มีรูป` or `รูปอยู่ในเครื่อง / ไม่พบไฟล์ใน export`.
-- Photo Index lists every expected/exported photo and the linked 21.6 cell.
-- Route Detail lists route rows.
-- Edit History lists audit entries.
-- Voided Records keeps voided records visible when included.
-- Backup Manifest sheet and `backup-manifest.json` include counts, filters, warnings, record IDs, photo IDs, and missing photos.
-- Export uses local records/photos/audit history first and works without Supabase or R2.
-
-## Export Dependencies
-
-- `exceljs` creates workbook sheets and hyperlinks.
-- `jszip` creates `backup.zip`.
-- Native browser Blob download is used; no paid service or Firebase is used.
+- BackupCleanupPage is a working page, no longer a placeholder.
+- Storage usage is estimated from local photo metadata and labelled as an estimate, not exact cloud billing data.
+- Warning levels use a 10 GB local free-tier reference: normal, yellow, orange, red, critical.
+- Backup flow uses the existing MVP-011 XLSX/ZIP export service.
+- Backup jobs are stored in `hubchecklist.backupJobs` with statuses `DRAFT`, `GENERATED`, `CONFIRMED`, `FAILED`.
+- Backup is marked `GENERATED` after ZIP generation succeeds.
+- Photos and records are marked backed up only after the user clicks confirmation that the backup file was saved.
+- Cleanup jobs are stored in `hubchecklist.cleanupJobs` with statuses `DRAFT`, `COMPLETED`, `PARTIAL`, `FAILED`.
+- Cleanup only lists photos with `backedUp = true`, a `backupId`, and a confirmed backup job.
+- Cleanup requires the confirmation phrase `ลบรูปที่สำรองแล้ว`.
+- Cleanup removes local compressed image payloads when present, keeps photo metadata, and never deletes vehicle records, route rows, or audit history.
+- R2 cloud deletion is not faked. When no delete endpoint exists, the UI states cleanup is local-only.
+- Dashboard storage card shows backup warning, not-backed-up photos, eligible cleanup count, and a link to Backup/Cleanup Guard.
 
 ## Commands
 
@@ -50,5 +42,6 @@ npm run build
 10. MVP-010 Dashboard hardening and operational filters
 11. MVP-011 Export XLSX/ZIP with exact 21.6 layout
 12. MVP-012 Backup Reminder + Cleanup Guard
+13. MVP-013 Final Android QA and device readiness
 
-Cleanup Guard, production R2 backend, and storage billing automation remain future MVPs.
+Production R2 backend, cloud delete automation, app store build, and billing automation remain future work.

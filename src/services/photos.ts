@@ -29,6 +29,91 @@ export function listVehiclePhotos(): VehiclePhoto[] {
   return readPhotos().filter((photo) => !photo.deletedAt);
 }
 
+export function markPhotosBackedUp(photoIds: string[], backupId: string): VehiclePhoto[] {
+  const now = new Date().toISOString();
+  const photoIdSet = new Set(photoIds);
+  const photos = readPhotos().map((photo) => photoIdSet.has(photo.id)
+    ? { ...photo, backedUp: true, backupId, updatedAt: now }
+    : photo);
+  writePhotos(photos);
+  return photos.filter((photo) => photoIdSet.has(photo.id));
+}
+
+export interface CleanupPhotoFilters {
+  startDate?: string;
+  endDate?: string;
+  branch?: string;
+  responsibleEmployeeCode?: string;
+  olderThanDate?: string;
+}
+
+export function listCleanupEligiblePhotos(filters: CleanupPhotoFilters = {}): {
+  eligible: VehiclePhoto[];
+  blocked: VehiclePhoto[];
+} {
+  const photos = listVehiclePhotos().filter((photo) => {
+    if (filters.startDate && photo.workDate < filters.startDate) return false;
+    if (filters.endDate && photo.workDate > filters.endDate) return false;
+    if (filters.branch && filters.branch !== 'all' && photo.branch !== filters.branch) return false;
+    if (filters.responsibleEmployeeCode && photo.responsibleEmployeeCode !== filters.responsibleEmployeeCode) return false;
+    if (filters.olderThanDate && photo.workDate >= filters.olderThanDate) return false;
+    return true;
+  });
+  return {
+    eligible: photos.filter((photo) => photo.backedUp && photo.backupId && !photo.localCleaned),
+    blocked: photos.filter((photo) => !photo.backedUp || !photo.backupId || photo.localCleaned),
+  };
+}
+
+export function cleanupLocalPhotoPayloads(photoIds: string[], cleanupJobId: string, cleanedBy = 'local-user'): {
+  cleaned: VehiclePhoto[];
+  skipped: VehiclePhoto[];
+  freedBytes: number;
+} {
+  const now = new Date().toISOString();
+  const photoIdSet = new Set(photoIds);
+  let freedBytes = 0;
+  const cleaned: VehiclePhoto[] = [];
+  const skipped: VehiclePhoto[] = [];
+  const photos = readPhotos().map((photo) => {
+    if (!photoIdSet.has(photo.id)) return photo;
+    const hasLocalPayload = Boolean(photo.localObjectUrl || window.localStorage.getItem(photo.localStorageKey));
+    if (!photo.backedUp || !photo.backupId || photo.localCleaned || !hasLocalPayload) {
+      skipped.push(photo);
+      return photo;
+    }
+    window.localStorage.removeItem(photo.localStorageKey);
+    freedBytes += photo.sizeBytes || 0;
+    const updated: VehiclePhoto = {
+      ...photo,
+      localObjectUrl: undefined,
+      localCleaned: true,
+      cleanedAt: now,
+      cleanedBy,
+      cleanupJobId,
+      cloudDeleted: false,
+      updatedAt: now,
+    };
+    cleaned.push(updated);
+    return updated;
+  });
+  writePhotos(photos);
+  return { cleaned, skipped, freedBytes };
+}
+
+export function getPhotoStorageStats() {
+  const photos = listVehiclePhotos();
+  return {
+    totalPhotos: photos.length,
+    localOnlyPhotos: photos.filter((photo) => photo.uploadStatus === 'LOCAL_ONLY').length,
+    uploadedPhotos: photos.filter((photo) => photo.uploadStatus === 'UPLOADED').length,
+    backedUpPhotos: photos.filter((photo) => photo.backedUp).length,
+    notBackedUpPhotos: photos.filter((photo) => !photo.backedUp).length,
+    localCleanedPhotos: photos.filter((photo) => photo.localCleaned).length,
+    estimatedSizeBytes: photos.reduce((total, photo) => total + (photo.localCleaned ? 0 : photo.sizeBytes || 0), 0),
+  };
+}
+
 export function getPhotoByType(recordId: string, photoType: PhotoType): VehiclePhoto | null {
   return listPhotosForRecord(recordId).find((photo) => photo.photoType === photoType) ?? null;
 }
@@ -233,6 +318,10 @@ function formatPhotoAuditValue(photo: VehiclePhoto): string {
 function upsertPhoto(photo: VehiclePhoto): void {
   const photos = readPhotos().filter((item) => item.id !== photo.id);
   photos.push(photo);
+  writePhotos(photos);
+}
+
+function writePhotos(photos: VehiclePhoto[]): void {
   window.localStorage.setItem(VEHICLE_PHOTOS_KEY, JSON.stringify(photos));
 }
 

@@ -1,150 +1,116 @@
 # Project Specification
 
-## MVP-011 Export XLSX/ZIP With Exact 21.6 Layout
+## MVP-012 Backup Reminder + Cleanup Guard
 
-MVP-011 creates an offline/free export package from local records, photos, and audit history. The export is audit-ready and links workbook photo cells to exact matching photo files inside the ZIP when local image data exists.
+MVP-012 protects operators from storage growth and careless deletion. It guides backup export, records local backup history, requires user confirmation, and only cleans local photo payloads that are confirmed backed up.
 
-## ZIP Structure
+## Local Storage Keys
+
+- Backup jobs: `hubchecklist.backupJobs`
+- Cleanup jobs: `hubchecklist.cleanupJobs`
+- Vehicle photos: `hubchecklist.vehiclePhotos`
+- Vehicle records: `hubchecklist.vehicleRecords`
+- Audit history: `hubchecklist.vehicleRecordEditHistory`
+
+## Storage Warning
+
+Usage is estimated from local photo metadata `sizeBytes`; it is not exact cloud billing data.
+
+Reference limit:
+
+- 10 GB
+
+Warning levels:
+
+- 0-59%: normal
+- 60-74%: yellow, `ควรเริ่มสำรองข้อมูล`
+- 75-84%: orange, `แนะนำให้ Export Backup`
+- 85-94%: red, `ควรสำรองและเตรียมลบรูปเก่า`
+- 95%+: critical, `ต้อง Backup และ Cleanup ก่อนเพิ่มรูปจำนวนมาก`
+
+## Backup Flow
+
+1. User chooses backup filters.
+2. System previews records/photos using the MVP-011 export service.
+3. User clicks Create Backup.
+4. System generates and downloads ZIP.
+5. Backup job is stored as `GENERATED`.
+6. Browser cannot verify that the file was actually kept, so user must click confirmation.
+7. Only after confirmation:
+   - Backup job becomes `CONFIRMED`.
+   - Included photos are marked `backedUp = true`.
+   - Included photos receive `backupId`.
+   - Included records receive backup reference.
+   - Audit-like entries are created.
+
+Backup job statuses:
+
+- `DRAFT`
+- `GENERATED`
+- `CONFIRMED`
+- `FAILED`
+
+## Cleanup Guard
+
+Cleanup can only target photos where:
+
+- `backedUp = true`
+- `backupId` exists
+- matching backup job status is `CONFIRMED`
+- `localCleaned` is not already true
+
+Cleanup requires the confirmation phrase:
 
 ```text
-backup.zip
-├─ workbook.xlsx
-├─ photos/
-├─ flash-screenshots/
-└─ backup-manifest.json
+ลบรูปที่สำรองแล้ว
 ```
 
-## Workbook Sheets
+Cleanup removes only real local compressed image payloads. It keeps:
 
-`workbook.xlsx` contains:
+- vehicle records
+- route rows
+- audit history
+- photo metadata
+- backup references
 
-- `21.6`
-- `Route Detail`
-- `Photo Index`
-- `Edit History`
-- `Backup Manifest`
-- `Voided Records`
+For MVP local mode:
 
-## 21.6 Sheet
+- Remove `localStorage` photo blobs when present.
+- Clear `localObjectUrl`.
+- Set `localCleaned`, `cleanedAt`, `cleanedBy`, and `cleanupJobId`.
+- Do not set `cloudDeleted = true` unless a future real cloud delete succeeds.
+- Do not fake R2 deletion.
 
-The sheet name must be exactly `21.6`.
+Cleanup job statuses:
 
-Column blocks:
+- `DRAFT`
+- `COMPLETED`
+- `PARTIAL`
+- `FAILED`
 
-- Main drop / รถหลักพ่วงสาขา: A:K
-- Main vehicle / รถหลัก: M:U
-- Extra vehicle / รถเสริม: W:AE
-- Extra drop / รถเสริมพ่วงสาขา: AG:AQ
+## Blocking Messages
 
-Current mapping:
+The UI must make these rules clear:
 
-- `NORMAL_ROUTE` exports to Main vehicle M:U.
-- `MULTI_DROP` exports to Main drop A:K.
-- Extra vehicle and extra drop headers are prepared but no records are faked into those blocks until checklist type expansion exists.
+- `ยังลบไม่ได้ เพราะยังไม่ได้ Backup`
+- `ต้องยืนยันว่าเก็บไฟล์ Backup แล้วก่อน`
+- `รายการนี้ถูกสำรองแล้ว สามารถ Cleanup รูปได้`
+- `ระบบจะไม่ลบข้อมูลรถและประวัติการแก้ไข`
+- R2 deletion is not connected; MVP cleanup is local-only.
 
-Photo cells:
+## Dashboard Integration
 
-- Link to relative paths under `photos/` when the local photo data exists.
-- Show `ยังไม่มีรูป` when no photo exists.
-- Show `รูปอยู่ในเครื่อง / ไม่พบไฟล์ใน export` when metadata exists but local image data is not available or local-only photos are excluded.
-- Full-size images are not embedded to avoid huge XLSX files.
+TodayDashboardPage storage card shows:
 
-## Photo Folder Layout
+- backup warning level
+- photos not backed up
+- photos eligible for cleanup
+- link to BackupCleanupPage
 
-```text
-photos/
-YYYY-MM-DD/
-employeeCode_displayName/
-vehicleBarcode_recordId/
-loadingPhoto.jpg
-dropPhotoAfterDeparture.jpg
-branchDropPhoto1.jpg
-branchDropPhoto2.jpg
-```
+## Still Placeholder After MVP-012
 
-Filenames are sanitized for Windows-safe ZIP extraction.
-
-## Support Sheets
-
-### Route Detail
-
-One row per route row with work date, branch, responsible profile, vehicle barcode, record ID, route index, branch name, times, scanners, duration, distance, and seal numbers.
-
-### Photo Index
-
-One row per expected photo with:
-
-- work date
-- branch
-- responsible profile
-- vehicle barcode
-- record ID
-- checklist type
-- photo type
-- Thai photo label
-- original filename
-- exported filename
-- relative path
-- captured metadata
-- upload status
-- linked `21.6` cell
-- exists-in-ZIP flag
-- missing reason
-
-### Edit History
-
-One row per audit entry with record ID, vehicle barcode, action type, field, old value, new value, editor, timestamp, reason, and source.
-
-### Voided Records
-
-Voided records remain visible when included in export filters.
-
-### Backup Manifest
-
-The sheet and `backup-manifest.json` include:
-
-- backup ID
-- exported time
-- exported by
-- filters
-- counts
-- included record IDs
-- included photo IDs
-- missing photos
-- warnings
-- app version
-
-## Export UI
-
-ExportPage supports:
-
-- date range
-- branch
-- responsible employee code
-- responsible display name
-- status
-- vehicle barcode
-- include voided
-- include local-only photos
-- export filename
-- preview export summary
-- included-record preview
-- missing-photo preview
-- ZIP generation and download
-
-## Data Source Rules
-
-- Use local vehicle records, vehicle photos, and audit history first.
-- Work without Supabase env keys.
-- Work without R2 signed upload endpoint.
-- Do not fake missing photos.
-- Do not fake Flash screenshots.
-- Include Flash HTML snapshots only if local snapshot data exists.
-
-## Still Placeholder After MVP-011
-
-- Backup Reminder
-- Cleanup Guard
-- Production R2 backend
+- Production R2 delete backend
+- Real cloud cleanup success
+- Android final QA
+- App store build
 - Storage billing automation
-- Cloud cleanup/delete flow

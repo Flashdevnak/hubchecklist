@@ -2,6 +2,7 @@ import { ClipboardCheck, Edit3, History, ImagePlus, Search, UserCog } from 'luci
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import { formatBytes as formatBackupBytes, getBackupCleanupSummary } from '../services/backupCleanup';
 import {
   type DashboardDateMode,
   type DashboardSortMode,
@@ -59,6 +60,7 @@ export default function TodayDashboardPage() {
   const [sortMode, setSortMode] = useState<DashboardSortMode>('latest');
   const vehicleStorage = getVehicleRecordStorageStatus();
   const photoStorage = getPhotoStorageMode();
+  const backupSummary = getBackupCleanupSummary();
 
   useEffect(() => {
     setRecords(listVehicleRecords());
@@ -233,8 +235,15 @@ export default function TodayDashboardPage() {
           <StatusLine label="Uploaded photo count" value={String(allSummary.uploadedPhotos)} />
           <StatusLine label="Upload failed count" value={String(allSummary.uploadFailedPhotos)} />
           <StatusLine label="Estimated local photo size" value={formatBytes(allSummary.estimatedLocalPhotoBytes)} />
+          <StatusLine label="Backup warning" value={`${backupSummary.warningLevel}: ${backupSummary.warningMessage}`} />
+          <StatusLine label="Photos not backed up" value={String(backupSummary.photosNotBackedUp)} />
+          <StatusLine label="Eligible for cleanup" value={`${backupSummary.photosEligibleForCleanup} / ${formatBackupBytes(backupSummary.estimatedPhotoStorageBytes)}`} />
         </div>
-        <p className="scan-message warning">Export/Backup จะทำใน MVP-011/MVP-012</p>
+        <div className="scan-actions">
+          <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/backup-cleanup'; }}>
+            <span>Backup / Cleanup Guard</span>
+          </PrimaryButton>
+        </div>
       </article>
 
       <section className="record-card-grid">

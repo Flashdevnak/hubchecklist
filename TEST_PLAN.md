@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-011
+## MVP-012
 
-Goal: prove the app can create an audit-ready offline `backup.zip` with an exact `21.6` workbook layout, support sheets, manifest, and photo links without fake cloud or missing-photo success.
+Goal: prove backup reminders, backup job history, user confirmation, and cleanup guard protect local photo payloads without deleting business records or faking cloud deletion.
 
 Commands:
 
@@ -14,33 +14,35 @@ npm run build
 
 Manual checks:
 
-- Open ExportPage and confirm it is a working export UI.
-- Filter by date range, branch, responsible employee code/display name, status, barcode, include voided, and include local-only photos.
-- Preview export summary and confirm record, photo, voided, missing-photo, and warning counts.
-- Generate and download `backup.zip`.
-- Extract ZIP and confirm `workbook.xlsx`, `backup-manifest.json`, `photos/`, and `flash-screenshots/` exist.
-- Open `workbook.xlsx` and confirm sheet `21.6` is named exactly `21.6`.
-- Confirm `21.6` has Main drop A:K, Main vehicle M:U, Extra vehicle W:AE, and Extra drop AG:AQ blocks.
-- Confirm `NORMAL_ROUTE` records appear in M:U.
-- Confirm `MULTI_DROP` records appear in A:K.
-- Confirm photo cells link to matching files under `photos/YYYY-MM-DD/employeeCode_displayName/vehicleBarcode_recordId/`.
-- Confirm missing photos show `ยังไม่มีรูป`.
-- Confirm Photo Index includes each expected photo, relative path, linked 21.6 cell, existence flag, and missing reason.
-- Confirm Route Detail includes route rows.
-- Confirm Edit History includes audit entries.
-- Confirm Voided Records includes voided records when `includeVoided` is checked.
-- Confirm Backup Manifest sheet and `backup-manifest.json` include filters, counts, included record IDs, included photo IDs, missing photos, warnings, app version.
-- Confirm local-only photos are exported when local compressed image data exists and includeLocalOnlyPhotos is checked.
-- Confirm metadata-only photos without local data are reported missing, not faked.
-- Confirm Flash screenshots/html are only included when local snapshot data exists.
-- Confirm app works without Supabase env keys and without R2 signed upload endpoint.
+- Open BackupCleanupPage and confirm storage summary is visible.
+- Confirm estimated usage is labelled as an estimate from local data.
+- Confirm warning levels change at 60%, 75%, 85%, and 95% of the 10 GB reference.
+- Preview backup filters and included records/photos.
+- Create Backup and confirm ZIP download is triggered.
+- Confirm backup job appears as `GENERATED`.
+- Confirm photos are not marked backed up before user confirmation.
+- Click `ยืนยันว่าเก็บไฟล์ Backup แล้ว`.
+- Confirm backup job changes to `CONFIRMED`.
+- Confirm included photos have `backedUp = true` and `backupId`.
+- Confirm included records keep metadata and get backup reference.
+- Confirm cleanup preview lists only confirmed backed-up photos as eligible.
+- Confirm unbacked-up photos are blocked.
+- Try cleanup without confirmation phrase and confirm it fails.
+- Type `ลบรูปที่สำรองแล้ว` and run cleanup.
+- Confirm local image payload is removed only when real local data exists.
+- Confirm photo metadata remains.
+- Confirm vehicle records, route rows, and audit history remain searchable.
+- Confirm cleanup job history is visible.
+- Confirm audit-like entries are created for backup confirmation and cleanup.
+- Confirm Dashboard storage card links to BackupCleanupPage.
+- Confirm app works without Supabase keys and without R2 signed upload/delete endpoint.
+- Confirm no UI claims R2 cloud delete success.
 - Confirm mobile layout has no horizontal overflow.
-- Confirm Cleanup Guard and photo deletion are not implemented in this MVP.
 
 ## Future Test Areas
 
-### MVP-012 Backup Reminder + Cleanup Guard
+### MVP-013 Final Android QA and device readiness
 
-- Remind operators to export before cleanup.
-- Block cleanup unless a valid backup package exists.
-- Do not delete cloud/local photos before backup success.
+- Device smoke test on Samsung S23 FE, Galaxy Tab A7 Lite, and iPad browser fallback.
+- Android WebView flow readiness checks.
+- Final offline/local-mode checks.

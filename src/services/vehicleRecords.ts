@@ -223,6 +223,16 @@ export function saveVehicleRecordLocal(record: VehicleRecord): void {
   writeRecords(records);
 }
 
+export function markVehicleRecordsBackedUp(recordIds: string[], backupId: string): VehicleRecord[] {
+  const now = new Date().toISOString();
+  const recordIdSet = new Set(recordIds);
+  const records = readRecords().map((record) => recordIdSet.has(record.id)
+    ? { ...record, backedUp: true, backupId, updatedAt: now }
+    : record);
+  writeRecords(records);
+  return records.filter((record) => recordIdSet.has(record.id));
+}
+
 export async function syncVehicleRecordToSupabase(record: VehicleRecord): Promise<{ synced: boolean; message: string }> {
   if (!supabaseConfig.isConfigured || !supabase) {
     return { synced: false, message: 'บันทึกในเครื่อง / ยังไม่ได้เชื่อม Supabase' };
