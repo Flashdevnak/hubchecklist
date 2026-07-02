@@ -2,6 +2,7 @@ import { ClipboardCheck, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import { getPhotoCompletionStatus } from '../services/photos';
 import { getVehicleRecordStorageStatus, listVehicleRecords } from '../services/vehicleRecords';
 import type { VehicleRecord } from '../types';
 
@@ -19,7 +20,8 @@ export default function TodayDashboardPage() {
   const counts = useMemo(() => ({
     total: records.length,
     ready: records.filter((record) => record.status === 'READY_FOR_PHOTO').length,
-    review: records.filter((record) => record.status === 'NEED_REVIEW').length,
+    pending: records.filter((record) => record.status === 'PENDING_PHOTO').length,
+    complete: records.filter((record) => record.status === 'COMPLETE').length,
     voided: records.filter((record) => record.status === 'VOIDED').length,
   }), [records]);
 
@@ -28,7 +30,8 @@ export default function TodayDashboardPage() {
       <section className="stat-grid">
         <article className="feature-card"><strong>{counts.total}</strong><span>total</span></article>
         <article className="feature-card"><strong>{counts.ready}</strong><span>READY_FOR_PHOTO</span></article>
-        <article className="feature-card"><strong>{counts.review}</strong><span>NEED_REVIEW</span></article>
+        <article className="feature-card"><strong>{counts.pending}</strong><span>PENDING_PHOTO</span></article>
+        <article className="feature-card"><strong>{counts.complete}</strong><span>COMPLETE</span></article>
         <article className="feature-card"><strong>{counts.voided}</strong><span>VOIDED</span></article>
       </section>
 
@@ -48,6 +51,8 @@ export default function TodayDashboardPage() {
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">ทั้งหมด</option>
               <option value="READY_FOR_PHOTO">READY_FOR_PHOTO</option>
+              <option value="PENDING_PHOTO">PENDING_PHOTO</option>
+              <option value="COMPLETE">COMPLETE</option>
               <option value="NEED_REVIEW">NEED_REVIEW</option>
               <option value="VOIDED">VOIDED</option>
             </select>
@@ -63,6 +68,9 @@ export default function TodayDashboardPage() {
               <StatusBadge label={record.status} tone={record.status === 'VOIDED' ? 'danger' : 'success'} />
             </div>
             <p>{record.driverPhone} / {record.responsibleEmployeeCode} {record.responsibleDisplayName}</p>
+            <p className="muted-note">
+              รูปถ่าย {getPhotoCompletionStatus(record).completeCount}/{getPhotoCompletionStatus(record).requiredCount}
+            </p>
             <p className="muted-note">{record.routeSummary || record.sourceUrl}</p>
             <PrimaryButton onClick={() => { window.location.hash = `/checklist?recordId=${record.id}`; }}>
               <ClipboardCheck size={20} />

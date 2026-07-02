@@ -439,7 +439,7 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
 }
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .stat-grid .feature-card {
@@ -487,6 +487,56 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
 .record-card {
   display: grid;
   gap: 12px;
+}
+.photo-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.photo-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  background: #f8fafc;
+}
+.photo-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.photo-card img,
+.photo-empty {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  object-fit: cover;
+}
+.photo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 900;
+}
+.photo-input-button {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--charcoal);
+  font-weight: 900;
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+.photo-input-button input {
+  display: none;
 }
 
 @media (max-width: 900px) {

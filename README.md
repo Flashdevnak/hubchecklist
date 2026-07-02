@@ -2,56 +2,48 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-MVP-007 adds local-first vehicle record creation, duplicate handling, checklist record preview, dashboard counts, basic edit history, and void flow. It does **not** implement R2 upload, photo upload, export, backup, cleanup, or final 21.6 export.
+MVP-008 adds checklist photo capture/upload foundation, client-side compression, local photo metadata, honest R2 signed-upload behavior, and photo completion status logic. It does **not** implement final Excel export, backup, cleanup, or production storage billing automation.
 
-## Final Product Goal
+## MVP-008 Behavior
 
-Staff do not know in advance how many vehicles will come each day. The system must let staff create records on demand from real scans, not from a daily pre-imported list.
+- Required photos come from record `checklistType`.
+- `NORMAL_ROUTE`: `loadingPhoto`, `dropPhotoAfterDeparture`.
+- `MULTI_DROP`: `branchDropPhoto1`, `branchDropPhoto2`, `dropPhotoAfterDeparture`.
+- Images are compressed in the browser with canvas before saving or upload attempt.
+- Local photo metadata is stored in `hubchecklist.vehiclePhotos`.
+- Compressed preview data is stored locally for MVP use.
+- If `VITE_R2_SIGNED_UPLOAD_ENDPOINT` is missing, the app stays in local-only mode and shows `เก็บรูปในเครื่อง / ยังไม่ได้เชื่อม R2`.
+- Frontend never uses R2 secret keys.
+- Upload status is only `UPLOADED` after a signed upload URL flow returns and the upload succeeds.
+- Record status changes from `READY_FOR_PHOTO` to `PENDING_PHOTO`, then `COMPLETE` when all required photos exist.
+- `VOIDED` records stay unchanged.
 
-## Current MVP Foundations
+## Environment
 
-- MVP-002: Supabase schema/auth/roles/RLS draft
-- MVP-004: Full-screen QR scan UI foundation
-- MVP-005: OCR phone preview/edit foundation
-- MVP-006: Android WebView Flash automation foundation
-- MVP-007: Vehicle record creation and duplicate handling
+Frontend placeholders:
 
-## MVP-007 Behavior
-
-- Reads Flash result draft from `hubchecklist.flashProofResultDraft`
-- Creates local vehicle records first
-- Uses `hubchecklist.vehicleRecords` for local record storage
-- Uses `hubchecklist.vehicleRecordEditHistory` for audit entries
-- Detects exact duplicate records
-- Detects same-day same-barcode conflicts when phone/route differs
-- Allows opening existing record, creating a new trip, or voiding wrong records
-- Never hard-deletes records by default
-- Keeps voided records searchable
-- Determines default checklist type:
-  - `MULTI_DROP` when route rows length is greater than 1
-  - `NORMAL_ROUTE` otherwise
-- Sets required photo placeholders for MVP-008
-- Shows local/Supabase storage mode honestly
-
-## Supabase Behavior
-
-The app works without Supabase keys. If Supabase URL and anon key are missing, records are saved locally and the UI shows:
-
-```text
-บันทึกในเครื่อง / ยังไม่ได้เชื่อม Supabase
+```bash
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_R2_PUBLIC_BASE_URL=
+VITE_R2_SIGNED_UPLOAD_ENDPOINT=
 ```
 
-If Supabase is configured, the service attempts a safe insert path and records the real result. It does not expose the service role key and does not claim sync success unless Supabase returns success.
+Server-only placeholders, never expose in frontend:
 
-## Install
+```bash
+SUPABASE_SERVICE_ROLE_KEY=placeholder-server-only-never-expose-to-frontend
+R2_ACCOUNT_ID=placeholder-server-only
+R2_ACCESS_KEY_ID=placeholder-server-only
+R2_SECRET_ACCESS_KEY=placeholder-server-only
+R2_BUCKET_VEHICLE_PHOTOS=placeholder-server-only
+```
+
+## Commands
 
 ```bash
 npm install
-```
-
-## Build
-
-```bash
+npx tsc -b
 npm run build
 ```
 
@@ -64,13 +56,7 @@ npm run build
 5. MVP-005 OCR phone + preview/edit
 6. MVP-006 Android WebView Flash automation
 7. MVP-007 Vehicle record creation + duplicate handling
-8. MVP-008 Checklist photos + compression + R2 upload
-9. MVP-009 Edit / redo / void / audit history hardening
-10. MVP-010 Dashboard hardening
-11. MVP-011 Export XLSX/ZIP with exact 21.6 layout
-12. MVP-012 Backup Reminder + Cleanup Guard
-13. MVP-013 QA mobile layout + Android build
+8. MVP-008 Checklist photos + compression + R2 upload foundation
+9. MVP-009 Edit redo void audit hardening
 
-## Important Warning
-
-Photo upload, export, backup, and cleanup remain placeholders until their MVPs. Do not mark future features as complete unless they are implemented and QA passed.
+Export, backup, and cleanup remain future MVPs.

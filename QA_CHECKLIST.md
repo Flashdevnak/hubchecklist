@@ -1,29 +1,27 @@
 # QA Checklist
 
-## MVP-007 required checks
+## MVP-008 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] User can create vehicle record from `hubchecklist.flashProofResultDraft`
-- [ ] Vehicle record persists locally after refresh
-- [ ] App works without Supabase env keys
-- [ ] App shows `บันทึกในเครื่อง / ยังไม่ได้เชื่อม Supabase` in local-only mode
-- [ ] App does not fake Supabase sync success
-- [ ] Duplicate same workDate + branch + vehicleBarcode + driverPhone + sourceUrl is detected
-- [ ] Same barcode but different phone/route shows stronger warning
-- [ ] User can open existing duplicate
-- [ ] User can create new trip with confirmation
-- [ ] User can void record with reason
-- [ ] Voided record remains searchable
-- [ ] Basic edit writes edit history
-- [ ] VehicleChecklistPage shows created record summary
-- [ ] VehicleChecklistPage keeps photos as MVP-008 placeholder
-- [ ] Dashboard lists local vehicle records
-- [ ] Dashboard counts total, READY_FOR_PHOTO, NEED_REVIEW, and VOIDED
-- [ ] Dashboard can filter/search by barcode, phone, responsible, or status
+- [ ] VehicleChecklistPage shows required photo checklist
+- [ ] NORMAL_ROUTE requires `loadingPhoto` and `dropPhotoAfterDeparture`
+- [ ] MULTI_DROP requires `branchDropPhoto1`, `branchDropPhoto2`, and `dropPhotoAfterDeparture`
+- [ ] User can add/upload/take photo for each required type
+- [ ] Photo is compressed before saving/upload attempt
+- [ ] UI shows original size and compressed size
+- [ ] Photo preview displays correctly
+- [ ] Retake photo works
+- [ ] Missing photos keep record `PENDING_PHOTO`
+- [ ] All required photos present mark record `COMPLETE`
+- [ ] Dashboard reflects `PENDING_PHOTO` and `COMPLETE` counts
+- [ ] R2 missing config shows honest local-only mode
+- [ ] R2 upload is not faked
+- [ ] R2 secrets are not exposed in frontend
+- [ ] App works without R2 config
 - [ ] Mobile layout has no horizontal overflow
-- [ ] No R2/photo/export/backup feature is falsely marked complete
+- [ ] Export/backup/cleanup remain clearly placeholder
 
 ## Future QA gates
 

@@ -156,7 +156,15 @@ export async function syncVehicleRecordToSupabase(record: VehicleRecord): Promis
       vehicle_barcode: record.vehicleBarcode,
       driver_phone: record.driverPhone,
       flash_url: record.sourceUrl,
-      status: record.status === 'VOIDED' ? 'voided' : record.status === 'NEED_REVIEW' ? 'need_review' : 'ready_for_photo',
+      status: record.status === 'VOIDED'
+        ? 'voided'
+        : record.status === 'NEED_REVIEW'
+          ? 'need_review'
+          : record.status === 'COMPLETE'
+            ? 'complete'
+            : record.status === 'PENDING_PHOTO'
+              ? 'pending_photo'
+              : 'ready_for_photo',
     });
 
     if (error) {
@@ -245,7 +253,7 @@ function createRecord(draft: VehicleRecordDraft): VehicleRecord {
       createdAt: now,
     })),
     checklistType,
-    requiredPhotos: getRequiredPhotos(checklistType),
+    requiredPhotos: getRequiredPhotosForChecklist(checklistType),
     flashHtmlSnapshot: draft.flashHtmlSnapshot,
     status: validateRecordDraft(draft).length === 0 ? 'READY_FOR_PHOTO' : 'NEED_REVIEW',
     duplicateKey: createDuplicateKey(draft),
@@ -261,7 +269,7 @@ function getChecklistType(rows: unknown[]): ChecklistType {
   return rows.length > 1 ? 'MULTI_DROP' : 'NORMAL_ROUTE';
 }
 
-function getRequiredPhotos(checklistType: ChecklistType): string[] {
+export function getRequiredPhotosForChecklist(checklistType: ChecklistType): string[] {
   return checklistType === 'MULTI_DROP'
     ? ['branchDropPhoto1', 'branchDropPhoto2', 'dropPhotoAfterDeparture']
     : ['loadingPhoto', 'dropPhotoAfterDeparture'];

@@ -2,15 +2,26 @@ import { ArrowLeft, ClipboardCheck, PencilLine, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import {
+  getPhotoByType,
+  getPhotoCompletionStatus,
+  getPhotoStorageMode,
+  PHOTO_TYPE_LABELS,
+  retakePhoto,
+} from '../services/photos';
 import { getVehicleRecordById, voidVehicleRecord } from '../services/vehicleRecords';
-import type { VehicleRecord } from '../types';
+import type { PhotoType, VehiclePhoto, VehicleRecord } from '../types';
 
 export default function VehicleChecklistPage() {
   const [record, setRecord] = useState<VehicleRecord | null>(null);
+  const [photos, setPhotos] = useState<Record<string, VehiclePhoto | null>>({});
+  const [photoMessage, setPhotoMessage] = useState('');
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('recordId');
-    setRecord(id ? getVehicleRecordById(id) : null);
+    const found = id ? getVehicleRecordById(id) : null;
+    setRecord(found);
+    if (found) refreshPhotos(found);
   }, []);
 
   const handleVoid = () => {
@@ -19,6 +30,30 @@ export default function VehicleChecklistPage() {
     if (!reason) return;
     const next = voidVehicleRecord(record.id, reason);
     if (next) setRecord(next);
+  };
+
+  const refreshPhotos = (nextRecord: VehicleRecord) => {
+    const nextPhotos: Record<string, VehiclePhoto | null> = {};
+    nextRecord.requiredPhotos.forEach((type) => {
+      nextPhotos[type] = getPhotoByType(nextRecord.id, type as PhotoType);
+    });
+    setPhotos(nextPhotos);
+  };
+
+  const handlePhotoSelected = async (photoType: PhotoType, file: File | undefined) => {
+    if (!record || !file) return;
+    try {
+      setPhotoMessage('กำลังบีบอัดและบันทึกรูป');
+      await retakePhoto(record, photoType, file);
+      const updated = getVehicleRecordById(record.id);
+      if (updated) {
+        setRecord(updated);
+        refreshPhotos(updated);
+      }
+      setPhotoMessage(getPhotoStorageMode().message);
+    } catch (error) {
+      setPhotoMessage(error instanceof Error ? error.message : 'บันทึกรูปไม่สำเร็จ');
+    }
   };
 
   if (!record) {
@@ -41,6 +76,9 @@ export default function VehicleChecklistPage() {
       </div>
     );
   }
+
+  const completion = getPhotoCompletionStatus(record);
+  const storageMode = getPhotoStorageMode();
 
   return (
     <div className="record-page">
@@ -65,17 +103,53 @@ export default function VehicleChecklistPage() {
             <span>routeRows</span><strong>{record.routeRows.length}</strong>
             <span>checklistType</span><strong>{record.checklistType}</strong>
             <span>requiredPhotos</span><strong>{record.requiredPhotos.join(', ')}</strong>
+            <span>photo progress</span><strong>{completion.completeCount}/{completion.requiredCount}</strong>
             <span>sync</span><strong>{record.syncMessage || record.syncStatus}</strong>
             {record.voidReason ? <><span>voidReason</span><strong>{record.voidReason}</strong></> : null}
           </div>
         </article>
 
         <article className="feature-card">
-          <h2>รูปถ่าย Checklist</h2>
-          <p className="scan-message warning">การถ่ายรูปจะทำใน MVP-008</p>
-          <ul className="check-list">
-            {record.requiredPhotos.map((photo) => <li key={photo}>{photo}</li>)}
-          </ul>
+          <div className="scan-result-heading">
+            <h2>รูปถ่าย Checklist</h2>
+            <StatusBadge label={storageMode.mode === 'local_only' ? 'Local photos' : 'R2 signed upload'} tone={storageMode.mode === 'local_only' ? 'warning' : 'success'} />
+          </div>
+          <p className={completion.isComplete ? 'scan-message success' : 'scan-message warning'}>
+            {completion.isComplete ? 'ถ่ายครบแล้ว' : `ยังขาดรูป: ${completion.missingTypes.map((type) => PHOTO_TYPE_LABELS[type]).join(', ')}`}
+          </p>
+          <p className="muted-note">{photoMessage || storageMode.message}</p>
+          <div className="photo-card-grid">
+            {completion.required.map((photoType) => {
+              const photo = photos[photoType];
+              return (
+                <article className="photo-card" key={photoType}>
+                  <div>
+                    <strong>{PHOTO_TYPE_LABELS[photoType]}</strong>
+                    <StatusBadge
+                      label={photo ? photo.uploadStatus === 'UPLOADED' ? 'อัปโหลดแล้ว' : photo.uploadStatus === 'LOCAL_ONLY' ? 'เก็บในเครื่อง' : 'ถ่ายแล้ว' : 'ยังไม่มีรูป'}
+                      tone={photo ? 'success' : 'warning'}
+                    />
+                  </div>
+                  {photo?.localObjectUrl ? <img src={photo.localObjectUrl} alt={PHOTO_TYPE_LABELS[photoType]} /> : <div className="photo-empty">ยังไม่มีรูป</div>}
+                  {photo ? (
+                    <p className="muted-note">
+                      เดิม {(photo.originalSizeBytes / 1024).toFixed(0)} KB / บีบอัด {(photo.sizeBytes / 1024).toFixed(0)} KB<br />
+                      {photo.width}x{photo.height} / {photo.uploadError ?? storageMode.message}
+                    </p>
+                  ) : null}
+                  <label className="photo-input-button">
+                    <span>{photo ? 'ถ่ายใหม่ / Retake' : 'ถ่ายหรืออัปโหลดรูป'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(event) => handlePhotoSelected(photoType, event.target.files?.[0])}
+                    />
+                  </label>
+                </article>
+              );
+            })}
+          </div>
         </article>
       </section>
 

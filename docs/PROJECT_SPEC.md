@@ -1,91 +1,48 @@
 # Project Specification
 
-## Final Direction
+## MVP-008 Checklist Photos
 
-Hub Vehicle Proof Capture is an Android-first mobile system with PWA fallback. Records are created from real scans on demand. The app must not require daily vehicle import, known vehicle count, or fixed routes.
+MVP-008 implements checklist photo capture, compression, local metadata storage, R2 signed-upload foundation, and record photo completion logic.
 
-## MVP-007 Vehicle Record Creation
+## Photo Rules
 
-Implemented foundation:
+`NORMAL_ROUTE` requires:
 
-- Local-first vehicle record service in `src/services/vehicleRecords.ts`
-- Record creation from `hubchecklist.flashProofResultDraft`
-- Local record persistence in `hubchecklist.vehicleRecords`
-- Edit history in `hubchecklist.vehicleRecordEditHistory`
-- Duplicate detection:
-  - Exact duplicate: same workDate + branch + vehicleBarcode + driverPhone + sourceUrl
-  - Conflict: same workDate + branch + vehicleBarcode but different phone or route summary
-- Duplicate actions:
-  - Open existing
-  - Create new trip
-  - Void wrong record
-  - Cancel
-- Void flow requires reason and never hard-deletes
-- Default checklist type:
-  - `NORMAL_ROUTE`
-  - `MULTI_DROP`
-- Required photo placeholders for MVP-008
-- Dashboard counts/search/filter
-- Basic edit page for driver phone, driver name, company, route summary, and checklist type
-- Supabase sync path is safe/optional and does not fake success
+- `loadingPhoto`
+- `dropPhotoAfterDeparture`
 
-Vehicle records include:
+`MULTI_DROP` requires:
 
-- id
-- workDate
-- branch
-- responsibleEmployeeCode
-- responsibleDisplayName
-- sourceUrl
-- vehicleBarcode
-- driverPhone
-- driverName
-- companyName
-- routeSummary
-- firstBranch
-- lastBranch
-- plannedDepartureTime
-- actualDepartureTime
-- checklistType
-- requiredPhotos
-- flashPageStatus
-- flashHtmlSnapshot
-- ocrRawText
-- ocrConfidence
-- status
-- duplicateKey
-- backedUp
-- backupId
-- voidReason
-- createdAt
-- updatedAt
+- `branchDropPhoto1`
+- `branchDropPhoto2`
+- `dropPhotoAfterDeparture`
 
-Still placeholders after MVP-007:
+Thai labels:
 
-- Photo capture and upload
-- R2 upload
-- Exact 21.6 export
-- Backup execution
-- Cleanup execution
-- Final dashboard hardening
+- `loadingPhoto`: รูปถ่ายการบรรทุก
+- `dropPhotoAfterDeparture`: รูป Drop หลังปล่อยรถ
+- `branchDropPhoto1`: รูปสาขาที่พ่วง 1
+- `branchDropPhoto2`: รูปสาขาที่พ่วง 2
 
-## Exact Backup Requirement
+## Storage
 
-Backup ZIP must contain:
+- Photo metadata key: `hubchecklist.vehiclePhotos`
+- Compressed local preview key prefix: `hubchecklist.vehiclePhotoBlob.`
+- Client compression uses canvas.
+- R2 upload requires a signed upload endpoint.
+- Frontend must not use R2 secret keys.
+- Missing R2 config keeps local-only mode.
 
-```text
-backup.zip
-├─ workbook.xlsx
-├─ photos/
-├─ flash-screenshots/
-└─ backup-manifest.json
-```
+## Record Status
 
-`workbook.xlsx` must contain sheet `21.6` with original reference-style column blocks:
+- `READY_FOR_PHOTO`: record created but no photo yet.
+- `PENDING_PHOTO`: some required photos are missing.
+- `COMPLETE`: all required photos exist locally or uploaded.
+- `VOIDED`: unchanged by photo logic.
 
-- A:K รถหลักพ่วงสาขา
-- M:U รถหลัก
-- W:AE รถเสริม
-- AG:AQ รถเสริมพ่วงสาขา
+Still placeholders after MVP-008:
 
-Photo cells must hyperlink to the matching photo for the exact vehicle. Users must not manually hunt for photos.
+- Final Excel export
+- Backup ZIP
+- Cleanup Guard
+- Production storage billing automation

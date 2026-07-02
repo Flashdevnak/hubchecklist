@@ -11,7 +11,7 @@ export type {
   RouteRow as DbRouteRow,
   StorageUsageSnapshot,
   UserRole,
-  VehiclePhoto,
+  VehiclePhoto as DbVehiclePhoto,
   VehiclePhotoKind,
   VehicleRecord as DbVehicleRecord,
   VehicleRecordStatus as DbVehicleRecordStatus,
@@ -124,9 +124,13 @@ export interface ValidationResult {
   warning?: string;
 }
 
-export type VehicleRecordStatus = 'READY_FOR_PHOTO' | 'NEED_REVIEW' | 'VOIDED';
+export type VehicleRecordStatus = 'READY_FOR_PHOTO' | 'PENDING_PHOTO' | 'COMPLETE' | 'NEED_REVIEW' | 'VOIDED';
 
 export type ChecklistType = 'NORMAL_ROUTE' | 'MULTI_DROP';
+
+export type PhotoType = 'loadingPhoto' | 'dropPhotoAfterDeparture' | 'branchDropPhoto1' | 'branchDropPhoto2';
+
+export type PhotoUploadStatus = 'LOCAL_ONLY' | 'PENDING_UPLOAD' | 'UPLOADING' | 'UPLOADED' | 'UPLOAD_FAILED';
 
 export interface RouteRow {
   id: string;
@@ -181,6 +185,38 @@ export interface VehicleRecord {
   updatedAt: string;
   syncStatus: 'local_only' | 'pending' | 'synced' | 'error';
   syncMessage?: string;
+}
+
+export interface VehiclePhoto {
+  id: string;
+  recordId: string;
+  vehicleBarcode: string;
+  workDate: string;
+  branch: string;
+  responsibleEmployeeCode: string;
+  responsibleDisplayName: string;
+  photoType: PhotoType;
+  objectKey?: string;
+  localObjectUrl?: string;
+  localStorageKey: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  originalSizeBytes: number;
+  width: number;
+  height: number;
+  capturedAt: string;
+  capturedBy: string;
+  uploadStatus: PhotoUploadStatus;
+  uploadError?: string;
+  backedUp: boolean;
+  backupId?: string;
+  cloudDeleted: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  replacedPhotoId?: string;
 }
 
 export interface VehicleRecordDraft {

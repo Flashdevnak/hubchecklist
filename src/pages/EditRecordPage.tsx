@@ -2,7 +2,7 @@ import { Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
-import { getEditHistory, getVehicleRecordById, updateVehicleRecord } from '../services/vehicleRecords';
+import { getEditHistory, getRequiredPhotosForChecklist, getVehicleRecordById, updateVehicleRecord } from '../services/vehicleRecords';
 import type { ChecklistType, EditHistoryEntry, VehicleRecord } from '../types';
 
 export default function EditRecordPage() {
@@ -42,6 +42,7 @@ export default function EditRecordPage() {
       companyName: form.companyName,
       routeSummary: form.routeSummary,
       checklistType: form.checklistType,
+      requiredPhotos: getRequiredPhotosForChecklist(form.checklistType),
     }, form.reason);
     if (updated) {
       setRecord(updated);
@@ -65,6 +66,9 @@ export default function EditRecordPage() {
             <label><span>companyName</span><input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} /></label>
             <label><span>checklistType</span><select value={form.checklistType} onChange={(event) => setForm({ ...form, checklistType: event.target.value as ChecklistType })}><option value="NORMAL_ROUTE">NORMAL_ROUTE</option><option value="MULTI_DROP">MULTI_DROP</option></select></label>
           </div>
+          {form.checklistType !== record.checklistType ? (
+            <p className="scan-message warning">การเปลี่ยน checklistType จะเปลี่ยนรายการรูปที่ต้องถ่าย</p>
+          ) : null}
           <div className="scan-form">
             <label htmlFor="route-summary">routeSummary</label>
             <textarea id="route-summary" value={form.routeSummary} onChange={(event) => setForm({ ...form, routeSummary: event.target.value })} />
