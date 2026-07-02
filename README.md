@@ -2,7 +2,7 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-This repository is prepared for GitHub and Codex MVP development. MVP-001 contains the app skeleton only. MVP-002 adds the Supabase database/auth foundation, role model, and RLS draft. It does **not** claim QR, OCR, Flash WebView automation, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
+This repository is prepared for GitHub and Codex MVP development. MVP-004 adds the full-screen QR scan mobile UI foundation and manual QR/barcode parsing. It does **not** claim real camera QR scanning, OCR, Flash WebView automation, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
 
 ## Final product goal
 
@@ -30,7 +30,9 @@ Staff do not know in advance how many vehicles will come each day. The system mu
 - Supabase client configuration guard
 - Supabase migration draft for Auth/Postgres roles and RLS
 
-MVP-002 database/auth foundation includes:
+## Implemented MVP foundations
+
+MVP-002 database/auth foundation:
 
 - Supabase Free target for Auth/Postgres/Realtime/API
 - `staff`, `supervisor`, and `admin` roles
@@ -38,11 +40,23 @@ MVP-002 database/auth foundation includes:
 - RLS draft policies where staff can view/create own records, supervisors can view branch records, and admins can manage all records
 - Safe missing-env behavior that shows `Supabase ยังไม่ได้ตั้งค่า` instead of crashing
 
+MVP-004 QR scan UI foundation:
+
+- Full-screen mobile-first scan page with a large camera placeholder frame
+- Manual QR URL or raw barcode input
+- Flash proof URL parsing from the last URL path segment
+- Vehicle barcode normalization and validation
+- Local scan draft persistence in `localStorage`
+- Scan preview page showing barcode, source URL, responsible profile, and an MVP-005 OCR placeholder note
+- Safe camera scanner messaging when direct browser QR scanning is unavailable or not yet connected
+
 Future MVPs will add:
 
-- Cloudflare R2 Free for photos/screenshots/backups
-- Android native WebView plugin for Flash auto-fill
+- Responsible profile production flow if not already present in the target branch
+- Real camera QR scanner integration
 - OCR phone reading
+- Android native WebView plugin for Flash auto-fill
+- Cloudflare R2 Free for photos/screenshots/backups
 - Exact 21.6 XLSX/ZIP export
 - Backup Reminder + Cleanup Guard
 
@@ -93,6 +107,22 @@ MVP-002 migration files live in `supabase/migrations/`.
 
 The first migration creates the schema, indexes, update triggers, role helpers, and RLS draft policies. Apply it to a Supabase project with the Supabase CLI in a later environment setup step. This repository does not include real production secrets.
 
+## QR scan UI
+
+Use the Scan page to manually test MVP-004:
+
+```text
+https://api.flashexpress.com/gw/nws/web/proof/go/NAK1R7XJ45
+```
+
+Expected parsed barcode:
+
+```text
+NAK1R7XJ45
+```
+
+Raw barcode input such as `NAK1R7XJ45` is also accepted. Continuing requires a valid barcode and an active responsible profile from the profile flow. The camera button is a scanner integration foundation only and does not mark real camera scanning complete.
+
 ## Capacitor Android
 
 After `npm install` and `npm run build`:
@@ -120,24 +150,6 @@ This MVP includes Capacitor config only. The native Android project is generated
 11. MVP-011 Export XLSX/ZIP with exact 21.6 layout
 12. MVP-012 Backup Reminder + Cleanup Guard
 13. MVP-013 QA mobile layout + Android build
-
-## GitHub push steps
-
-```bash
-git init
-git add .
-git commit -m "MVP-001 project skeleton and Capacitor foundation"
-git branch -M main
-git remote add origin https://github.com/Flashdevnak/hubchecklist.git
-git push -u origin main
-```
-
-If the remote already exists:
-
-```bash
-git remote set-url origin https://github.com/Flashdevnak/hubchecklist.git
-git push -u origin main
-```
 
 ## Important warning
 

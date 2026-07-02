@@ -31,7 +31,7 @@ const pageMap: Record<AppRoute, JSX.Element> = {
 };
 
 function getRouteFromHash(): AppRoute {
-  const value = window.location.hash.replace('#/', '') as AppRoute;
+  const value = window.location.hash.replace('#/', '').split('?')[0] as AppRoute;
   return pages.some((page) => page.route === value) ? value : 'dashboard';
 }
 

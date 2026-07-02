@@ -39,24 +39,38 @@ Implemented foundation:
 - `public.users` profile table linked to `auth.users`.
 - Branch-aware role model: `staff`, `supervisor`, `admin`.
 - Tables for branches, responsible profiles, vehicle records, route rows, vehicle photos, edit history, backup jobs, cleanup jobs, storage usage snapshots, and app settings.
-- RLS draft policies:
-  - Staff can view/create their own records.
-  - Supervisors can view branch records.
-  - Admins can manage all records.
+- RLS draft policies where staff can view/create their own records, supervisors can view branch records, and admins can manage all records.
 - `.env.example` documents frontend Supabase values and server-only placeholders.
 
-Still placeholders after MVP-002:
+## MVP-004 QR scan UI foundation
 
-- QR scan.
+MVP-004 implements the mobile QR scan UI foundation only.
+
+Implemented foundation:
+
+- Full-screen-style scan page with a large camera placeholder frame.
+- Manual QR URL or raw barcode input.
+- Flash proof URL parsing from the last URL path segment.
+- `sourceUrl` and `vehicleBarcode` preview.
+- Vehicle barcode uppercase normalization.
+- Required alphanumeric validation with warning-only handling for unusual future formats.
+- Active responsible profile display when available.
+- Warning and navigation to Responsible Profile when no active profile is selected.
+- Local scan draft persistence with `sourceUrl`, `vehicleBarcode`, `scannedAt`, responsible employee code, responsible display name, and branch.
+- ScanPreviewPage display of scan draft and an explicit MVP-005 OCR note.
+
+Still placeholders after MVP-004:
+
+- Real camera QR scanner integration.
 - OCR phone reading.
 - Android WebView Flash automation.
+- Flash route/status extraction.
+- Supabase vehicle record creation.
 - R2 upload.
 - Photo upload.
 - Exact 21.6 export execution.
 - Backup execution.
 - Cleanup execution.
-
-The app must still open when Supabase values are missing and show `Supabase ยังไม่ได้ตั้งค่า`.
 
 ## Exact backup requirement
 

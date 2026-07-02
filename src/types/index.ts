@@ -41,3 +41,27 @@ export interface PageDefinition {
   nextMvp: string;
   icon: LucideIcon;
 }
+
+export interface ActiveResponsibleProfile {
+  employeeCode: string;
+  displayName: string;
+  branch: string;
+}
+
+export interface ScanDraft {
+  sourceUrl: string;
+  vehicleBarcode: string;
+  scannedAt: string;
+  responsibleEmployeeCode: string;
+  responsibleDisplayName: string;
+  branch: string;
+}
+
+export interface FlashProofParseResult {
+  sourceUrl: string;
+  vehicleBarcode: string;
+  isFlashUrl: boolean;
+  isValid: boolean;
+  warning?: string;
+  error?: string;
+}
