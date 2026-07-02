@@ -1,6 +1,6 @@
 # Project Specification
 
-## Final direction
+## Final Direction
 
 Hub Vehicle Proof Capture is an Android-first mobile system with PWA fallback.
 
@@ -18,7 +18,7 @@ The real workflow is:
 10. Supervisor exports exact 21.6 workbook + photos ZIP backup.
 11. Backup must succeed before cloud photo cleanup.
 
-## Critical rules
+## Critical Rules
 
 - Do not require daily import.
 - Do not assume number of vehicles.
@@ -29,7 +29,7 @@ The real workflow is:
 - Photos must be compressed before cloud upload.
 - Backup/Cleanup Guard prevents unexpected cloud cost.
 
-## MVP-002 database/auth foundation
+## MVP-002 Database/Auth Foundation
 
 MVP-002 establishes the Supabase foundation only.
 
@@ -42,7 +42,7 @@ Implemented foundation:
 - RLS draft policies where staff can view/create their own records, supervisors can view branch records, and admins can manage all records.
 - `.env.example` documents frontend Supabase values and server-only placeholders.
 
-## MVP-004 QR scan UI foundation
+## MVP-004 QR Scan UI Foundation
 
 MVP-004 implements the mobile QR scan UI foundation only.
 
@@ -54,15 +54,28 @@ Implemented foundation:
 - `sourceUrl` and `vehicleBarcode` preview.
 - Vehicle barcode uppercase normalization.
 - Required alphanumeric validation with warning-only handling for unusual future formats.
-- Active responsible profile display when available.
-- Warning and navigation to Responsible Profile when no active profile is selected.
 - Local scan draft persistence with `sourceUrl`, `vehicleBarcode`, `scannedAt`, responsible employee code, responsible display name, and branch.
-- ScanPreviewPage display of scan draft and an explicit MVP-005 OCR note.
 
-Still placeholders after MVP-004:
+## MVP-005 OCR Phone Preview/Edit Foundation
 
-- Real camera QR scanner integration.
-- OCR phone reading.
+MVP-005 implements OCR phone text extraction and manual correction only.
+
+Implemented foundation:
+
+- ScanPreviewPage review/edit UI for `vehicleBarcode`, `sourceUrl`, responsible profile, and `driverPhone`.
+- Paper image/file input for future OCR engine integration.
+- Clear OCR status when a real OCR engine is unavailable.
+- Raw OCR text paste/test mode.
+- Thai mobile phone normalization and extraction from text.
+- Validation requiring a 10-digit phone starting with `06`, `08`, or `09`.
+- Multiple phone candidate selection.
+- Manual correction before confirm.
+- Local preview draft persistence with `sourceUrl`, `vehicleBarcode`, `driverPhone`, `ocrRawText`, `ocrConfidence`, responsible employee code, responsible display name, branch, `scannedAt`, and `phoneConfirmedAt`.
+- Explicit next-step note: Flash page opening and automatic phone fill are MVP-006.
+
+Still placeholders after MVP-005:
+
+- Production OCR engine for images.
 - Android WebView Flash automation.
 - Flash route/status extraction.
 - Supabase vehicle record creation.
@@ -72,7 +85,7 @@ Still placeholders after MVP-004:
 - Backup execution.
 - Cleanup execution.
 
-## Exact backup requirement
+## Exact Backup Requirement
 
 Backup ZIP must contain:
 

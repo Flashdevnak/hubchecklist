@@ -57,6 +57,13 @@ export interface ScanDraft {
   branch: string;
 }
 
+export interface ScanPreviewDraft extends ScanDraft {
+  driverPhone: string;
+  ocrRawText: string;
+  ocrConfidence?: number;
+  phoneConfirmedAt?: string;
+}
+
 export interface FlashProofParseResult {
   sourceUrl: string;
   vehicleBarcode: string;
@@ -64,4 +71,10 @@ export interface FlashProofParseResult {
   isValid: boolean;
   warning?: string;
   error?: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  warning?: string;
 }

@@ -1,4 +1,10 @@
-import type { ActiveResponsibleProfile, FlashProofParseResult, ScanDraft } from '../types';
+import type {
+  ActiveResponsibleProfile,
+  FlashProofParseResult,
+  ScanDraft,
+  ScanPreviewDraft,
+  ValidationResult,
+} from '../types';
 
 export function formatThaiDate(date: Date = new Date()): string {
   return new Intl.DateTimeFormat('th-TH', {
@@ -22,6 +28,7 @@ export function extractBarcodeFromFlashUrl(value: string): string | null {
 }
 
 export const SCAN_DRAFT_STORAGE_KEY = 'hubchecklist.scanDraft';
+export const SCAN_PREVIEW_DRAFT_STORAGE_KEY = 'hubchecklist.scanPreviewDraft';
 export const ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS = [
   'hubchecklist.activeResponsibleProfile',
   'hubchecklist.responsibleProfile.active',
@@ -81,6 +88,61 @@ export function validateVehicleBarcode(barcode: string): {
   return { isValid: true };
 }
 
+export function normalizeThaiPhoneText(input: string): string {
+  return input
+    .replace(/[๐-๙]/g, (digit) => String('๐๑๒๓๔๕๖๗๘๙'.indexOf(digit)))
+    .replace(/\u00a0/g, ' ')
+    .trim();
+}
+
+export function extractThaiPhoneNumbers(input: string): string[] {
+  const normalizedText = normalizeThaiPhoneText(input);
+  const candidates = new Set<string>();
+  const phoneLikePattern = /0[689](?:[\s\-.()/]*\d){8}/g;
+  const compactText = normalizedText.replace(/[^\d]/g, '');
+  const compactPattern = /0[689]\d{8}/g;
+
+  for (const match of normalizedText.matchAll(phoneLikePattern)) {
+    const normalizedPhone = match[0].replace(/\D/g, '');
+    if (validateThaiPhoneNumber(normalizedPhone).isValid) {
+      candidates.add(normalizedPhone);
+    }
+  }
+
+  for (const match of compactText.matchAll(compactPattern)) {
+    const normalizedPhone = match[0];
+    if (validateThaiPhoneNumber(normalizedPhone).isValid) {
+      candidates.add(normalizedPhone);
+    }
+  }
+
+  return [...candidates];
+}
+
+export function validateThaiPhoneNumber(phone: string): ValidationResult {
+  const normalizedPhone = phone.replace(/\D/g, '');
+
+  if (!normalizedPhone) {
+    return { isValid: false, error: 'กรุณากรอกเบอร์โทรคนขับ' };
+  }
+
+  if (!/^\d{10}$/.test(normalizedPhone)) {
+    return { isValid: false, error: 'เบอร์โทรต้องเป็นตัวเลข 10 หลัก' };
+  }
+
+  if (!/^0[689]/.test(normalizedPhone)) {
+    return { isValid: false, error: 'เบอร์โทรต้องขึ้นต้นด้วย 06, 08 หรือ 09' };
+  }
+
+  return { isValid: true };
+}
+
+export function formatThaiPhone(phone: string): string {
+  const normalizedPhone = phone.replace(/\D/g, '');
+  if (normalizedPhone.length !== 10) return phone;
+  return `${normalizedPhone.slice(0, 3)}-${normalizedPhone.slice(3, 6)}-${normalizedPhone.slice(6)}`;
+}
+
 export function parseFlashProofInput(input: string): FlashProofParseResult {
   const trimmed = input.trim();
   const vehicleBarcode = extractVehicleBarcode(trimmed);
@@ -136,6 +198,44 @@ export function getScanDraft(): ScanDraft | null {
   } catch {
     return null;
   }
+}
+
+export function createScanPreviewDraft(
+  scanDraft: ScanDraft,
+  values: {
+    driverPhone: string;
+    ocrRawText: string;
+    ocrConfidence?: number;
+    phoneConfirmedAt?: string;
+  },
+): ScanPreviewDraft {
+  return {
+    ...scanDraft,
+    driverPhone: values.driverPhone.replace(/\D/g, ''),
+    ocrRawText: values.ocrRawText,
+    ocrConfidence: values.ocrConfidence,
+    phoneConfirmedAt: values.phoneConfirmedAt,
+  };
+}
+
+export function saveScanPreviewDraft(draft: ScanPreviewDraft): void {
+  window.localStorage.setItem(SCAN_PREVIEW_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+}
+
+export function getScanPreviewDraft(): ScanPreviewDraft | null {
+  const rawValue = window.localStorage.getItem(SCAN_PREVIEW_DRAFT_STORAGE_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const parsed = JSON.parse(rawValue) as ScanPreviewDraft;
+    return parsed.vehicleBarcode ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearScanPreviewDraft(): void {
+  window.localStorage.removeItem(SCAN_PREVIEW_DRAFT_STORAGE_KEY);
 }
 
 function normalizeVehicleBarcode(value: string): string {

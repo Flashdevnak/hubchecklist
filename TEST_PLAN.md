@@ -44,11 +44,11 @@ Manual checks:
 - Run the app without Supabase env values.
 - Confirm the UI shows `Supabase ยังไม่ได้ตั้งค่า`.
 - Confirm the app does not crash or claim login success.
-- Confirm OCR, Android WebView, R2 upload, photo upload, export, backup, and cleanup remain placeholders.
+- Confirm Android WebView, R2 upload, photo upload, export, backup, and cleanup remain placeholders.
 
 ## MVP-004
 
-Goal: prove the QR scan mobile UI foundation can parse Flash proof URLs and raw barcodes without claiming real camera scanning, OCR, Flash automation, uploads, export, backup, or cleanup are complete.
+Goal: prove the QR scan mobile UI foundation can parse Flash proof URLs and raw barcodes without claiming real camera scanning, Flash automation, uploads, export, backup, or cleanup are complete.
 
 Commands:
 
@@ -62,22 +62,55 @@ Manual checks:
 
 - Open the Scan page.
 - Confirm the scan frame is visually large and mobile-first.
-- With no active responsible profile, confirm the warning says `กรุณาเลือกผู้รับผิดชอบก่อนเริ่มสแกน`.
-- Confirm the warning has a button to the Responsible Profile page.
 - Enter `https://api.flashexpress.com/gw/nws/web/proof/go/NAK1R7XJ45`.
 - Confirm `vehicleBarcode` displays `NAK1R7XJ45`.
 - Enter raw barcode `NAK1R7XJ45`.
 - Confirm it is accepted as `vehicleBarcode`.
-- Enter invalid input with symbols and confirm a Thai error appears.
-- Confirm Next is disabled when barcode is invalid or profile is missing.
-- With an active profile in localStorage, confirm the responsible profile appears in the result preview.
 - Confirm a valid scan draft persists after refresh.
-- Continue to ScanPreviewPage and confirm barcode, source URL, responsible profile, and the MVP-005 OCR note appear.
-- Resize to Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop widths.
-- Confirm no horizontal overflow.
+- Continue to ScanPreviewPage.
 - Confirm camera QR scanning is described as a prepared integration, not a completed scanner.
 
-## Future test areas
+## MVP-005
+
+Goal: prove the preview/edit screen can extract Thai mobile phone numbers from OCR/raw text, allow manual correction, and persist a confirmed preview draft without opening Flash or claiming WebView automation is complete.
+
+Commands:
+
+```bash
+npm install
+npx tsc -b
+npm run build
+```
+
+Manual checks:
+
+- Open ScanPreviewPage with no scan draft and confirm it warns the user and links back to Scan.
+- Create or load a scan draft from the Scan page.
+- Confirm ScanPreviewPage shows `vehicleBarcode`, `sourceUrl`, and responsible profile.
+- Edit `vehicleBarcode` and `sourceUrl`.
+- Choose/take an image in the OCR file input.
+- Confirm the page says OCR engine is unavailable / not production-ready and does not fake success.
+- Paste:
+
+```text
+บาร์โค้ดประจำตัวรถ: NAK1R7XJ45
+เบอร์โทรศัพท์ของคนขับรถ: 0643042911
+```
+
+- Click `ดึงเบอร์จากข้อความ`.
+- Confirm `driverPhone = 0643042911`.
+- Paste `เบอร์โทร 064-304-2911` and confirm it extracts `0643042911`.
+- Paste `โทร 064 304 2911 / สำรอง 0891234567`.
+- Confirm candidates include `0643042911` and `0891234567`.
+- Select one candidate and confirm it fills `driverPhone`.
+- Enter an invalid phone and confirm a Thai validation error appears.
+- Confirm the preview button is disabled while phone is invalid.
+- Confirm a valid preview draft persists after refresh.
+- Confirm the page says Flash auto-fill is MVP-006.
+- Resize to Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop widths.
+- Confirm no horizontal overflow.
+
+## Future Test Areas
 
 ### QR camera integration
 
@@ -86,12 +119,12 @@ Manual checks:
 - Decode QR from a phone screen.
 - Handle unsupported browser scanning with manual fallback.
 
-### OCR phone
+### OCR engine integration
 
-- Detect Thai 10-digit phone numbers.
-- Allow manual edit.
-- Show multiple phone candidates.
-- Store raw OCR text.
+- Run OCR against real paper photos.
+- Report confidence when available.
+- Keep manual correction always available.
+- Never auto-confirm a low-confidence OCR result.
 
 ### Android WebView Flash automation
 

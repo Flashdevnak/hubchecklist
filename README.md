@@ -2,9 +2,9 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-This repository is prepared for GitHub and Codex MVP development. MVP-004 adds the full-screen QR scan mobile UI foundation and manual QR/barcode parsing. It does **not** claim real camera QR scanning, OCR, Flash WebView automation, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
+This repository is prepared for GitHub and Codex MVP development. MVP-005 adds OCR phone text extraction and preview/edit flow. It does **not** claim Android WebView automation, real Flash route/status extraction, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
 
-## Final product goal
+## Final Product Goal
 
 Staff do not know in advance how many vehicles will come each day. The system must let staff:
 
@@ -30,7 +30,7 @@ Staff do not know in advance how many vehicles will come each day. The system mu
 - Supabase client configuration guard
 - Supabase migration draft for Auth/Postgres roles and RLS
 
-## Implemented MVP foundations
+## Implemented MVP Foundations
 
 MVP-002 database/auth foundation:
 
@@ -47,15 +47,25 @@ MVP-004 QR scan UI foundation:
 - Flash proof URL parsing from the last URL path segment
 - Vehicle barcode normalization and validation
 - Local scan draft persistence in `localStorage`
-- Scan preview page showing barcode, source URL, responsible profile, and an MVP-005 OCR placeholder note
 - Safe camera scanner messaging when direct browser QR scanning is unavailable or not yet connected
+
+MVP-005 OCR phone preview/edit foundation:
+
+- ScanPreviewPage review and edit flow for `vehicleBarcode`, `sourceUrl`, `driverPhone`, and responsible profile
+- Paper image/file intake for future OCR engine integration
+- Raw OCR text paste/test mode
+- Real Thai mobile phone extraction from text
+- Multiple phone candidate selection
+- Manual phone correction before confirm
+- Local preview draft persistence in `hubchecklist.scanPreviewDraft`
+- Explicit MVP-006 note for Flash auto-fill
 
 Future MVPs will add:
 
-- Responsible profile production flow if not already present in the target branch
 - Real camera QR scanner integration
-- OCR phone reading
+- OCR engine integration for paper photos
 - Android native WebView plugin for Flash auto-fill
+- Flash route/status extraction
 - Cloudflare R2 Free for photos/screenshots/backups
 - Exact 21.6 XLSX/ZIP export
 - Backup Reminder + Cleanup Guard
@@ -87,7 +97,7 @@ R2_SECRET_ACCESS_KEY=placeholder-server-only
 
 If Supabase URL/key are missing, the app still opens and shows `Supabase ยังไม่ได้ตั้งค่า`.
 
-## Run web dev
+## Run Web Dev
 
 ```bash
 npm run dev
@@ -101,15 +111,15 @@ Open the URL shown by Vite. For phone testing on the same Wi-Fi, use the LAN URL
 npm run build
 ```
 
-## Supabase migrations
+## Supabase Migrations
 
 MVP-002 migration files live in `supabase/migrations/`.
 
 The first migration creates the schema, indexes, update triggers, role helpers, and RLS draft policies. Apply it to a Supabase project with the Supabase CLI in a later environment setup step. This repository does not include real production secrets.
 
-## QR scan UI
+## QR And Phone Preview
 
-Use the Scan page to manually test MVP-004:
+Use the Scan page to manually test MVP-004 QR parsing:
 
 ```text
 https://api.flashexpress.com/gw/nws/web/proof/go/NAK1R7XJ45
@@ -121,7 +131,20 @@ Expected parsed barcode:
 NAK1R7XJ45
 ```
 
-Raw barcode input such as `NAK1R7XJ45` is also accepted. Continuing requires a valid barcode and an active responsible profile from the profile flow. The camera button is a scanner integration foundation only and does not mark real camera scanning complete.
+Use the Preview page to test MVP-005 phone extraction:
+
+```text
+บาร์โค้ดประจำตัวรถ: NAK1R7XJ45
+เบอร์โทรศัพท์ของคนขับรถ: 0643042911
+```
+
+Expected driver phone:
+
+```text
+0643042911
+```
+
+Hyphen and space formats such as `064-304-2911` and `064 304 2911` are normalized to 10 digits. If multiple phone numbers are found, the user must choose the driver phone. The OCR image upload is an intake foundation only until a real OCR engine is added.
 
 ## Capacitor Android
 
@@ -135,7 +158,7 @@ npm run cap:open
 
 This MVP includes Capacitor config only. The native Android project is generated later by Capacitor.
 
-## MVP roadmap
+## MVP Roadmap
 
 1. MVP-001 Project skeleton + PWA + Capacitor foundation
 2. MVP-002 Supabase schema + auth + roles + RLS draft
@@ -151,6 +174,6 @@ This MVP includes Capacitor config only. The native Android project is generated
 12. MVP-012 Backup Reminder + Cleanup Guard
 13. MVP-013 QA mobile layout + Android build
 
-## Important warning
+## Important Warning
 
-Do not mark future features as complete unless they are implemented and QA passed. Placeholder pages must stay clearly marked.
+Do not mark future features as complete unless they are implemented and QA passed. Placeholder or foundation-only features must stay clearly labeled.
