@@ -1,39 +1,29 @@
 # QA Checklist
 
-## MVP-005 required checks
+## MVP-006 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] ScanPreviewPage is no longer placeholder-only
-- [ ] Missing QR/vehicleBarcode shows a warning and link back to Scan
-- [ ] Scan summary shows `vehicleBarcode`, `sourceUrl`, and responsible profile
-- [ ] User can edit `vehicleBarcode` and `sourceUrl`
-- [ ] User can choose/take a paper image for OCR intake
-- [ ] UI clearly says OCR engine is not production-ready when unavailable
-- [ ] User can paste OCR raw text
-- [ ] User can manually enter and edit `driverPhone`
-- [ ] Text extraction finds `0643042911` from Thai label text
-- [ ] Text extraction finds `0643042911` from `064-304-2911`
-- [ ] Text extraction finds multiple candidates and lets user choose
-- [ ] Invalid phone shows Thai validation error
-- [ ] Confirm is disabled when phone is invalid
-- [ ] Valid confirmed preview persists after refresh
-- [ ] Preview draft stores `driverPhone`, `ocrRawText`, profile, scan data, and `phoneConfirmedAt`
-- [ ] App clearly says Flash auto-fill is MVP-006
+- [ ] `npx cap sync android` passes
+- [ ] Android project exists
+- [ ] `FlashProofWebViewPlugin` native file exists
+- [ ] Plugin validates `api.flashexpress.com`
+- [ ] Plugin rejects unknown domains
+- [ ] Plugin uses `evaluateJavascript` for auto-fill/search/extraction
+- [ ] Plugin returns structured success/error result to React
+- [ ] FlashSearchPage is no longer placeholder-only
+- [ ] FlashSearchPage loads confirmed scan preview draft
+- [ ] FlashSearchPage validates `sourceUrl`, `vehicleBarcode`, and `driverPhone`
+- [ ] Android platform status is shown
+- [ ] Web/PWA fallback is honest and does not claim auto-fill
+- [ ] Web/PWA fallback has copy phone and open Flash URL actions
+- [ ] Manual raw-text parser is clearly labeled as fallback/testing only
+- [ ] No fake Flash data is displayed as real
+- [ ] Flash result draft persists only after plugin result or clearly marked manual fallback
+- [ ] Documentation explains Android WebView requirement
 - [ ] Mobile layout has no horizontal overflow
-- [ ] Samsung S23 FE width fits
-- [ ] Galaxy Tab A7 Lite width fits
-- [ ] iPad browser fallback width fits
-- [ ] Desktop browser width fits
-- [ ] No fake completed Android WebView feature
-- [ ] No fake completed Flash route/status extraction
-- [ ] No fake completed R2 upload or photo upload feature
-- [ ] No fake completed Export 21.6 feature
-- [ ] No fake completed Backup or Cleanup execution feature
-- [ ] README.md updated
-- [ ] TEST_PLAN.md updated
-- [ ] docs/PROJECT_SPEC.md updated
+- [ ] No R2/photo/export/backup feature is falsely marked complete
 
 ## Future QA gates
 

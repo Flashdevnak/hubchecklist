@@ -85,6 +85,49 @@ Still placeholders after MVP-005:
 - Backup execution.
 - Cleanup execution.
 
+## MVP-006 Android WebView Flash Automation Foundation
+
+MVP-006 implements the Android WebView automation foundation only.
+
+Implemented foundation:
+
+- Generated Capacitor Android project.
+- Native `FlashProofWebViewPlugin` registered in `MainActivity`.
+- Plugin methods:
+  - `openFlashProof(options)`
+  - `closeFlashProof()`
+  - `getLastFlashProofResult()`
+  - `isFlashProofWebViewAvailable()`
+- Strict URL validation before opening WebView.
+- Allowed only:
+  - HTTPS
+  - `api.flashexpress.com`
+  - path containing `/gw/nws/web/proof/go/`
+- WebView JavaScript enabled only inside the controlled Flash proof WebView.
+- Resilient phone input lookup and search button lookup through `evaluateJavascript`.
+- Structured success/error response bridge to React.
+- Local Flash result draft persistence under `hubchecklist.flashProofResultDraft`.
+- FlashSearchPage integration UI.
+- Browser/PWA fallback with copy phone, open Flash link, and manual raw text parser.
+
+Safety boundaries:
+
+- Browser/PWA mode must not claim it can auto-fill a cross-domain Flash page.
+- Unknown domains are rejected before WebView automation.
+- Manual fallback results are labeled as manual/testing, not real automated Flash extraction.
+- Vehicle record creation remains MVP-007.
+
+Still placeholders after MVP-006:
+
+- Physical-device verification against the live Flash DOM.
+- Hardened final route/status extraction after testing real Flash result markup.
+- Supabase vehicle record creation.
+- R2 upload.
+- Photo upload.
+- Exact 21.6 export execution.
+- Backup execution.
+- Cleanup execution.
+
 ## Exact Backup Requirement
 
 Backup ZIP must contain:

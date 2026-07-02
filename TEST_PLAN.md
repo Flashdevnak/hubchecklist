@@ -110,6 +110,43 @@ Manual checks:
 - Resize to Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop widths.
 - Confirm no horizontal overflow.
 
+## MVP-006
+
+Goal: prove the Android WebView Flash automation foundation exists, validates allowed domains, bridges structured results to React, and keeps browser/PWA behavior as honest manual fallback.
+
+Commands:
+
+```bash
+npm install
+npx tsc -b
+npm run build
+npx cap sync android
+```
+
+Static checks:
+
+- Confirm `android/` project exists.
+- Confirm `android/app/src/main/java/com/flashops/hubchecklist/FlashProofWebViewPlugin.java` exists.
+- Confirm `MainActivity.java` registers `FlashProofWebViewPlugin`.
+- Confirm the plugin only allows HTTPS `api.flashexpress.com` URLs containing `/gw/nws/web/proof/go/`.
+- Confirm the plugin rejects unknown domains before opening WebView or injecting JavaScript.
+- Confirm auto-fill/search/extraction uses `evaluateJavascript`.
+- Confirm React bridge functions exist in `src/services/flashProofWebView.ts`.
+
+Manual checks:
+
+- Open FlashSearchPage with no confirmed preview draft and confirm it links back to Preview.
+- Create a confirmed scan preview draft with source URL, vehicle barcode, and valid driver phone.
+- Confirm FlashSearchPage shows source URL, vehicle barcode, driver phone, and responsible profile.
+- In browser/PWA mode, confirm the page says web mode cannot auto-fill Flash automatically.
+- Confirm copy phone button copies the driver phone.
+- Confirm open Flash URL button opens the Flash URL manually.
+- Confirm native auto-fill button is disabled in browser/PWA mode.
+- Paste manual Flash raw text and confirm any saved result is labeled manual fallback/testing only.
+- Confirm the page states vehicle record creation is MVP-007.
+- Resize to Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop widths.
+- Confirm no horizontal overflow.
+
 ## Future Test Areas
 
 ### QR camera integration
@@ -128,6 +165,10 @@ Manual checks:
 
 ### Android WebView Flash automation
 
+- Validate on a physical Android device against the live Flash page.
+- Confirm phone input selectors still match live Flash markup.
+- Confirm search button detection still matches live Flash markup.
+- Confirm wrong phone/no result/timeouts return clear errors.
 - Load only `api.flashexpress.com`.
 - Auto-fill phone.
 - Click search.

@@ -1,6 +1,8 @@
 import type {
   ActiveResponsibleProfile,
   FlashProofParseResult,
+  FlashProofResult,
+  FlashProofRouteRow,
   ScanDraft,
   ScanPreviewDraft,
   ValidationResult,
@@ -29,6 +31,7 @@ export function extractBarcodeFromFlashUrl(value: string): string | null {
 
 export const SCAN_DRAFT_STORAGE_KEY = 'hubchecklist.scanDraft';
 export const SCAN_PREVIEW_DRAFT_STORAGE_KEY = 'hubchecklist.scanPreviewDraft';
+export const FLASH_PROOF_RESULT_DRAFT_STORAGE_KEY = 'hubchecklist.flashProofResultDraft';
 export const ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS = [
   'hubchecklist.activeResponsibleProfile',
   'hubchecklist.responsibleProfile.active',
@@ -236,6 +239,70 @@ export function getScanPreviewDraft(): ScanPreviewDraft | null {
 
 export function clearScanPreviewDraft(): void {
   window.localStorage.removeItem(SCAN_PREVIEW_DRAFT_STORAGE_KEY);
+}
+
+export function isAllowedFlashProofUrl(input: string): boolean {
+  try {
+    const url = new URL(input);
+    return (
+      url.protocol === 'https:' &&
+      url.hostname.toLowerCase() === 'api.flashexpress.com' &&
+      url.pathname.toLowerCase().includes('/gw/nws/web/proof/go/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function parseFlashProofRawText(rawText: string): Partial<FlashProofResult> {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const routeRows: FlashProofRouteRow[] = [];
+
+  lines.forEach((line, index) => {
+    if (/สาขา|branch/i.test(line)) {
+      routeRows.push({ index: routeRows.length + 1, branchName: line });
+    }
+    if (index === 0 && routeRows.length === 0 && line.length > 20) {
+      routeRows.push({ index: 1, branchName: line });
+    }
+  });
+
+  const findValue = (patterns: RegExp[]) => {
+    for (const pattern of patterns) {
+      const line = lines.find((item) => pattern.test(item));
+      if (line) return line.replace(/^[^:：]*[:：]?\s*/, '').trim();
+    }
+    return undefined;
+  };
+
+  return {
+    driverName: findValue([/พนักงานขับรถ/, /driver/i]),
+    companyName: findValue([/ชื่อบริษัท/, /company/i]),
+    routeSummary: lines.slice(0, 6).join('\n'),
+    firstBranch: routeRows[0]?.branchName,
+    lastBranch: routeRows[routeRows.length - 1]?.branchName,
+    routeRows,
+    rawText,
+  };
+}
+
+export function saveFlashProofResultDraft(result: FlashProofResult): void {
+  window.localStorage.setItem(FLASH_PROOF_RESULT_DRAFT_STORAGE_KEY, JSON.stringify(result));
+}
+
+export function getFlashProofResultDraft(): FlashProofResult | null {
+  const rawValue = window.localStorage.getItem(FLASH_PROOF_RESULT_DRAFT_STORAGE_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const parsed = JSON.parse(rawValue) as FlashProofResult;
+    return parsed.vehicleBarcode ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeVehicleBarcode(value: string): string {

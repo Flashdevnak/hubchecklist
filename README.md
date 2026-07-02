@@ -2,7 +2,7 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-This repository is prepared for GitHub and Codex MVP development. MVP-005 adds OCR phone text extraction and preview/edit flow. It does **not** claim Android WebView automation, real Flash route/status extraction, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
+This repository is prepared for GitHub and Codex MVP development. MVP-006 adds the Android WebView Flash automation foundation. It does **not** claim final vehicle record creation, R2 upload, photo upload, Export, Backup execution, or Cleanup execution are complete yet.
 
 ## Final Product Goal
 
@@ -60,12 +60,24 @@ MVP-005 OCR phone preview/edit foundation:
 - Local preview draft persistence in `hubchecklist.scanPreviewDraft`
 - Explicit MVP-006 note for Flash auto-fill
 
+MVP-006 Android WebView Flash automation foundation:
+
+- Generated Capacitor Android project
+- Native `FlashProofWebViewPlugin`
+- Strict Flash URL allowlist for `https://api.flashexpress.com/gw/nws/web/proof/go/`
+- WebView JavaScript auto-fill/click-search foundation using `evaluateJavascript`
+- Structured success/error bridge back to React
+- FlashSearchPage integration UI
+- Browser/PWA fallback with copy phone, open link, and clearly labeled manual text parser
+- Local Flash result draft persistence in `hubchecklist.flashProofResultDraft`
+
 Future MVPs will add:
 
 - Real camera QR scanner integration
 - OCR engine integration for paper photos
-- Android native WebView plugin for Flash auto-fill
-- Flash route/status extraction
+- Physical-device validation against the live Flash DOM
+- Final Flash route/status extraction hardening
+- Vehicle record creation
 - Cloudflare R2 Free for photos/screenshots/backups
 - Exact 21.6 XLSX/ZIP export
 - Backup Reminder + Cleanup Guard
@@ -145,6 +157,24 @@ Expected driver phone:
 ```
 
 Hyphen and space formats such as `064-304-2911` and `064 304 2911` are normalized to 10 digits. If multiple phone numbers are found, the user must choose the driver phone. The OCR image upload is an intake foundation only until a real OCR engine is added.
+
+## Android Flash WebView
+
+MVP-006 requires Android app mode for automatic Flash phone fill. Browser/PWA mode cannot control `api.flashexpress.com`, so the app shows an honest fallback with copy/open buttons.
+
+Native plugin:
+
+```text
+FlashProofWebViewPlugin
+```
+
+Allowed URL:
+
+```text
+https://api.flashexpress.com/gw/nws/web/proof/go/<vehicleBarcode>
+```
+
+The plugin rejects unknown domains and does not inject JavaScript outside the allowed Flash proof URL. Vehicle record creation remains MVP-007.
 
 ## Capacitor Android
 

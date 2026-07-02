@@ -64,6 +64,51 @@ export interface ScanPreviewDraft extends ScanDraft {
   phoneConfirmedAt?: string;
 }
 
+export interface FlashProofRouteRow {
+  index: number;
+  branchName?: string;
+  date?: string;
+  expectedArrivalTime?: string;
+  actualArrivalTime?: string;
+  inboundScanner?: string;
+  expectedDepartureTime?: string;
+  actualDepartureTime?: string;
+  outboundScanner?: string;
+  duration?: string;
+  distance?: string;
+  sealNumbers?: string;
+}
+
+export interface FlashProofResult {
+  sourceUrl: string;
+  vehicleBarcode: string;
+  driverPhone: string;
+  driverName?: string;
+  companyName?: string;
+  routeSummary?: string;
+  firstBranch?: string;
+  lastBranch?: string;
+  plannedDepartureTime?: string;
+  actualDepartureTime?: string;
+  routeRows: FlashProofRouteRow[];
+  rawText: string;
+  htmlSnapshot?: string;
+  status: 'success' | 'error' | 'unavailable' | 'manual_fallback';
+  message?: string;
+  flashPageStatus?: string;
+  extractedAt: string;
+  responsibleEmployeeCode?: string;
+  responsibleDisplayName?: string;
+  branch?: string;
+}
+
+export interface FlashProofPluginResponse {
+  success: boolean;
+  status: 'success' | 'error' | 'unavailable';
+  message: string;
+  data?: FlashProofResult;
+}
+
 export interface FlashProofParseResult {
   sourceUrl: string;
   vehicleBarcode: string;
