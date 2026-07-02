@@ -1,30 +1,34 @@
 # QA Checklist
 
-## MVP-012 required checks
+## MVP-013 required checks
 
-- [ ] `npm install` passes
-- [ ] `npx tsc -b` passes
-- [ ] `npm run build` passes
-- [ ] BackupCleanupPage is no longer placeholder-only
-- [ ] Page shows estimated storage usage
-- [ ] Page shows warning levels at 60%, 75%, 85%, 95%
-- [ ] User can generate backup ZIP using existing MVP-011 export service
-- [ ] Backup job is created with `GENERATED` status
-- [ ] User must confirm backup was saved before cleanup is allowed
-- [ ] Confirmed backup marks included photos as `backedUp = true`
-- [ ] Backup history is visible
-- [ ] Cleanup only lists confirmed backed-up photos
-- [ ] Cleanup is blocked for unbacked-up photos
-- [ ] Cleanup requires confirmation phrase `ลบรูปที่สำรองแล้ว`
-- [ ] Cleanup removes local heavy photo payload when possible but keeps metadata
-- [ ] Vehicle records remain searchable after cleanup
-- [ ] Audit/history/job record is preserved
-- [ ] Dashboard shows backup/storage warning link
-- [ ] App works without Supabase env keys
-- [ ] App works without R2 signed upload/delete endpoint
-- [ ] No fake cloud deletion is shown
-- [ ] Mobile layout has no horizontal overflow
-- [ ] Production R2 backend remains clearly placeholder
+- [x] `npm install` passes
+- [x] `npx tsc -b` passes
+- [x] `npm run build` passes
+- [x] `npx cap sync android` passes
+- [x] `npx cap doctor` passes
+- [ ] Android debug build passes on local machine
+- [x] Android build blocker is documented when Java/SDK are missing
+- [x] All main routes are registered in `src/App.tsx`
+- [x] App works without Supabase env keys
+- [x] App works without R2 signed upload endpoint
+- [x] End-to-end local test flow is documented
+- [x] Android device test guide exists
+- [x] Flow QA checklist exists
+- [x] Deployment notes exist
+- [x] Mobile layout checklist is updated
+- [x] No fake cloud/Flash success was added
+- [x] Final README explains current MVP status and remaining production tasks
+
+## Android build blocker
+
+Local `.\android\gradlew.bat assembleDebug` result:
+
+```text
+ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+```
+
+Install Android Studio, Android SDK, and JDK 17+, then set `JAVA_HOME` before rerunning the Gradle build.
 
 ## Future QA gates
 

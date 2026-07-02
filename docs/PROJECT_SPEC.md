@@ -1,116 +1,85 @@
 # Project Specification
 
-## MVP-012 Backup Reminder + Cleanup Guard
+## MVP-013 Final Android QA and Device Readiness
 
-MVP-012 protects operators from storage growth and careless deletion. It guides backup export, records local backup history, requires user confirmation, and only cleans local photo payloads that are confirmed backed up.
+MVP-013 prepares the project for real mobile testing. It verifies web build, TypeScript, Capacitor sync, Android readiness docs, route coverage, safety constraints, and device QA checklists.
 
-## Local Storage Keys
+## Verified Locally
 
-- Backup jobs: `hubchecklist.backupJobs`
-- Cleanup jobs: `hubchecklist.cleanupJobs`
-- Vehicle photos: `hubchecklist.vehiclePhotos`
-- Vehicle records: `hubchecklist.vehicleRecords`
-- Audit history: `hubchecklist.vehicleRecordEditHistory`
+- `npm install` passes.
+- `npx tsc -b` passes.
+- `npm run build` passes.
+- `npx cap sync android` passes.
+- `npx cap doctor` passes.
 
-## Storage Warning
+## Android Build Status
 
-Usage is estimated from local photo metadata `sizeBytes`; it is not exact cloud billing data.
-
-Reference limit:
-
-- 10 GB
-
-Warning levels:
-
-- 0-59%: normal
-- 60-74%: yellow, `ควรเริ่มสำรองข้อมูล`
-- 75-84%: orange, `แนะนำให้ Export Backup`
-- 85-94%: red, `ควรสำรองและเตรียมลบรูปเก่า`
-- 95%+: critical, `ต้อง Backup และ Cleanup ก่อนเพิ่มรูปจำนวนมาก`
-
-## Backup Flow
-
-1. User chooses backup filters.
-2. System previews records/photos using the MVP-011 export service.
-3. User clicks Create Backup.
-4. System generates and downloads ZIP.
-5. Backup job is stored as `GENERATED`.
-6. Browser cannot verify that the file was actually kept, so user must click confirmation.
-7. Only after confirmation:
-   - Backup job becomes `CONFIRMED`.
-   - Included photos are marked `backedUp = true`.
-   - Included photos receive `backupId`.
-   - Included records receive backup reference.
-   - Audit-like entries are created.
-
-Backup job statuses:
-
-- `DRAFT`
-- `GENERATED`
-- `CONFIRMED`
-- `FAILED`
-
-## Cleanup Guard
-
-Cleanup can only target photos where:
-
-- `backedUp = true`
-- `backupId` exists
-- matching backup job status is `CONFIRMED`
-- `localCleaned` is not already true
-
-Cleanup requires the confirmation phrase:
+Android debug build is not verified on this machine because Java is missing:
 
 ```text
-ลบรูปที่สำรองแล้ว
+ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
 ```
 
-Cleanup removes only real local compressed image payloads. It keeps:
+This is a local toolchain blocker, not an app code success. Install Android Studio, Android SDK, and JDK 17+, then set `JAVA_HOME` before building APK.
 
-- vehicle records
-- route rows
-- audit history
-- photo metadata
-- backup references
+## Registered Routes
 
-For MVP local mode:
+- `login`
+- `responsible-profile`
+- `scan`
+- `scan-preview`
+- `flash-search`
+- `checklist`
+- `edit-record`
+- `dashboard`
+- `export`
+- `backup-cleanup`
+- `admin-settings`
+- `user-management`
 
-- Remove `localStorage` photo blobs when present.
-- Clear `localObjectUrl`.
-- Set `localCleaned`, `cleanedAt`, `cleanedBy`, and `cleanupJobId`.
-- Do not set `cloudDeleted = true` unless a future real cloud delete succeeds.
-- Do not fake R2 deletion.
+## Android WebView Safety Review
 
-Cleanup job statuses:
+- Plugin: `FlashProofWebViewPlugin`
+- Registered in `MainActivity`.
+- Allowed host: `api.flashexpress.com`
+- Allowed path: `/gw/nws/web/proof/go/`
+- Blocks navigation outside the allowed Flash proof URL.
+- Validates Thai phone format before WebView automation.
+- Uses timeout and error responses for network/loading/extraction failures.
+- PWA/browser fallback remains honest and does not claim cross-site automation.
 
-- `DRAFT`
-- `COMPLETED`
-- `PARTIAL`
-- `FAILED`
+## Device QA Required
 
-## Blocking Messages
+Real device validation is still required for:
 
-The UI must make these rules clear:
+- Samsung S23 FE
+- Galaxy Tab A7 Lite
+- iPad browser fallback
+- Desktop browser
 
-- `ยังลบไม่ได้ เพราะยังไม่ได้ Backup`
-- `ต้องยืนยันว่าเก็บไฟล์ Backup แล้วก่อน`
-- `รายการนี้ถูกสำรองแล้ว สามารถ Cleanup รูปได้`
-- `ระบบจะไม่ลบข้อมูลรถและประวัติการแก้ไข`
-- R2 deletion is not connected; MVP cleanup is local-only.
+See:
 
-## Dashboard Integration
+- `docs/ANDROID_DEVICE_TEST.md`
+- `docs/FLOW_QA_CHECKLIST.md`
+- `docs/DEPLOYMENT_NOTES.md`
 
-TodayDashboardPage storage card shows:
+## Safety Constraints
 
-- backup warning level
-- photos not backed up
-- photos eligible for cleanup
-- link to BackupCleanupPage
+- No Firebase.
+- No paid cloud requirement.
+- No R2 secrets in frontend.
+- No fake Supabase sync success.
+- No fake R2 upload/delete success.
+- No fake Flash extraction success.
+- No business record hard delete.
+- Cleanup only removes confirmed backed-up local photo payloads.
 
-## Still Placeholder After MVP-012
+## Remaining Production Tasks
 
-- Production R2 delete backend
-- Real cloud cleanup success
-- Android final QA
-- App store build
-- Storage billing automation
+- Real Android device QA.
+- Android release signing.
+- App store build/release process.
+- Production R2 signed upload backend.
+- Production R2 delete backend.
+- Production Supabase sync hardening.
+- Storage billing automation or real cloud usage reporting.
