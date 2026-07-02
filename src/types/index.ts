@@ -132,6 +132,21 @@ export type PhotoType = 'loadingPhoto' | 'dropPhotoAfterDeparture' | 'branchDrop
 
 export type PhotoUploadStatus = 'LOCAL_ONLY' | 'PENDING_UPLOAD' | 'UPLOADING' | 'UPLOADED' | 'UPLOAD_FAILED';
 
+export type AuditActionType =
+  | 'FIELD_EDIT'
+  | 'PHONE_EDIT'
+  | 'ROUTE_EDIT'
+  | 'CHECKLIST_TYPE_CHANGE'
+  | 'REDO_QR_SCAN'
+  | 'REDO_PHONE_OCR'
+  | 'REFETCH_FLASH'
+  | 'PHOTO_RETAKE'
+  | 'VOID_RECORD'
+  | 'RESTORE_RECORD'
+  | 'STATUS_CHANGE';
+
+export type AuditSource = 'user' | 'system' | 'duplicate_flow' | 'photo_flow';
+
 export interface RouteRow {
   id: string;
   recordId: string;
@@ -252,10 +267,12 @@ export interface DuplicateVehicleRecordResult {
 export interface EditHistoryEntry {
   id: string;
   recordId: string;
+  actionType: AuditActionType;
   fieldName: string;
   oldValue?: string;
   newValue?: string;
   editedBy: string;
   editedAt: string;
   reason: string;
+  source: AuditSource;
 }

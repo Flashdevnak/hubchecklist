@@ -1,5 +1,6 @@
-import { ArrowLeft, ClipboardCheck, PencilLine, XCircle } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, FileSearch, PencilLine, Phone, RotateCcw, ScanLine, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import AuditHistory from '../components/AuditHistory';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -9,7 +10,7 @@ import {
   PHOTO_TYPE_LABELS,
   retakePhoto,
 } from '../services/photos';
-import { getVehicleRecordById, voidVehicleRecord } from '../services/vehicleRecords';
+import { getVehicleRecordById, restoreRecordWithAudit, voidRecordWithAudit } from '../services/vehicleRecords';
 import type { PhotoType, VehiclePhoto, VehicleRecord } from '../types';
 
 export default function VehicleChecklistPage() {
@@ -28,7 +29,19 @@ export default function VehicleChecklistPage() {
     if (!record) return;
     const reason = window.prompt('กรุณาระบุเหตุผลการยกเลิกรายการ');
     if (!reason) return;
-    const next = voidVehicleRecord(record.id, reason);
+    const confirmed = window.confirm('Void รายการนี้หรือไม่? ระบบจะเก็บรูปและประวัติไว้ ไม่ลบข้อมูลถาวร');
+    if (!confirmed) return;
+    const next = voidRecordWithAudit(record.id, reason);
+    if (next) setRecord(next);
+  };
+
+  const handleRestore = () => {
+    if (!record) return;
+    const reason = window.prompt('ระบุเหตุผลในการกู้คืนรายการ');
+    if (!reason) return;
+    const confirmed = window.confirm('กู้คืนรายการนี้และคำนวณสถานะใหม่หรือไม่?');
+    if (!confirmed) return;
+    const next = restoreRecordWithAudit(record.id, reason);
     if (next) setRecord(next);
   };
 
@@ -160,14 +173,35 @@ export default function VehicleChecklistPage() {
             <PencilLine size={20} />
             <span>แก้ไขข้อมูล</span>
           </PrimaryButton>
+          <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/scan?redoRecordId=${record.id}`; }}>
+            <ScanLine size={20} />
+            <span>สแกน QR ใหม่</span>
+          </PrimaryButton>
+          <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/scan-preview?redoPhoneRecordId=${record.id}`; }}>
+            <Phone size={20} />
+            <span>อ่านเบอร์ใหม่</span>
+          </PrimaryButton>
+          <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/flash-search?refetchRecordId=${record.id}`; }}>
+            <FileSearch size={20} />
+            <span>ดึงข้อมูล Flash ใหม่</span>
+          </PrimaryButton>
           <PrimaryButton variant="danger" onClick={handleVoid} disabled={record.status === 'VOIDED'}>
             <XCircle size={20} />
             <span>ยกเลิกรายการ / Void</span>
           </PrimaryButton>
+          {record.status === 'VOIDED' ? (
+            <PrimaryButton variant="secondary" onClick={handleRestore}>
+              <RotateCcw size={20} />
+              <span>กู้คืนรายการ</span>
+            </PrimaryButton>
+          ) : null}
           <PrimaryButton onClick={() => { window.location.hash = '/dashboard'; }}>
             <ArrowLeft size={20} />
             <span>กลับ Dashboard</span>
           </PrimaryButton>
+        </article>
+        <article className="feature-card">
+          <AuditHistory recordId={record.id} />
         </article>
       </aside>
     </div>

@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-008
+## MVP-009
 
-Goal: prove required checklist photos can be captured/uploaded, compressed, stored locally, and used to update record photo completion status without faking R2 upload success.
+Goal: prove edit, redo, void/restore, photo retake, status recalculation, dashboard filtering, and audit history work locally without fake cloud or Flash success.
 
 Commands:
 
@@ -14,30 +14,27 @@ npm run build
 
 Manual checks:
 
-- Create/open a `NORMAL_ROUTE` vehicle record.
-- Confirm required photos are `loadingPhoto` and `dropPhotoAfterDeparture`.
-- Add a photo for one required type.
-- Confirm preview displays and original/compressed sizes are shown.
-- Confirm record status becomes `PENDING_PHOTO`.
-- Add the second required photo.
-- Confirm record status becomes `COMPLETE`.
-- Retake a photo and confirm preview/metadata updates.
-- Create/open a `MULTI_DROP` record.
-- Confirm required photos are `branchDropPhoto1`, `branchDropPhoto2`, and `dropPhotoAfterDeparture`.
-- Confirm Dashboard counts include `PENDING_PHOTO` and `COMPLETE`.
-- Confirm local-only mode says `เก็บรูปในเครื่อง / ยังไม่ได้เชื่อม R2` when no signed endpoint is configured.
-- Confirm no UI claims upload success unless uploadStatus is `UPLOADED`.
-- Confirm R2 secrets are not exposed in frontend code.
-- Confirm mobile layout has no horizontal overflow.
-- Confirm export, backup, and cleanup remain placeholders.
+- Open an existing vehicle record and go to Edit.
+- Change `driverPhone` or `routeSummary` with no reason and confirm save stays disabled.
+- Add a reason and save; confirm the checklist page shows audit entries with old/new values.
+- Change `checklistType`; confirm `requiredPhotos` updates and status recalculates from existing photos.
+- Use “สแกน QR ใหม่”; enter a new URL/barcode, confirm replacement, and verify `REDO_QR_SCAN`.
+- Use “อ่านเบอร์ใหม่”; enter/extract a new phone, confirm replacement, and verify `REDO_PHONE_OCR`.
+- Use “ดึงข้อมูล Flash ใหม่”; in PWA/manual mode, paste Flash text, compare old/new values, confirm replacement, and verify `REFETCH_FLASH`.
+- Void a record; confirm reason and warning are required, status becomes `VOIDED`, and the record is still searchable.
+- Restore a voided record; confirm reason is required and status returns to previous non-void status or recalculates.
+- Retake a checklist photo and confirm `PHOTO_RETAKE` includes old/new photo metadata.
+- Confirm Dashboard active/voided/complete/pending filters and edit/redo indicators.
+- Confirm the app opens and builds without Supabase keys and without an R2 signed upload endpoint.
+- Confirm export, backup, cleanup, production R2 backend, and storage billing automation are still placeholders.
 
 ## Future Test Areas
 
-### MVP-009 Edit redo void audit hardening
+### MVP-010 Dashboard hardening and operational filters
 
-- Retake history review.
-- Redo scan/edit workflows.
-- Stronger audit trail.
+- Daily operations filter polish.
+- Supervisor/admin views.
+- More complete local reporting indicators.
 
 ### Exact 21.6 export
 

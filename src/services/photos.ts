@@ -1,5 +1,10 @@
 import type { PhotoType, PhotoUploadStatus, VehiclePhoto, VehicleRecord } from '../types';
-import { getVehicleRecordById, getRequiredPhotosForChecklist, updateVehicleRecord } from './vehicleRecords';
+import {
+  addAuditEntry,
+  getVehicleRecordById,
+  getRequiredPhotosForChecklist,
+  recalculateVehicleRecordStatus,
+} from './vehicleRecords';
 
 const VEHICLE_PHOTOS_KEY = 'hubchecklist.vehiclePhotos';
 const SIGNED_UPLOAD_ENDPOINT = import.meta.env.VITE_R2_SIGNED_UPLOAD_ENDPOINT?.trim();
@@ -60,6 +65,18 @@ export async function savePhotoLocal(record: VehicleRecord, photoType: PhotoType
 
   window.localStorage.setItem(localStorageKey, compressed.dataUrl);
   upsertPhoto(photo);
+  if (previous) {
+    addAuditEntry({
+      recordId: record.id,
+      actionType: 'PHOTO_RETAKE',
+      fieldName: photoType,
+      oldValue: formatPhotoAuditValue(previous),
+      newValue: formatPhotoAuditValue(photo),
+      editedBy: record.responsibleEmployeeCode || 'local-user',
+      reason: 'photo retake',
+      source: 'photo_flow',
+    });
+  }
   updateRecordStatusFromPhotos(record.id);
 
   if (uploadStatus === 'PENDING_UPLOAD') {
@@ -188,12 +205,7 @@ export function getPhotoCompletionStatus(record: VehicleRecord) {
 }
 
 export function updateRecordStatusFromPhotos(recordId: string): VehicleRecord | null {
-  const record = getVehicleRecordById(recordId);
-  if (!record || record.status === 'VOIDED') return record;
-  const completion = getPhotoCompletionStatus(record);
-  return updateVehicleRecord(record.id, {
-    status: completion.isComplete ? 'COMPLETE' : 'PENDING_PHOTO',
-  }, 'photo completion status');
+  return recalculateVehicleRecordStatus(recordId, 'photo_flow');
 }
 
 export function getPhotoStorageMode() {
@@ -204,6 +216,14 @@ export function getPhotoStorageMode() {
 
 function getPhotoById(photoId: string): VehiclePhoto | null {
   return readPhotos().find((photo) => photo.id === photoId) ?? null;
+}
+
+function formatPhotoAuditValue(photo: VehiclePhoto): string {
+  return JSON.stringify({
+    id: photo.id,
+    fileName: photo.fileName,
+    capturedAt: photo.capturedAt,
+  });
 }
 
 function upsertPhoto(photo: VehiclePhoto): void {

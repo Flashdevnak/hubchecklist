@@ -2,6 +2,7 @@ import { Camera, Keyboard, RefreshCcw, ScanLine, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import { getVehicleRecordById, updateRecordWithAudit } from '../services/vehicleRecords';
 import type { ActiveResponsibleProfile, ScanDraft } from '../types';
 import {
   getActiveResponsibleProfile,
@@ -17,9 +18,19 @@ export default function FullScreenScanPage() {
   const [manualInput, setManualInput] = useState('');
   const [scannerMessage, setScannerMessage] = useState('');
   const [activeProfile, setActiveProfile] = useState<ActiveResponsibleProfile | null>(null);
+  const [redoRecordId, setRedoRecordId] = useState('');
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const redoId = params.get('redoRecordId') ?? '';
+    setRedoRecordId(redoId);
     setActiveProfile(getActiveResponsibleProfile());
+    const redoRecord = redoId ? getVehicleRecordById(redoId) : null;
+    if (redoRecord) {
+      setManualInput(redoRecord.sourceUrl || redoRecord.vehicleBarcode);
+      setScannerMessage('โหมดสแกน QR ใหม่: ระบบจะไม่แทนที่ข้อมูลเดิมจนกว่าจะยืนยัน');
+      return;
+    }
     const lastDraft = getScanDraft();
     if (lastDraft?.sourceUrl) {
       setManualInput(lastDraft.sourceUrl);
@@ -73,6 +84,25 @@ export default function FullScreenScanPage() {
     };
 
     saveScanDraft(draft);
+
+    if (redoRecordId) {
+      const oldRecord = getVehicleRecordById(redoRecordId);
+      const confirmed = window.confirm(
+        `แทนที่ QR ของรายการนี้หรือไม่?\n\nเดิม: ${oldRecord?.vehicleBarcode ?? '-'}\nใหม่: ${draft.vehicleBarcode}`,
+      );
+      if (!confirmed) return;
+      const updated = updateRecordWithAudit(
+        redoRecordId,
+        { sourceUrl: draft.sourceUrl, vehicleBarcode: draft.vehicleBarcode },
+        'redo QR scan confirmed',
+        'user',
+        'REDO_QR_SCAN',
+      );
+      if (updated) {
+        window.location.hash = `/checklist?recordId=${updated.id}`;
+      }
+      return;
+    }
 
     const params = new URLSearchParams({
       vehicleBarcode: draft.vehicleBarcode,
@@ -135,7 +165,7 @@ export default function FullScreenScanPage() {
           <div className="scan-result-heading">
             <h2>ผลตรวจ QR</h2>
             <StatusBadge
-              label={parseResult.isValid ? 'พร้อมตรวจต่อ' : 'รอข้อมูลถูกต้อง'}
+              label={redoRecordId ? 'โหมดสแกน QR ใหม่' : parseResult.isValid ? 'พร้อมตรวจต่อ' : 'รอข้อมูลถูกต้อง'}
               tone={parseResult.isValid ? 'success' : 'warning'}
             />
           </div>

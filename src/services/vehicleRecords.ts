@@ -1,4 +1,6 @@
 import type {
+  AuditActionType,
+  AuditSource,
   ChecklistType,
   DuplicateVehicleRecordResult,
   EditHistoryEntry,
@@ -6,12 +8,15 @@ import type {
   RouteRow,
   VehicleRecord,
   VehicleRecordDraft,
+  VehicleRecordStatus,
 } from '../types';
 import { getScanPreviewDraft, validateThaiPhoneNumber, validateVehicleBarcode } from '../utils';
 import { supabase, supabaseConfig } from './supabase';
 
 const VEHICLE_RECORDS_KEY = 'hubchecklist.vehicleRecords';
 const EDIT_HISTORY_KEY = 'hubchecklist.vehicleRecordEditHistory';
+const VEHICLE_PHOTOS_KEY = 'hubchecklist.vehiclePhotos';
+const AUDIT_SKIPPED_FIELDS = new Set(['updatedAt', 'duplicateKey']);
 
 export interface VehicleRecordStorageStatus {
   mode: 'local_only' | 'supabase_configured';
@@ -35,7 +40,7 @@ export function createVehicleRecordFromFlashDraft(
   const status = getVehicleRecordStorageStatus();
 
   if (options.voidExistingId && options.voidReason) {
-    voidVehicleRecord(options.voidExistingId, options.voidReason);
+    voidRecordWithAudit(options.voidExistingId, options.voidReason, 'duplicate_flow');
   }
 
   if (validationErrors.length > 0) {
@@ -90,24 +95,99 @@ export function getVehicleRecordById(id: string): VehicleRecord | null {
 }
 
 export function updateVehicleRecord(id: string, patch: Partial<VehicleRecord>, reason = 'manual edit'): VehicleRecord | null {
+  return updateRecordWithAudit(id, patch, reason, 'user');
+}
+
+export function updateRecordWithAudit(
+  id: string,
+  patch: Partial<VehicleRecord>,
+  reason = 'manual edit',
+  source: AuditSource = 'user',
+  actionType?: AuditActionType,
+): VehicleRecord | null {
   const records = readRecords();
   const index = records.findIndex((record) => record.id === id);
   if (index < 0) return null;
 
   const oldRecord = records[index];
+  const normalizedPatch = normalizePatch(oldRecord, patch);
   const nextRecord: VehicleRecord = {
     ...oldRecord,
-    ...patch,
+    ...normalizedPatch,
     updatedAt: new Date().toISOString(),
   };
   records[index] = nextRecord;
   writeRecords(records);
-  writeEditHistory(oldRecord, nextRecord, reason);
-  return nextRecord;
+  writeEditHistory(oldRecord, nextRecord, reason, source, actionType);
+  return shouldRecalculateAfterPatch(normalizedPatch)
+    ? recalculateVehicleRecordStatus(id, source)
+    : nextRecord;
 }
 
 export function voidVehicleRecord(id: string, reason: string): VehicleRecord | null {
-  return updateVehicleRecord(id, { status: 'VOIDED', voidReason: reason }, reason || 'void record');
+  return voidRecordWithAudit(id, reason);
+}
+
+export function voidRecordWithAudit(id: string, reason: string, source: AuditSource = 'user'): VehicleRecord | null {
+  if (!reason.trim()) return null;
+  return updateRecordWithAudit(
+    id,
+    { status: 'VOIDED', voidReason: reason.trim() },
+    reason.trim(),
+    source,
+    'VOID_RECORD',
+  );
+}
+
+export function restoreRecordWithAudit(id: string, reason: string, source: AuditSource = 'user'): VehicleRecord | null {
+  if (!reason.trim()) return null;
+  const previousStatus = getPreviousNonVoidedStatus(id) ?? 'NEED_REVIEW';
+  const restored = updateRecordWithAudit(
+    id,
+    { status: previousStatus, voidReason: undefined },
+    reason.trim(),
+    source,
+    'RESTORE_RECORD',
+  );
+  return restored ? recalculateVehicleRecordStatus(id, source) : null;
+}
+
+export function recalculateVehicleRecordStatus(recordId: string, source: AuditSource = 'system'): VehicleRecord | null {
+  const record = getVehicleRecordById(recordId);
+  if (!record || record.status === 'VOIDED') return record;
+
+  const required = getRequiredPhotosForChecklist(record.checklistType);
+  const photos = readJson<Array<{ recordId: string; photoType: string; deletedAt?: string }>>(VEHICLE_PHOTOS_KEY, []);
+  const completeCount = required.filter((photoType) => photos.some((photo) => (
+    photo.recordId === record.id &&
+    photo.photoType === photoType &&
+    !photo.deletedAt
+  ))).length;
+  const status: VehicleRecordStatus = completeCount === 0
+    ? 'READY_FOR_PHOTO'
+    : completeCount === required.length
+      ? 'COMPLETE'
+      : 'PENDING_PHOTO';
+
+  return updateRecordStatusOnly(record.id, {
+    requiredPhotos: required,
+    status,
+  }, 'recalculate status from required photos', source);
+}
+
+export function getPreviousNonVoidedStatus(recordId: string): VehicleRecordStatus | null {
+  const entries = listAuditEntries(recordId)
+    .filter((entry) => entry.fieldName === 'status')
+    .sort((a, b) => b.editedAt.localeCompare(a.editedAt));
+
+  for (const entry of entries) {
+    if (entry.oldValue && entry.oldValue !== 'VOIDED') {
+      return entry.oldValue as VehicleRecordStatus;
+    }
+  }
+
+  const record = getVehicleRecordById(recordId);
+  return record && record.status !== 'VOIDED' ? record.status : null;
 }
 
 export function findDuplicateVehicleRecords(candidate: Pick<VehicleRecordDraft, 'workDate' | 'branch' | 'vehicleBarcode' | 'driverPhone' | 'sourceUrl' | 'routeSummary'>): DuplicateVehicleRecordResult {
@@ -187,8 +267,26 @@ export function getVehicleRecordStorageStatus(): VehicleRecordStorageStatus {
 }
 
 export function getEditHistory(recordId?: string): EditHistoryEntry[] {
+  return listAuditEntries(recordId);
+}
+
+export function listAuditEntries(recordId?: string): EditHistoryEntry[] {
   const entries = readJson<EditHistoryEntry[]>(EDIT_HISTORY_KEY, []);
-  return recordId ? entries.filter((entry) => entry.recordId === recordId) : entries;
+  const normalized = entries.map(normalizeAuditEntry);
+  return (recordId ? normalized.filter((entry) => entry.recordId === recordId) : normalized)
+    .sort((a, b) => b.editedAt.localeCompare(a.editedAt));
+}
+
+export function addAuditEntry(entry: Omit<EditHistoryEntry, 'id' | 'editedAt'> & Partial<Pick<EditHistoryEntry, 'id' | 'editedAt'>>): EditHistoryEntry {
+  const entries = readJson<EditHistoryEntry[]>(EDIT_HISTORY_KEY, []).map(normalizeAuditEntry);
+  const next: EditHistoryEntry = {
+    ...entry,
+    id: entry.id ?? createId(),
+    editedAt: entry.editedAt ?? new Date().toISOString(),
+  };
+  entries.push(next);
+  window.localStorage.setItem(EDIT_HISTORY_KEY, JSON.stringify(entries));
+  return next;
 }
 
 function buildVehicleRecordDraft(draft: FlashProofResult): VehicleRecordDraft {
@@ -287,23 +385,100 @@ function writeRecords(records: VehicleRecord[]): void {
   window.localStorage.setItem(VEHICLE_RECORDS_KEY, JSON.stringify(records));
 }
 
-function writeEditHistory(oldRecord: VehicleRecord, nextRecord: VehicleRecord, reason: string): void {
-  const entries = readJson<EditHistoryEntry[]>(EDIT_HISTORY_KEY, []);
+function writeEditHistory(
+  oldRecord: VehicleRecord,
+  nextRecord: VehicleRecord,
+  reason: string,
+  source: AuditSource,
+  forcedActionType?: AuditActionType,
+): void {
+  const entries = readJson<EditHistoryEntry[]>(EDIT_HISTORY_KEY, []).map(normalizeAuditEntry);
   Object.entries(nextRecord).forEach(([fieldName, newValue]) => {
+    if (AUDIT_SKIPPED_FIELDS.has(fieldName)) return;
     const oldValue = oldRecord[fieldName as keyof VehicleRecord];
     if (JSON.stringify(oldValue) === JSON.stringify(newValue)) return;
     entries.push({
       id: createId(),
       recordId: nextRecord.id,
+      actionType: forcedActionType ?? getAuditActionForField(fieldName),
       fieldName,
       oldValue: typeof oldValue === 'string' ? oldValue : JSON.stringify(oldValue ?? ''),
       newValue: typeof newValue === 'string' ? newValue : JSON.stringify(newValue ?? ''),
       editedBy: nextRecord.responsibleEmployeeCode || 'local-user',
       editedAt: new Date().toISOString(),
       reason,
+      source,
     });
   });
   window.localStorage.setItem(EDIT_HISTORY_KEY, JSON.stringify(entries));
+}
+
+function updateRecordStatusOnly(
+  id: string,
+  patch: Pick<Partial<VehicleRecord>, 'requiredPhotos' | 'status'>,
+  reason: string,
+  source: AuditSource,
+): VehicleRecord | null {
+  const records = readRecords();
+  const index = records.findIndex((record) => record.id === id);
+  if (index < 0) return null;
+  const oldRecord = records[index];
+  const nextRecord = { ...oldRecord, ...patch, updatedAt: new Date().toISOString() };
+  records[index] = nextRecord;
+  writeRecords(records);
+  writeEditHistory(oldRecord, nextRecord, reason, source, 'STATUS_CHANGE');
+  return nextRecord;
+}
+
+function normalizePatch(record: VehicleRecord, patch: Partial<VehicleRecord>): Partial<VehicleRecord> {
+  const nextPatch: Partial<VehicleRecord> = { ...patch };
+  if (nextPatch.vehicleBarcode) nextPatch.vehicleBarcode = nextPatch.vehicleBarcode.trim().toUpperCase();
+  if (nextPatch.driverPhone !== undefined) nextPatch.driverPhone = nextPatch.driverPhone.replace(/\D/g, '');
+  if (nextPatch.branch !== undefined) nextPatch.branch = nextPatch.branch.trim();
+  if (nextPatch.responsibleEmployeeCode !== undefined) {
+    nextPatch.responsibleEmployeeCode = nextPatch.responsibleEmployeeCode.trim();
+  }
+  if (nextPatch.checklistType && nextPatch.checklistType !== record.checklistType) {
+    nextPatch.requiredPhotos = getRequiredPhotosForChecklist(nextPatch.checklistType);
+  }
+  if (
+    nextPatch.vehicleBarcode !== undefined ||
+    nextPatch.driverPhone !== undefined ||
+    nextPatch.sourceUrl !== undefined ||
+    nextPatch.branch !== undefined
+  ) {
+    nextPatch.duplicateKey = createDuplicateKey({
+      workDate: nextPatch.workDate ?? record.workDate,
+      branch: nextPatch.branch ?? record.branch,
+      vehicleBarcode: nextPatch.vehicleBarcode ?? record.vehicleBarcode,
+      driverPhone: nextPatch.driverPhone ?? record.driverPhone,
+      sourceUrl: nextPatch.sourceUrl ?? record.sourceUrl,
+    });
+  }
+  return nextPatch;
+}
+
+function shouldRecalculateAfterPatch(patch: Partial<VehicleRecord>): boolean {
+  return Boolean(patch.checklistType);
+}
+
+function getAuditActionForField(fieldName: string): AuditActionType {
+  if (fieldName === 'driverPhone') return 'PHONE_EDIT';
+  if (fieldName === 'checklistType' || fieldName === 'requiredPhotos') return 'CHECKLIST_TYPE_CHANGE';
+  if (fieldName === 'routeSummary' || fieldName === 'routeRows' || fieldName === 'firstBranch' || fieldName === 'lastBranch') {
+    return 'ROUTE_EDIT';
+  }
+  if (fieldName === 'status') return 'STATUS_CHANGE';
+  return 'FIELD_EDIT';
+}
+
+function normalizeAuditEntry(entry: EditHistoryEntry): EditHistoryEntry {
+  const legacyEntry = entry as EditHistoryEntry & { actionType?: AuditActionType; source?: AuditSource };
+  return {
+    ...entry,
+    actionType: legacyEntry.actionType ?? getAuditActionForField(entry.fieldName),
+    source: legacyEntry.source ?? 'user',
+  };
 }
 
 function readJson<T>(key: string, fallback: T): T {

@@ -1,26 +1,30 @@
 # QA Checklist
 
-## MVP-008 required checks
+## MVP-009 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] VehicleChecklistPage shows required photo checklist
-- [ ] NORMAL_ROUTE requires `loadingPhoto` and `dropPhotoAfterDeparture`
-- [ ] MULTI_DROP requires `branchDropPhoto1`, `branchDropPhoto2`, and `dropPhotoAfterDeparture`
-- [ ] User can add/upload/take photo for each required type
-- [ ] Photo is compressed before saving/upload attempt
-- [ ] UI shows original size and compressed size
-- [ ] Photo preview displays correctly
-- [ ] Retake photo works
-- [ ] Missing photos keep record `PENDING_PHOTO`
-- [ ] All required photos present mark record `COMPLETE`
-- [ ] Dashboard reflects `PENDING_PHOTO` and `COMPLETE` counts
-- [ ] R2 missing config shows honest local-only mode
-- [ ] R2 upload is not faked
-- [ ] R2 secrets are not exposed in frontend
-- [ ] App works without R2 config
-- [ ] Mobile layout has no horizontal overflow
+- [ ] EditRecordPage edits supported fields without horizontal overflow
+- [ ] `vehicleBarcode`, branch, responsible employee code, and `checklistType` validation block invalid save
+- [ ] Thai phone validation blocks invalid phone when present
+- [ ] Important edits require a reason
+- [ ] Save button is disabled when invalid or unchanged
+- [ ] Before/after values are visible before saving
+- [ ] Checklist type changes update `requiredPhotos` and recalculate status
+- [ ] Every manual edit creates audit history with action type and source
+- [ ] VehicleChecklistPage shows latest audit history
+- [ ] Redo QR asks before replacing source URL/barcode and writes `REDO_QR_SCAN`
+- [ ] Redo phone asks before replacing driver phone and writes `REDO_PHONE_OCR`
+- [ ] Flash refetch mode compares old/new values and writes `REFETCH_FLASH` only after confirmation
+- [ ] Void requires reason and confirmation
+- [ ] Voided records remain searchable and keep photos/history
+- [ ] Restore requires reason and writes `RESTORE_RECORD`
+- [ ] Retake photo writes `PHOTO_RETAKE` with old/new photo metadata
+- [ ] Dashboard filters active/voided/complete/pending
+- [ ] Dashboard shows manual edit and redo/refetch indicators
+- [ ] App works without Supabase env keys
+- [ ] App works without R2 signed upload endpoint
 - [ ] Export/backup/cleanup remain clearly placeholder
 
 ## Future QA gates

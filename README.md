@@ -2,21 +2,22 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-MVP-008 adds checklist photo capture/upload foundation, client-side compression, local photo metadata, honest R2 signed-upload behavior, and photo completion status logic. It does **not** implement final Excel export, backup, cleanup, or production storage billing automation.
+MVP-009 hardens edit, redo, void/restore, photo retake, status recalculation, dashboard indicators, and local audit history. It does **not** implement final Excel export exact 21.6, Backup ZIP, Cleanup Guard, production R2 backend, storage billing automation, or fake Flash/Supabase success.
 
-## MVP-008 Behavior
+## MVP-009 Behavior
 
-- Required photos come from record `checklistType`.
-- `NORMAL_ROUTE`: `loadingPhoto`, `dropPhotoAfterDeparture`.
-- `MULTI_DROP`: `branchDropPhoto1`, `branchDropPhoto2`, `dropPhotoAfterDeparture`.
-- Images are compressed in the browser with canvas before saving or upload attempt.
-- Local photo metadata is stored in `hubchecklist.vehiclePhotos`.
-- Compressed preview data is stored locally for MVP use.
-- If `VITE_R2_SIGNED_UPLOAD_ENDPOINT` is missing, the app stays in local-only mode and shows `เก็บรูปในเครื่อง / ยังไม่ได้เชื่อม R2`.
-- Frontend never uses R2 secret keys.
-- Upload status is only `UPLOADED` after a signed upload URL flow returns and the upload succeeds.
-- Record status changes from `READY_FOR_PHOTO` to `PENDING_PHOTO`, then `COMPLETE` when all required photos exist.
-- `VOIDED` records stay unchanged.
+- Manual record edits go through `updateRecordWithAudit`.
+- Audit entries store `id`, `recordId`, `actionType`, `fieldName`, `oldValue`, `newValue`, `editedBy`, `editedAt`, `reason`, and `source`.
+- Edit page supports safe updates for vehicle, phone, driver/company, route summary, branch endpoints, departure times, and `checklistType`.
+- Important edits require a reason: `vehicleBarcode`, `driverPhone`, `checklistType`, and `routeSummary`.
+- `checklistType` changes update `requiredPhotos` and recalculate status.
+- Redo QR and redo phone flows preserve the current record, ask before replacing values, and write audit entries.
+- Flash refetch mode compares old/new route, driver, company, and route row count before replacement.
+- Void requires reason and confirmation, keeps photos/history, and does not hard-delete.
+- Restore requires reason and recalculates the previous non-void status where possible.
+- Photo retake records old/new photo metadata in audit history.
+- Dashboard has active/voided/complete/pending filters plus manual edit and redo/refetch indicators.
+- The app still works without Supabase env keys and without an R2 signed upload endpoint.
 
 ## Environment
 
@@ -58,5 +59,6 @@ npm run build
 7. MVP-007 Vehicle record creation + duplicate handling
 8. MVP-008 Checklist photos + compression + R2 upload foundation
 9. MVP-009 Edit redo void audit hardening
+10. MVP-010 Dashboard hardening and operational filters
 
-Export, backup, and cleanup remain future MVPs.
+Export, backup, cleanup, production R2 backend, and storage billing automation remain future MVPs.

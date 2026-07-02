@@ -8,8 +8,10 @@ import {
 } from '../services/flashProofWebView';
 import {
   createVehicleRecordFromFlashDraft,
+  getVehicleRecordById,
+  updateRecordWithAudit,
 } from '../services/vehicleRecords';
-import type { DuplicateVehicleRecordResult, FlashProofResult, ScanPreviewDraft } from '../types';
+import type { DuplicateVehicleRecordResult, FlashProofResult, RouteRow, ScanPreviewDraft, VehicleRecord } from '../types';
 import {
   getFlashProofResultDraft,
   getScanPreviewDraft,
@@ -32,9 +34,29 @@ export default function FlashSearchPage() {
   const [manualRawText, setManualRawText] = useState('');
   const [duplicateResult, setDuplicateResult] = useState<DuplicateVehicleRecordResult | null>(null);
   const [recordErrors, setRecordErrors] = useState<string[]>([]);
+  const [refetchRecord, setRefetchRecord] = useState<VehicleRecord | null>(null);
 
   useEffect(() => {
-    setPreviewDraft(getScanPreviewDraft());
+    const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const refetchId = params.get('refetchRecordId') ?? '';
+    const record = refetchId ? getVehicleRecordById(refetchId) : null;
+    setRefetchRecord(record);
+    if (record) {
+      setPreviewDraft({
+        sourceUrl: record.sourceUrl,
+        vehicleBarcode: record.vehicleBarcode,
+        scannedAt: record.createdAt,
+        responsibleEmployeeCode: record.responsibleEmployeeCode,
+        responsibleDisplayName: record.responsibleDisplayName,
+        branch: record.branch,
+        driverPhone: record.driverPhone,
+        ocrRawText: record.ocrRawText ?? '',
+        ocrConfidence: record.ocrConfidence,
+        phoneConfirmedAt: record.createdAt,
+      });
+    } else {
+      setPreviewDraft(getScanPreviewDraft());
+    }
     setFlashResult(getFlashProofResultDraft());
     checkFlashProofWebViewAvailability().then((status) => {
       setPlatformAvailable(status.available);
@@ -131,6 +153,48 @@ export default function FlashSearchPage() {
     }
   };
 
+  const handleRefetchReplace = () => {
+    if (!refetchRecord || !flashResult) return;
+    const confirmed = window.confirm('แทนที่ข้อมูล Flash ของรายการเดิมหรือไม่? ระบบจะบันทึก audit ทุกฟิลด์ที่เปลี่ยน');
+    if (!confirmed) return;
+    const routeRows: RouteRow[] = flashResult.routeRows.map((row, index) => ({
+      id: crypto.randomUUID?.() ?? `${Date.now()}-${index}`,
+      recordId: refetchRecord.id,
+      index: row.index || index + 1,
+      branchName: row.branchName,
+      date: row.date,
+      expectedArrivalTime: row.expectedArrivalTime,
+      actualArrivalTime: row.actualArrivalTime,
+      inboundScanner: row.inboundScanner,
+      expectedDepartureTime: row.expectedDepartureTime,
+      actualDepartureTime: row.actualDepartureTime,
+      outboundScanner: row.outboundScanner,
+      duration: row.duration,
+      distance: row.distance,
+      sealNumbers: row.sealNumbers,
+      createdAt: new Date().toISOString(),
+    }));
+    const updated = updateRecordWithAudit(
+      refetchRecord.id,
+      {
+        routeSummary: flashResult.routeSummary,
+        driverName: flashResult.driverName,
+        companyName: flashResult.companyName,
+        firstBranch: flashResult.firstBranch,
+        lastBranch: flashResult.lastBranch,
+        plannedDepartureTime: flashResult.plannedDepartureTime,
+        actualDepartureTime: flashResult.actualDepartureTime,
+        routeRows,
+        flashPageStatus: flashResult.flashPageStatus,
+        flashHtmlSnapshot: flashResult.htmlSnapshot,
+      },
+      'refetch Flash data confirmed',
+      'user',
+      'REFETCH_FLASH',
+    );
+    if (updated) window.location.hash = `/checklist?recordId=${updated.id}`;
+  };
+
   const handleOpenExisting = () => {
     const existing = duplicateResult?.exactMatches[0] ?? duplicateResult?.conflictingMatches[0];
     if (!existing) return;
@@ -184,8 +248,8 @@ export default function FlashSearchPage() {
           <div className="card-heading-row">
             <div className="large-icon"><FileSearch size={30} /></div>
             <div>
-              <StatusBadge label="MVP-006 WebView foundation" tone="success" />
-              <h2>ค้นหา Flash Proof</h2>
+              <StatusBadge label={refetchRecord ? 'MVP-009 refetch mode' : 'MVP-006 WebView foundation'} tone="success" />
+              <h2>{refetchRecord ? 'ดึงข้อมูล Flash ใหม่' : 'ค้นหา Flash Proof'}</h2>
             </div>
           </div>
 
@@ -247,6 +311,21 @@ export default function FlashSearchPage() {
         </article>
 
         {flashResult ? (
+          refetchRecord ? (
+          <article className="feature-card action-card">
+            <h2>เปรียบเทียบก่อนแทนที่</h2>
+            <div className="before-after-list">
+              <CompareRow label="routeSummary" oldValue={refetchRecord.routeSummary} newValue={flashResult.routeSummary} />
+              <CompareRow label="driverName" oldValue={refetchRecord.driverName} newValue={flashResult.driverName} />
+              <CompareRow label="companyName" oldValue={refetchRecord.companyName} newValue={flashResult.companyName} />
+              <CompareRow label="routeRows" oldValue={String(refetchRecord.routeRows.length)} newValue={String(flashResult.routeRows.length)} />
+            </div>
+            <PrimaryButton onClick={handleRefetchReplace} disabled={!canCreateRecord}>
+              <RefreshCcw size={20} />
+              <span>ยืนยันแทนที่ข้อมูล Flash</span>
+            </PrimaryButton>
+          </article>
+          ) : (
           <article className="feature-card action-card">
             <h2>สร้างรายการรถ</h2>
             <PrimaryButton onClick={() => handleCreateVehicleRecord(false)} disabled={!canCreateRecord}>
@@ -273,6 +352,7 @@ export default function FlashSearchPage() {
               </div>
             ) : null}
           </article>
+          )
         ) : null}
       </section>
 
@@ -325,4 +405,14 @@ function attachResponsibleProfile(result: FlashProofResult, previewDraft: ScanPr
     responsibleDisplayName: previewDraft.responsibleDisplayName,
     branch: previewDraft.branch,
   };
+}
+
+function CompareRow({ label, oldValue, newValue }: { label: string; oldValue?: string; newValue?: string }) {
+  return (
+    <div className={String(oldValue ?? '') !== String(newValue ?? '') ? 'before-after-row changed' : 'before-after-row'}>
+      <span>{label}</span>
+      <strong>{oldValue || '-'}</strong>
+      <strong>{newValue || '-'}</strong>
+    </div>
+  );
 }

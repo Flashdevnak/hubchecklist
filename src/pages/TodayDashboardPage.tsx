@@ -3,20 +3,28 @@ import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
 import { getPhotoCompletionStatus } from '../services/photos';
-import { getVehicleRecordStorageStatus, listVehicleRecords } from '../services/vehicleRecords';
+import { getVehicleRecordStorageStatus, listAuditEntries, listVehicleRecords } from '../services/vehicleRecords';
 import type { VehicleRecord } from '../types';
 
 export default function TodayDashboardPage() {
   const [records, setRecords] = useState<VehicleRecord[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [groupFilter, setGroupFilter] = useState('active');
   const storage = getVehicleRecordStorageStatus();
 
   useEffect(() => {
     setRecords(listVehicleRecords());
   }, []);
 
-  const filteredRecords = useMemo(() => listVehicleRecords({ query, status }), [query, status, records]);
+  const filteredRecords = useMemo(() => {
+    const listed = listVehicleRecords({ query, status });
+    if (groupFilter === 'active') return listed.filter((record) => record.status !== 'VOIDED');
+    if (groupFilter === 'voided') return listed.filter((record) => record.status === 'VOIDED');
+    if (groupFilter === 'complete') return listed.filter((record) => record.status === 'COMPLETE');
+    if (groupFilter === 'pending') return listed.filter((record) => ['READY_FOR_PHOTO', 'PENDING_PHOTO', 'NEED_REVIEW'].includes(record.status));
+    return listed;
+  }, [groupFilter, query, status, records]);
   const counts = useMemo(() => ({
     total: records.length,
     ready: records.filter((record) => record.status === 'READY_FOR_PHOTO').length,
@@ -57,15 +65,34 @@ export default function TodayDashboardPage() {
               <option value="VOIDED">VOIDED</option>
             </select>
           </label>
+          <label>
+            <span>filter</span>
+            <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+              <option value="active">active</option>
+              <option value="voided">voided</option>
+              <option value="complete">complete</option>
+              <option value="pending">pending</option>
+              <option value="all">all</option>
+            </select>
+          </label>
         </div>
       </article>
 
       <section className="record-card-grid">
-        {filteredRecords.map((record) => (
+        {filteredRecords.map((record) => {
+          const auditEntries = listAuditEntries(record.id);
+          const hasManualEdit = auditEntries.some((entry) => ['FIELD_EDIT', 'PHONE_EDIT', 'ROUTE_EDIT', 'CHECKLIST_TYPE_CHANGE'].includes(entry.actionType));
+          const hasRedo = auditEntries.some((entry) => ['REDO_QR_SCAN', 'REDO_PHONE_OCR', 'REFETCH_FLASH'].includes(entry.actionType));
+          return (
           <article className="feature-card record-card" key={record.id}>
             <div className="scan-result-heading">
               <h3>{record.vehicleBarcode}</h3>
               <StatusBadge label={record.status} tone={record.status === 'VOIDED' ? 'danger' : 'success'} />
+            </div>
+            <div className="record-indicators">
+              {hasManualEdit ? <StatusBadge label="manual edit" tone="warning" /> : null}
+              {hasRedo ? <StatusBadge label="redo/refetch" tone="neutral" /> : null}
+              {record.status === 'VOIDED' ? <StatusBadge label="searchable voided" tone="danger" /> : null}
             </div>
             <p>{record.driverPhone} / {record.responsibleEmployeeCode} {record.responsibleDisplayName}</p>
             <p className="muted-note">
@@ -77,7 +104,8 @@ export default function TodayDashboardPage() {
               <span>เปิดรายการ</span>
             </PrimaryButton>
           </article>
-        ))}
+        );
+        })}
         {filteredRecords.length === 0 ? (
           <article className="feature-card">
             <Search size={32} />

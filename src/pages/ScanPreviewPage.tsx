@@ -2,6 +2,7 @@ import { CheckCircle2, FileImage, Phone, RefreshCcw, ScanLine, Search } from 'lu
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import { getVehicleRecordById, updateRecordWithAudit } from '../services/vehicleRecords';
 import type { ScanDraft } from '../types';
 import {
   clearScanPreviewDraft,
@@ -29,9 +30,29 @@ export default function ScanPreviewPage() {
   const [ocrStatus, setOcrStatus] = useState('ยังไม่ได้อ่าน OCR');
   const [selectedFileName, setSelectedFileName] = useState('');
   const [confirmedAt, setConfirmedAt] = useState('');
+  const [redoPhoneRecordId, setRedoPhoneRecordId] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const redoId = params.get('redoPhoneRecordId') ?? '';
+    setRedoPhoneRecordId(redoId);
+    const redoRecord = redoId ? getVehicleRecordById(redoId) : null;
+    if (redoRecord) {
+      const redoDraft: ScanDraft = {
+        sourceUrl: redoRecord.sourceUrl,
+        vehicleBarcode: redoRecord.vehicleBarcode,
+        scannedAt: new Date().toISOString(),
+        responsibleEmployeeCode: redoRecord.responsibleEmployeeCode,
+        responsibleDisplayName: redoRecord.responsibleDisplayName,
+        branch: redoRecord.branch,
+      };
+      setScanDraft(redoDraft);
+      setSourceUrl(redoDraft.sourceUrl);
+      setVehicleBarcode(redoDraft.vehicleBarcode);
+      setDriverPhone(redoRecord.driverPhone);
+      setOcrStatus('โหมดอ่านเบอร์ใหม่: ระบบจะไม่แทนที่เบอร์เดิมจนกว่าจะยืนยัน');
+      return;
+    }
     const queryBarcode = params.get('vehicleBarcode') ?? '';
     const savedPreview = getScanPreviewDraft();
 
@@ -110,6 +131,26 @@ export default function ScanPreviewPage() {
   const handleConfirm = () => {
     if (!workingDraft || !canConfirm) return;
 
+    if (redoPhoneRecordId) {
+      const oldRecord = getVehicleRecordById(redoPhoneRecordId);
+      const nextPhone = driverPhone.replace(/\D/g, '');
+      const confirmed = window.confirm(
+        `แทนที่เบอร์โทรหรือไม่?\n\nเดิม: ${oldRecord?.driverPhone ?? '-'}\nใหม่: ${nextPhone}`,
+      );
+      if (!confirmed) return;
+      const updated = updateRecordWithAudit(
+        redoPhoneRecordId,
+        { driverPhone: nextPhone },
+        'redo phone OCR confirmed',
+        'user',
+        'REDO_PHONE_OCR',
+      );
+      if (updated) {
+        window.location.hash = `/checklist?recordId=${updated.id}`;
+      }
+      return;
+    }
+
     const previewDraft = createScanPreviewDraft(workingDraft, {
       driverPhone,
       ocrRawText,
@@ -160,7 +201,7 @@ export default function ScanPreviewPage() {
           <div className="card-heading-row">
             <div className="large-icon"><ScanLine size={30} /></div>
             <div>
-              <StatusBadge label="MVP-005 preview/edit" tone="success" />
+              <StatusBadge label={redoPhoneRecordId ? 'MVP-009 redo phone' : 'MVP-005 preview/edit'} tone="success" />
               <h2>ตรวจข้อมูลก่อนค้นหา Flash</h2>
             </div>
           </div>
@@ -291,7 +332,7 @@ export default function ScanPreviewPage() {
           <h2>ยืนยันข้อมูล</h2>
           <PrimaryButton onClick={handleConfirm} disabled={!canConfirm}>
             <CheckCircle2 size={20} />
-            <span>ยืนยัน preview</span>
+            <span>{redoPhoneRecordId ? 'ยืนยันแทนที่เบอร์' : 'ยืนยัน preview'}</span>
           </PrimaryButton>
           <PrimaryButton variant="secondary" onClick={handleClear}>
             <RefreshCcw size={20} />
