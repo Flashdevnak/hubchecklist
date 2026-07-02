@@ -2,22 +2,22 @@
 
 Mobile-first project foundation for Hub vehicle proof capture.
 
-MVP-009 hardens edit, redo, void/restore, photo retake, status recalculation, dashboard indicators, and local audit history. It does **not** implement final Excel export exact 21.6, Backup ZIP, Cleanup Guard, production R2 backend, storage billing automation, or fake Flash/Supabase success.
+MVP-010 hardens the daily operations dashboard so supervisors can search, filter, group, sort, and monitor local hub work. It does **not** implement final Excel export exact 21.6, Backup ZIP, Cleanup Guard, production R2 backend, storage billing automation, or fake Flash/Supabase/R2 success.
 
-## MVP-009 Behavior
+## MVP-010 Behavior
 
-- Manual record edits go through `updateRecordWithAudit`.
-- Audit entries store `id`, `recordId`, `actionType`, `fieldName`, `oldValue`, `newValue`, `editedBy`, `editedAt`, `reason`, and `source`.
-- Edit page supports safe updates for vehicle, phone, driver/company, route summary, branch endpoints, departure times, and `checklistType`.
-- Important edits require a reason: `vehicleBarcode`, `driverPhone`, `checklistType`, and `routeSummary`.
-- `checklistType` changes update `requiredPhotos` and recalculate status.
-- Redo QR and redo phone flows preserve the current record, ask before replacing values, and write audit entries.
-- Flash refetch mode compares old/new route, driver, company, and route row count before replacement.
-- Void requires reason and confirmation, keeps photos/history, and does not hard-delete.
-- Restore requires reason and recalculates the previous non-void status where possible.
-- Photo retake records old/new photo metadata in audit history.
-- Dashboard has active/voided/complete/pending filters plus manual edit and redo/refetch indicators.
-- The app still works without Supabase env keys and without an R2 signed upload endpoint.
+- Dashboard summary cards show scanned records, photo status, voided records, edited records, redo/refetch records, local photos, uploaded photos, and upload failures.
+- Responsible-person summary groups by employee code, display name, and branch; tapping a person filters the record list.
+- Mobile-friendly filter chips cover active records, statuses, edited, redo/refetch, duplicate warning, local-only photos, and upload failed.
+- Search covers vehicle barcode, driver phone/name, company, route summary, first/last branch, responsible profile, status, checklist type, and branch.
+- Date filters support today, yesterday, last 7 days, custom work date, and all local records.
+- Branch filter defaults to the active responsible profile branch when available and includes BNAK plus branches found in local records.
+- Record cards show status, responsible profile, branch, checklist type, photo progress, edit/redo/void/duplicate/storage indicators, last update time, and action buttons.
+- Sorting supports latest, oldest, status, responsible person, vehicle barcode, and missing photos first.
+- Operational alerts highlight missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible profile, missing phone, and missing barcode.
+- Storage mode card shows Supabase/R2 configuration state, photo counts, failed uploads, and estimated local photo size.
+- Empty states provide scan and responsible-profile shortcuts.
+- Dashboard runs fully from local records, photos, and audit history without requiring Supabase or R2.
 
 ## Environment
 
@@ -60,5 +60,6 @@ npm run build
 8. MVP-008 Checklist photos + compression + R2 upload foundation
 9. MVP-009 Edit redo void audit hardening
 10. MVP-010 Dashboard hardening and operational filters
+11. MVP-011 Export XLSX/ZIP with exact 21.6 layout
 
 Export, backup, cleanup, production R2 backend, and storage billing automation remain future MVPs.

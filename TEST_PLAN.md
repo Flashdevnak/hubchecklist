@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-009
+## MVP-010
 
-Goal: prove edit, redo, void/restore, photo retake, status recalculation, dashboard filtering, and audit history work locally without fake cloud or Flash success.
+Goal: prove the dashboard is useful for daily hub supervision using local records, photos, and audit history without faking cloud sync or future export/backup features.
 
 Commands:
 
@@ -14,32 +14,31 @@ npm run build
 
 Manual checks:
 
-- Open an existing vehicle record and go to Edit.
-- Change `driverPhone` or `routeSummary` with no reason and confirm save stays disabled.
-- Add a reason and save; confirm the checklist page shows audit entries with old/new values.
-- Change `checklistType`; confirm `requiredPhotos` updates and status recalculates from existing photos.
-- Use “สแกน QR ใหม่”; enter a new URL/barcode, confirm replacement, and verify `REDO_QR_SCAN`.
-- Use “อ่านเบอร์ใหม่”; enter/extract a new phone, confirm replacement, and verify `REDO_PHONE_OCR`.
-- Use “ดึงข้อมูล Flash ใหม่”; in PWA/manual mode, paste Flash text, compare old/new values, confirm replacement, and verify `REFETCH_FLASH`.
-- Void a record; confirm reason and warning are required, status becomes `VOIDED`, and the record is still searchable.
-- Restore a voided record; confirm reason is required and status returns to previous non-void status or recalculates.
-- Retake a checklist photo and confirm `PHOTO_RETAKE` includes old/new photo metadata.
-- Confirm Dashboard active/voided/complete/pending filters and edit/redo indicators.
+- Open the dashboard with local vehicle records present.
+- Confirm summary cards show total, ready, pending, complete, voided, edited, redo/refetch, local photos, and uploaded photos.
+- Confirm responsible-person cards show totals, completion, pending photo, voided, edited, branch, and last updated time.
+- Tap a responsible-person card and confirm the record list filters.
+- Use each status chip: all, active, ready, pending, complete, voided, edited, redo/refetch, duplicate warning, local-only photos, upload failed.
+- Search by vehicle barcode, driver phone, driver name, company, route summary, first/last branch, responsible code/name, status, checklist type, and branch.
+- Test date quick filters: today, yesterday, last 7 days, all local records, and custom work date.
+- Test branch filter with BNAK and other branches found in records.
+- Test sorting by latest, oldest, status, responsible person, barcode, and missing photos first.
+- Confirm each record card shows status, checklist type, photo progress, indicators, local/upload state, and last updated time.
+- Confirm action buttons open checklist, edit record, view history, and continue photo capture when missing photos exist.
+- Confirm operational alerts count missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible, missing phone, and missing barcode.
+- Confirm storage card shows Supabase configured/not configured, R2 configured/not configured, local-only photo count, uploaded photo count, upload failed count, and estimated local size.
+- Confirm empty state shows scan and responsible-profile buttons when filters return no records.
+- Confirm dashboard remains usable on mobile widths without horizontal overflow.
 - Confirm the app opens and builds without Supabase keys and without an R2 signed upload endpoint.
-- Confirm export, backup, cleanup, production R2 backend, and storage billing automation are still placeholders.
+- Confirm exact 21.6 export, Backup ZIP, Cleanup Guard, production R2 backend, and storage billing automation remain placeholders.
 
 ## Future Test Areas
 
-### MVP-010 Dashboard hardening and operational filters
+### MVP-011 Export XLSX/ZIP with exact 21.6 layout
 
-- Daily operations filter polish.
-- Supervisor/admin views.
-- More complete local reporting indicators.
-
-### Exact 21.6 export
-
-- Workbook includes sheet `21.6`.
-- Photo cells link to exact vehicle photo.
+- Workbook includes exact sheet `21.6`.
+- Each photo is linked to the right vehicle row.
+- ZIP packaging remains blocked until the export layout is correct.
 
 ### Backup cleanup guard
 

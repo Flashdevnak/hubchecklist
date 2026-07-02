@@ -1,30 +1,27 @@
 # QA Checklist
 
-## MVP-009 required checks
+## MVP-010 required checks
 
 - [ ] `npm install` passes
 - [ ] `npx tsc -b` passes
 - [ ] `npm run build` passes
-- [ ] EditRecordPage edits supported fields without horizontal overflow
-- [ ] `vehicleBarcode`, branch, responsible employee code, and `checklistType` validation block invalid save
-- [ ] Thai phone validation blocks invalid phone when present
-- [ ] Important edits require a reason
-- [ ] Save button is disabled when invalid or unchanged
-- [ ] Before/after values are visible before saving
-- [ ] Checklist type changes update `requiredPhotos` and recalculate status
-- [ ] Every manual edit creates audit history with action type and source
-- [ ] VehicleChecklistPage shows latest audit history
-- [ ] Redo QR asks before replacing source URL/barcode and writes `REDO_QR_SCAN`
-- [ ] Redo phone asks before replacing driver phone and writes `REDO_PHONE_OCR`
-- [ ] Flash refetch mode compares old/new values and writes `REFETCH_FLASH` only after confirmation
-- [ ] Void requires reason and confirmation
-- [ ] Voided records remain searchable and keep photos/history
-- [ ] Restore requires reason and writes `RESTORE_RECORD`
-- [ ] Retake photo writes `PHOTO_RETAKE` with old/new photo metadata
-- [ ] Dashboard filters active/voided/complete/pending
-- [ ] Dashboard shows manual edit and redo/refetch indicators
-- [ ] App works without Supabase env keys
-- [ ] App works without R2 signed upload endpoint
+- [ ] Dashboard shows top summary cards
+- [ ] Dashboard groups records by responsible person
+- [ ] Clicking a responsible person filters the record list
+- [ ] Status filter chips work on mobile
+- [ ] Search covers barcode, phone, route, responsible person, branch, status, and checklist type
+- [ ] Date filters support today, yesterday, last 7 days, custom date, and all local records
+- [ ] Branch filter includes BNAK and branches found in records
+- [ ] Record cards show photo progress per record
+- [ ] Record cards show edited, redo/refetch, voided, duplicate/conflict, and storage indicators
+- [ ] Record cards include open, edit, history, and continue-photo actions where applicable
+- [ ] Sorting works for latest, oldest, status, responsible person, barcode, and missing photos first
+- [ ] Operational alerts show missing photos, voided today, edited today, upload failed, duplicate/conflict, missing responsible, missing phone, and missing barcode
+- [ ] Storage mode card shows Supabase/R2 config state and local/upload photo counts
+- [ ] Empty state has scan and responsible-profile shortcuts
+- [ ] Dashboard works without Supabase env keys
+- [ ] Dashboard works without R2 signed upload endpoint
+- [ ] Mobile layout has no horizontal overflow
 - [ ] Export/backup/cleanup remain clearly placeholder
 
 ## Future QA gates

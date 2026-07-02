@@ -1,102 +1,155 @@
 # Project Specification
 
-## MVP-009 Edit Redo Void Audit Hardening
+## MVP-010 Dashboard Hardening and Operational Filters
 
-MVP-009 makes correction workflows safe and reviewable. Important data must not be silently overwritten. Local mode remains the source of truth for this MVP, with Supabase/R2 integrations still optional foundations.
+MVP-010 turns TodayDashboardPage into a local-first operations dashboard for hub supervisors. It uses existing vehicle records, photo metadata, and audit history. It does not require Supabase or R2, and it does not implement export, backup, cleanup, production storage, or billing automation.
 
-## Audit Contract
-
-Every manual change writes an audit entry with:
-
-- `id`
-- `recordId`
-- `actionType`
-- `fieldName`
-- `oldValue`
-- `newValue`
-- `editedBy`
-- `editedAt`
-- `reason`
-- `source`
-
-Supported `actionType` values:
-
-- `FIELD_EDIT`
-- `PHONE_EDIT`
-- `ROUTE_EDIT`
-- `CHECKLIST_TYPE_CHANGE`
-- `REDO_QR_SCAN`
-- `REDO_PHONE_OCR`
-- `REFETCH_FLASH`
-- `PHOTO_RETAKE`
-- `VOID_RECORD`
-- `RESTORE_RECORD`
-- `STATUS_CHANGE`
-
-Supported `source` values:
-
-- `user`
-- `system`
-- `duplicate_flow`
-- `photo_flow`
-
-Local storage keys:
+## Dashboard Data Sources
 
 - Vehicle records: `hubchecklist.vehicleRecords`
-- Audit history: `hubchecklist.vehicleRecordEditHistory`
 - Vehicle photos: `hubchecklist.vehiclePhotos`
+- Audit history: `hubchecklist.vehicleRecordEditHistory`
+- Active responsible profile, when available, for default branch filtering
 
-## Safe Edit Rules
+## Summary Cards
 
-Editable fields include:
+The top dashboard cards show:
+
+- Total filtered records
+- `READY_FOR_PHOTO`
+- `PENDING_PHOTO`
+- `COMPLETE`
+- `VOIDED`
+- Edited records
+- Redo/refetch records
+- Local-only photo count
+- Uploaded photo count
+
+## Filters and Search
+
+Status chips:
+
+- All
+- Active
+- `READY_FOR_PHOTO`
+- `PENDING_PHOTO`
+- `COMPLETE`
+- `VOIDED`
+- Edited
+- Redo/refetch
+- Duplicate warning
+- Local-only photos
+- Upload failed
+
+Search includes:
 
 - `vehicleBarcode`
-- `sourceUrl`
 - `driverPhone`
 - `driverName`
 - `companyName`
 - `routeSummary`
 - `firstBranch`
 - `lastBranch`
-- `plannedDepartureTime`
-- `actualDepartureTime`
+- `responsibleEmployeeCode`
+- `responsibleDisplayName`
+- `status`
 - `checklistType`
 - `branch`
-- `responsibleEmployeeCode`
 
-Validation:
+Date filters:
 
-- `vehicleBarcode` is required and normalized to uppercase.
-- `driverPhone` must be a valid Thai phone when present.
-- `branch` is required.
-- `responsibleEmployeeCode` is required.
-- `checklistType` must be `NORMAL_ROUTE` or `MULTI_DROP`.
-- Editing `vehicleBarcode`, `driverPhone`, `checklistType`, or `routeSummary` requires a reason.
+- Today default
+- Yesterday
+- Last 7 days
+- Custom `workDate`
+- All local records
 
-## Redo and Refetch Rules
+Branch filters:
 
-- Redo QR keeps the record, asks before replacing `sourceUrl` and `vehicleBarcode`, and audits `REDO_QR_SCAN`.
-- Redo phone keeps the record, asks before replacing `driverPhone`, and audits `REDO_PHONE_OCR`.
-- Flash refetch uses the current `sourceUrl` and `driverPhone`, compares route summary, driver, company, and route row count, then audits `REFETCH_FLASH` after confirmation.
-- PWA mode remains honest: it can use manual pasted Flash text, but it does not fake Android WebView extraction success.
+- All branches
+- BNAK
+- Other branches found in local records
+- Defaults to active responsible profile branch if available
 
-## Void and Restore Rules
+## Responsible Summary
 
-- Void requires reason and confirmation.
-- Void sets `status = VOIDED`.
-- Void keeps photos and edit history.
-- Void never hard-deletes records.
-- Restore requires reason and restores previous non-void status when available, otherwise recalculates/falls back to review status.
+Records are grouped by `responsibleEmployeeCode` and `responsibleDisplayName`.
 
-## Status Recalculation
+Each responsible card shows:
 
-- `VOIDED` remains `VOIDED` unless restored.
-- No required photos present: `READY_FOR_PHOTO`.
-- Some required photos missing: `PENDING_PHOTO`.
-- All required photos present: `COMPLETE`.
-- Checklist type changes update required photo types and recalculate status.
+- Employee code
+- Display name
+- Branch
+- Total records
+- Complete
+- Pending photo
+- Voided
+- Edited
+- Last updated time
 
-## Still Placeholder After MVP-009
+Clicking a responsible card filters the record list.
+
+## Record Cards
+
+Each dashboard record card shows:
+
+- Vehicle barcode
+- Driver phone
+- Responsible profile
+- Branch
+- Status badge
+- Checklist type
+- Route summary
+- Photo progress
+- Edited indicator
+- Redo/refetch indicator
+- Voided indicator
+- Duplicate/conflict indicator
+- Local-only/upload failed indicator
+- Last updated time
+- Actions to open checklist, edit, view history, and continue photo capture when photos are missing
+
+## Sorting
+
+Supported sort modes:
+
+- Latest updated first
+- Oldest updated first
+- Status
+- Responsible person
+- Vehicle barcode
+- Missing photos first
+
+Default sort is latest updated first.
+
+## Operational Alerts
+
+Alerts are warnings only; they do not block operation.
+
+Alerts include:
+
+- Records missing required photos
+- Records voided today
+- Records edited today
+- Records with upload failed
+- Records with duplicate/conflict warning
+- Records with missing responsible profile
+- Records missing driver phone
+- Records missing vehicle barcode
+
+## Storage Mode Card
+
+The storage card shows:
+
+- Supabase configured/not configured
+- R2 signed upload configured/not configured
+- Local-only photo count
+- Uploaded photo count
+- Upload failed count
+- Estimated local photo size
+- Reminder that Export/Backup will be handled in MVP-011/MVP-012
+
+## Still Placeholder After MVP-010
 
 - Final Excel export exact 21.6
 - Backup ZIP

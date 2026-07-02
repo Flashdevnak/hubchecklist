@@ -25,6 +25,10 @@ export function listPhotosForRecord(recordId: string): VehiclePhoto[] {
   return readPhotos().filter((photo) => photo.recordId === recordId && !photo.deletedAt);
 }
 
+export function listVehiclePhotos(): VehiclePhoto[] {
+  return readPhotos().filter((photo) => !photo.deletedAt);
+}
+
 export function getPhotoByType(recordId: string, photoType: PhotoType): VehiclePhoto | null {
   return listPhotosForRecord(recordId).find((photo) => photo.photoType === photoType) ?? null;
 }
