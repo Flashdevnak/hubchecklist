@@ -2,7 +2,7 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
-MVP-013 prepares the project for real mobile and Android device testing. It does **not** implement production R2 backend, app store release, or fake Android build success.
+MVP-014 verifies Android APK build readiness and documents the exact local blocker. It does **not** implement production R2 backend, app store release, or fake APK success.
 
 ## Current QA Result
 
@@ -11,7 +11,8 @@ MVP-013 prepares the project for real mobile and Android device testing. It does
 - Production web build passes.
 - Capacitor Android sync passes.
 - Capacitor doctor passes.
-- Android debug APK build is blocked on this machine because `JAVA_HOME` is not set and `java` is not available on `PATH`.
+- Java exists at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot` and works when set for the current process.
+- Android debug APK build is blocked because Android SDK is not installed/configured at `C:\Users\myhou\AppData\Local\Android\Sdk`.
 
 ## MVP Status
 
@@ -30,12 +31,15 @@ MVP-013 prepares the project for real mobile and Android device testing. It does
 | MVP-011 XLSX/ZIP exact 21.6 export | Complete | Browser ZIP/export works locally |
 | MVP-012 Backup Reminder + Cleanup Guard | Complete | Cleanup only confirmed backed-up local payloads |
 | MVP-013 Android QA readiness | Complete | Docs/checklists added; APK build needs Java/Android SDK |
+| MVP-014 Android APK build readiness | Complete | Java verified; SDK blocker documented |
 
 ## Key Docs
 
 - [Android device test guide](docs/ANDROID_DEVICE_TEST.md)
 - [Flow QA checklist](docs/FLOW_QA_CHECKLIST.md)
 - [Deployment notes](docs/DEPLOYMENT_NOTES.md)
+- [APK build result](docs/APK_BUILD_RESULT.md)
+- [Real device test result](docs/REAL_DEVICE_TEST_RESULT.md)
 - [Project spec](docs/PROJECT_SPEC.md)
 
 ## Commands
@@ -48,14 +52,21 @@ npx cap sync android
 npx cap doctor
 ```
 
-Android debug build after installing JDK and Android SDK:
+Android debug build after installing Android SDK:
 
 ```bash
-.\android\gradlew.bat assembleDebug
+.\android\gradlew.bat -p android assembleDebug
+```
+
+Expected SDK local config after Android SDK install:
+
+```properties
+sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
 ```
 
 ## Remaining Production Work
 
+- Install Android SDK and rerun `.\android\gradlew.bat -p android assembleDebug`.
 - Real Android device QA on Samsung S23 FE and Galaxy Tab A7 Lite.
 - iPad browser fallback QA.
 - Android release signing/app store packaging.

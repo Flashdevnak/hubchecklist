@@ -1,48 +1,68 @@
 # Project Specification
 
-## MVP-013 Final Android QA and Device Readiness
+## MVP-014 Android APK Build and Real Device QA Readiness
 
-MVP-013 prepares the project for real mobile testing. It verifies web build, TypeScript, Capacitor sync, Android readiness docs, route coverage, safety constraints, and device QA checklists.
+MVP-014 verifies local Android APK build readiness. It checks Java, searches for Android SDK on Windows, documents the correct ignored `android/local.properties` content, runs the required web and Capacitor checks, attempts the Android debug build with the correct Gradle invocation, and prepares real device QA documentation.
 
 ## Verified Locally
 
-- `npm install` passes.
-- `npx tsc -b` passes.
-- `npm run build` passes.
-- `npx cap sync android` passes.
-- `npx cap doctor` passes.
+- Java exists at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`.
+- OpenJDK 17.0.19 works when called directly and when `JAVA_HOME`/`PATH` are set for the current process.
+- `npm.cmd install` passes.
+- `npx.cmd tsc -b` passes.
+- `npm.cmd run build` passes.
+- `npx.cmd cap doctor` passes.
+- `npx.cmd cap sync android` passes.
 
 ## Android Build Status
 
-Android debug build is not verified on this machine because Java is missing:
+Android debug APK build is blocked locally because Android SDK is not installed/configured at the expected Windows location.
+
+Checked paths:
 
 ```text
-ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+C:\Users\myhou\AppData\Local\Android\Sdk
+C:\Android\Sdk
+C:\Program Files\Android\Android Studio
+C:\Program Files (x86)\Android\android-sdk
 ```
 
-This is a local toolchain blocker, not an app code success. Install Android Studio, Android SDK, and JDK 17+, then set `JAVA_HOME` before building APK.
+Correct build command from project root:
 
-## Registered Routes
+```powershell
+.\android\gradlew.bat -p android assembleDebug
+```
 
-- `login`
-- `responsible-profile`
-- `scan`
-- `scan-preview`
-- `flash-search`
-- `checklist`
-- `edit-record`
-- `dashboard`
-- `export`
-- `backup-cleanup`
-- `admin-settings`
-- `user-management`
+Exact blocker:
+
+```text
+SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at 'C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\local.properties'.
+```
+
+Expected ignored local config after Android SDK installation:
+
+```properties
+sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
+```
+
+Expected APK path after successful build:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+## Android Project Settings
+
+- Package/application ID: `com.flashops.hubchecklist`
+- Plugin: `FlashProofWebViewPlugin`
+- Registered in `MainActivity`
+- Permission: `android.permission.INTERNET`
+- Allowed host: `api.flashexpress.com`
+- Allowed path: `/gw/nws/web/proof/go/`
 
 ## Android WebView Safety Review
 
-- Plugin: `FlashProofWebViewPlugin`
-- Registered in `MainActivity`.
-- Allowed host: `api.flashexpress.com`
-- Allowed path: `/gw/nws/web/proof/go/`
 - Blocks navigation outside the allowed Flash proof URL.
 - Validates Thai phone format before WebView automation.
 - Uses timeout and error responses for network/loading/extraction failures.
@@ -62,6 +82,8 @@ See:
 - `docs/ANDROID_DEVICE_TEST.md`
 - `docs/FLOW_QA_CHECKLIST.md`
 - `docs/DEPLOYMENT_NOTES.md`
+- `docs/APK_BUILD_RESULT.md`
+- `docs/REAL_DEVICE_TEST_RESULT.md`
 
 ## Safety Constraints
 
