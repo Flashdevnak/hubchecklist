@@ -1,8 +1,8 @@
 # Real Device Test Result
 
-## MVP-014 Status
+## MVP-015 Status
 
-The debug APK has been generated successfully, but real device testing is still pending.
+The debug APK has been generated successfully. MVP-015 UI/UX and role-flow changes still need real device testing.
 
 APK path:
 
@@ -11,6 +11,16 @@ C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\de
 ```
 
 Do not mark Flash live automation passed until it has been tested on a physical Android device with the real Flash proof page.
+
+Additional MVP-015 checks:
+
+- [ ] Staff mode bottom navigation is clean on Samsung S23 FE
+- [ ] Scan page has no generic Placeholder badge
+- [ ] Scan page has only one scan-again/reset action
+- [ ] Missing responsible profile warning is clear
+- [ ] Admin mode tools do not crowd staff flow
+- [ ] Galaxy Tab A7 Lite layout has no horizontal overflow
+- [ ] iPad browser fallback remains usable
 
 ## Target Devices
 

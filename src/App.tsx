@@ -13,7 +13,8 @@ import BackupCleanupPage from './pages/BackupCleanupPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
 import { pages } from './data/pages';
-import type { AppRoute } from './types';
+import type { AppRoleMode, AppRoute } from './types';
+import { getActiveResponsibleProfile, getRoleMode, saveRoleMode } from './utils';
 
 const pageMap: Record<AppRoute, JSX.Element> = {
   login: <LoginPage />,
@@ -37,14 +38,24 @@ function getRouteFromHash(): AppRoute {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash());
+  const [roleMode, setRoleMode] = useState<AppRoleMode>(getRoleMode());
+  const [activeProfile, setActiveProfile] = useState(getActiveResponsibleProfile());
 
   useEffect(() => {
-    const onHashChange = () => setRoute(getRouteFromHash());
-    window.addEventListener('hashchange', onHashChange);
+    const refreshShellState = () => {
+      setRoute(getRouteFromHash());
+      setRoleMode(getRoleMode());
+      setActiveProfile(getActiveResponsibleProfile());
+    };
+    window.addEventListener('hashchange', refreshShellState);
+    window.addEventListener('storage', refreshShellState);
     if (!window.location.hash) {
       window.location.hash = '/dashboard';
     }
-    return () => window.removeEventListener('hashchange', onHashChange);
+    return () => {
+      window.removeEventListener('hashchange', refreshShellState);
+      window.removeEventListener('storage', refreshShellState);
+    };
   }, []);
 
   const currentPage = useMemo(
@@ -55,10 +66,23 @@ export default function App() {
   const navigate = (nextRoute: AppRoute) => {
     window.location.hash = `/${nextRoute}`;
     setRoute(nextRoute);
+    setActiveProfile(getActiveResponsibleProfile());
+  };
+
+  const handleRoleChange = (mode: AppRoleMode) => {
+    saveRoleMode(mode);
+    setRoleMode(mode);
   };
 
   return (
-    <AppShell currentRoute={route} currentPage={currentPage} onNavigate={navigate}>
+    <AppShell
+      activeProfile={activeProfile}
+      currentPage={currentPage}
+      currentRoute={route}
+      roleMode={roleMode}
+      onNavigate={navigate}
+      onRoleChange={handleRoleChange}
+    >
       {pageMap[route]}
     </AppShell>
   );

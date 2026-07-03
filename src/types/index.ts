@@ -32,6 +32,7 @@ export type AppRoute =
   | 'user-management';
 
 export type FeatureStatus = 'placeholder' | 'planned' | 'ready';
+export type AppRoleMode = 'staff' | 'admin';
 
 export interface PageDefinition {
   route: AppRoute;
@@ -46,6 +47,12 @@ export interface ActiveResponsibleProfile {
   employeeCode: string;
   displayName: string;
   branch: string;
+}
+
+export interface ResponsibleProfileLocal extends ActiveResponsibleProfile {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ScanDraft {

@@ -78,6 +78,11 @@ export default function ExportPage() {
           <p className="muted-note">
             สร้าง backup.zip แบบ offline/free จาก local records, photos และ audit history พร้อม workbook.xlsx sheet 21.6 และลิงก์รูปใน ZIP
           </p>
+          <ol className="step-list">
+            <li>เลือกข้อมูล</li>
+            <li>ตรวจสอบจำนวนรายการและรูป</li>
+            <li>Export ZIP</li>
+          </ol>
           <pre className="code-block">backup.zip{'\n'}├─ workbook.xlsx{'\n'}├─ photos/{'\n'}├─ flash-screenshots/{'\n'}└─ backup-manifest.json</pre>
         </article>
 
@@ -189,7 +194,7 @@ export default function ExportPage() {
             <li>Backup Manifest</li>
             <li>Voided Records</li>
           </ul>
-          <p className="scan-message warning">Backup Reminder และ Cleanup Guard จะทำใน MVP-012</p>
+          <p className="scan-message success">ไฟล์ workbook.xlsx มีชีท 21.6 และลิงก์รูปตรงช่องตาม export preview</p>
         </article>
 
         <article className="feature-card">

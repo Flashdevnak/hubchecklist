@@ -2,7 +2,7 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
-MVP-014 verifies Android APK debug build readiness and records the successful local APK build. It does **not** implement production R2 backend, app store release, or fake Flash live automation success.
+MVP-015 polishes the mobile UI/UX and adds a local staff/admin operating mode. It does **not** implement secure Supabase Auth, production R2 backend, app store release, or fake Flash live automation success.
 
 ## Current QA Result
 
@@ -15,6 +15,9 @@ MVP-014 verifies Android APK debug build readiness and records the successful lo
 - Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`.
 - Android debug APK build passes.
 - APK path: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Staff/Admin mode is local-first and clearly labeled as not connected to central login.
+- Staff navigation is simplified for profile, scan, phone, Flash, photos, and own work.
+- Admin navigation keeps dashboard, records, export, backup, settings, and audit-oriented tools separate.
 - Physical device testing is still pending.
 
 ## MVP Status
@@ -35,6 +38,7 @@ MVP-014 verifies Android APK debug build readiness and records the successful lo
 | MVP-012 Backup Reminder + Cleanup Guard | Complete | Cleanup only confirmed backed-up local payloads |
 | MVP-013 Android QA readiness | Complete | Docs/checklists added; APK build needs Java/Android SDK |
 | MVP-014 Android APK build readiness | Complete | Debug APK build passed; real device QA pending |
+| MVP-015 UI/UX polish + role flow | Complete | Local staff/admin mode, cleaner mobile workflow |
 
 ## Key Docs
 
@@ -77,8 +81,10 @@ adb install android/app/build/outputs/apk/debug/app-debug.apk
 
 - Real Android device QA on Samsung S23 FE and Galaxy Tab A7 Lite.
 - iPad browser fallback QA.
+- Physical Android Flash live automation validation.
 - Android release signing/app store packaging.
 - Production R2 signed upload backend.
 - Production R2 delete backend.
 - Production Supabase sync hardening.
+- Secure Supabase Auth replacing the local MVP mode switch.
 - Storage billing automation or live cloud usage metrics.

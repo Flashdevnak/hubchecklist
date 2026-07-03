@@ -1,18 +1,36 @@
 import type { ReactNode } from 'react';
 import { pages } from '../data/pages';
-import type { AppRoute, PageDefinition } from '../types';
+import type { ActiveResponsibleProfile, AppRoleMode, AppRoute, PageDefinition } from '../types';
 import BottomNav from './BottomNav';
+import ModeBadge from './ModeBadge';
 import PageHeader from './PageHeader';
+import RoleSwitch from './RoleSwitch';
 import SupabaseStatusNotice from './SupabaseStatusNotice';
 
 interface AppShellProps {
+  activeProfile: ActiveResponsibleProfile | null;
   children: ReactNode;
   currentRoute: AppRoute;
   currentPage: PageDefinition;
+  roleMode: AppRoleMode;
   onNavigate: (route: AppRoute) => void;
+  onRoleChange: (mode: AppRoleMode) => void;
 }
 
-export default function AppShell({ children, currentRoute, currentPage, onNavigate }: AppShellProps) {
+const staffRoutes: AppRoute[] = ['dashboard', 'responsible-profile', 'scan', 'scan-preview', 'flash-search', 'checklist'];
+const adminRoutes: AppRoute[] = ['dashboard', 'export', 'backup-cleanup', 'admin-settings', 'user-management', 'edit-record'];
+
+export default function AppShell({
+  activeProfile,
+  children,
+  currentRoute,
+  currentPage,
+  roleMode,
+  onNavigate,
+  onRoleChange,
+}: AppShellProps) {
+  const visiblePages = pages.filter((page) => (roleMode === 'staff' ? staffRoutes : adminRoutes).includes(page.route));
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="เมนูหลัก">
@@ -23,8 +41,10 @@ export default function AppShell({ children, currentRoute, currentPage, onNaviga
             <span>Vehicle Proof</span>
           </div>
         </div>
+        <RoleSwitch mode={roleMode} onChange={onRoleChange} />
+        <p className="local-mode-note">โหมดภายในเครื่อง / ยังไม่ได้เชื่อมระบบ Login กลาง</p>
         <nav className="side-nav">
-          {pages.map((page) => {
+          {visiblePages.map((page) => {
             const Icon = page.icon;
             return (
               <button
@@ -42,12 +62,20 @@ export default function AppShell({ children, currentRoute, currentPage, onNaviga
       </aside>
 
       <main className="app-main">
-        <SupabaseStatusNotice />
+        <div className="top-status-row">
+          <ModeBadge mode={roleMode} />
+          {activeProfile ? (
+            <span className="profile-pill">{activeProfile.employeeCode} {activeProfile.displayName} / {activeProfile.branch}</span>
+          ) : (
+            <span className="profile-pill warning">ยังไม่ได้เลือกผู้รับผิดชอบ</span>
+          )}
+          <SupabaseStatusNotice compact />
+        </div>
         <PageHeader page={currentPage} />
         <section className="page-content">{children}</section>
       </main>
 
-      <BottomNav currentRoute={currentRoute} onNavigate={onNavigate} />
+      <BottomNav currentRoute={currentRoute} roleMode={roleMode} onNavigate={onNavigate} />
     </div>
   );
 }

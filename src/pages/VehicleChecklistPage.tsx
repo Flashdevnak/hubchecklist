@@ -127,6 +127,10 @@ export default function VehicleChecklistPage() {
             <h2>รูปถ่าย Checklist</h2>
             <StatusBadge label={storageMode.mode === 'local_only' ? 'Local photos' : 'R2 signed upload'} tone={storageMode.mode === 'local_only' ? 'warning' : 'success'} />
           </div>
+          <div className="photo-progress-banner">
+            <strong>รูปครบ {completion.completeCount}/{completion.requiredCount}</strong>
+            <span>{completion.isComplete ? 'พร้อมตรวจสอบและ Export' : 'ถ่ายรูปที่ยังขาดให้ครบก่อนจบงาน'}</span>
+          </div>
           <p className={completion.isComplete ? 'scan-message success' : 'scan-message warning'}>
             {completion.isComplete ? 'ถ่ายครบแล้ว' : `ยังขาดรูป: ${completion.missingTypes.map((type) => PHOTO_TYPE_LABELS[type]).join(', ')}`}
           </p>
@@ -168,7 +172,7 @@ export default function VehicleChecklistPage() {
 
       <aside className="preview-side-stack">
         <article className="feature-card action-card">
-          <h2>การทำงาน</h2>
+          <h2>จัดการรายการ</h2>
           <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/edit-record?recordId=${record.id}`; }}>
             <PencilLine size={20} />
             <span>แก้ไขข้อมูล</span>

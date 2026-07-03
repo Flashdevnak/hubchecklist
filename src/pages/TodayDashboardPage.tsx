@@ -2,6 +2,7 @@ import { ClipboardCheck, Edit3, History, ImagePlus, Search, UserCog } from 'luci
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import WarningCard from '../components/WarningCard';
 import { formatBytes as formatBackupBytes, getBackupCleanupSummary } from '../services/backupCleanup';
 import {
   type DashboardDateMode,
@@ -20,7 +21,7 @@ import {
 import { getPhotoStorageMode, listVehiclePhotos } from '../services/photos';
 import { getVehicleRecordStorageStatus, listAuditEntries, listVehicleRecords } from '../services/vehicleRecords';
 import type { EditHistoryEntry, VehiclePhoto, VehicleRecord } from '../types';
-import { getActiveResponsibleProfile } from '../utils';
+import { getActiveResponsibleProfile, getRoleMode } from '../utils';
 
 const STATUS_FILTERS: Array<{ id: DashboardStatusFilter; label: string }> = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -47,6 +48,7 @@ const SORT_OPTIONS: Array<{ id: DashboardSortMode; label: string }> = [
 
 export default function TodayDashboardPage() {
   const activeProfile = getActiveResponsibleProfile();
+  const roleMode = getRoleMode();
   const today = getLocalDateString(new Date());
   const [records, setRecords] = useState<VehicleRecord[]>([]);
   const [photos, setPhotos] = useState<VehiclePhoto[]>([]);
@@ -83,6 +85,14 @@ export default function TodayDashboardPage() {
   const responsibleSummary = useMemo(() => getResponsibleSummary(baseFilteredRecords, photos, audits), [audits, baseFilteredRecords, photos]);
   const alerts = useMemo(() => getOperationalAlerts(baseFilteredRecords, photos, audits), [audits, baseFilteredRecords, photos]);
   const branches = useMemo(() => getBranchOptions(records), [records]);
+  const staffRecords = useMemo(
+    () => records.filter((record) => (
+      activeProfile &&
+      record.responsibleEmployeeCode === activeProfile.employeeCode &&
+      record.workDate === today
+    )),
+    [activeProfile, records, today],
+  );
 
   const setQuickDate = (mode: DashboardDateMode) => {
     setDateMode(mode);
@@ -93,6 +103,67 @@ export default function TodayDashboardPage() {
       setSelectedDate(getLocalDateString(date));
     }
   };
+
+  if (roleMode === 'staff') {
+    const staffSummary = getDashboardSummary(staffRecords, photos, audits);
+    const pendingPhotoRecords = staffRecords.filter((record) => getPhotoProgress(record, photos).missingCount > 0 && record.status !== 'VOIDED');
+    return (
+      <div className="dashboard-page staff-home">
+        {!activeProfile ? (
+          <WarningCard
+            title="กรุณาเลือกผู้รับผิดชอบก่อนเริ่มงาน"
+            action={<PrimaryButton onClick={() => { window.location.hash = '/responsible-profile'; }}>เลือกผู้รับผิดชอบ</PrimaryButton>}
+          >
+            เมื่อเลือกแล้ว ระบบจะผูกงานสแกน รูปถ่าย และ Export กับชื่อนั้น
+          </WarningCard>
+        ) : (
+          <article className="feature-card primary-card staff-hero-card">
+            <div>
+              <StatusBadge label="พร้อมเริ่มงาน" tone="success" />
+              <h2>{activeProfile.employeeCode} {activeProfile.displayName} / {activeProfile.branch}</h2>
+              <p className="muted-note">โหมดพนักงานแสดงเฉพาะงานที่ต้องใช้หน้างานเร็ว ๆ</p>
+            </div>
+            <div className="scan-actions">
+              <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>เริ่มสแกนรถ</PrimaryButton>
+              <PrimaryButton variant="secondary" onClick={() => { window.location.hash = pendingPhotoRecords[0] ? `/checklist?recordId=${pendingPhotoRecords[0].id}` : '/dashboard'; }}>
+                ถ่ายรูปงานค้าง
+              </PrimaryButton>
+            </div>
+          </article>
+        )}
+
+        <section className="dashboard-summary-grid">
+          <SummaryCard label="งานของฉันวันนี้" value={staffSummary.total} />
+          <SummaryCard label="รอถ่ายรูป" value={staffSummary.ready + staffSummary.pending} tone="warning" />
+          <SummaryCard label="รูปครบ" value={staffSummary.complete} tone="success" />
+          <SummaryCard label="รูปในเครื่อง" value={staffSummary.localOnlyPhotos} tone="warning" />
+        </section>
+
+        <section className="record-card-grid">
+          {staffRecords.map((record) => (
+            <DashboardRecordCard
+              audits={audits}
+              key={record.id}
+              photos={photos}
+              record={record}
+              records={records}
+            />
+          ))}
+          {staffRecords.length === 0 ? (
+            <article className="feature-card dashboard-empty-state">
+              <Search size={38} />
+              <h2>ยังไม่มีงานของฉันวันนี้</h2>
+              <p className="muted-note">เลือกผู้รับผิดชอบแล้วกดเริ่มสแกนรถเพื่อสร้างรายการจากงานจริง</p>
+              <div className="scan-actions">
+                <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>เริ่มสแกนรถ</PrimaryButton>
+                <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>ผู้รับผิดชอบ</PrimaryButton>
+              </div>
+            </article>
+          ) : null}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page">

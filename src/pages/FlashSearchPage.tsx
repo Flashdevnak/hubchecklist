@@ -370,7 +370,8 @@ export default function FlashSearchPage() {
           </PrimaryButton>
         </article>
 
-        <article className="feature-card">
+        <details className="feature-card advanced-panel">
+          <summary>ตัวเลือกขั้นสูง: แปลงข้อความจาก Flash เอง</summary>
           <h2>โหมดทดสอบข้อความ</h2>
           <p className="muted-note">โหมดทดสอบข้อความ / ยังไม่ใช่การดึงจาก Flash อัตโนมัติ</p>
           <div className="scan-form">
@@ -387,11 +388,11 @@ export default function FlashSearchPage() {
             <RefreshCcw size={20} />
             <span>แปลงข้อความทดสอบ</span>
           </PrimaryButton>
-        </article>
+        </details>
 
         <article className="feature-card">
           <h2>ขั้นตอนถัดไป</h2>
-          <p className="muted-note">การสร้าง vehicle record จะทำใน MVP-007</p>
+          <p className="muted-note">เมื่อมีผล Flash แล้ว ให้กดสร้างรายการรถเพื่อไปถ่ายรูป Checklist</p>
         </article>
       </aside>
     </div>

@@ -1,6 +1,7 @@
 import { CheckCircle2, FileImage, Phone, RefreshCcw, ScanLine, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
+import StepProgress from '../components/StepProgress';
 import StatusBadge from '../components/StatusBadge';
 import { getVehicleRecordById, updateRecordWithAudit } from '../services/vehicleRecords';
 import type { ScanDraft } from '../types';
@@ -160,6 +161,7 @@ export default function ScanPreviewPage() {
     saveScanPreviewDraft(previewDraft);
     setConfirmedAt(previewDraft.phoneConfirmedAt ?? '');
     setDriverPhone(previewDraft.driverPhone);
+    window.location.hash = '/flash-search';
   };
 
   const handleClear = () => {
@@ -197,6 +199,7 @@ export default function ScanPreviewPage() {
   return (
     <div className="scan-preview-page">
       <section className="preview-main-stack">
+        <StepProgress steps={['QR completed', 'Phone number', 'Flash search']} current={1} />
         <article className="feature-card primary-card">
           <div className="card-heading-row">
             <div className="large-icon"><ScanLine size={30} /></div>
@@ -237,7 +240,8 @@ export default function ScanPreviewPage() {
           </div>
         </article>
 
-        <article className="feature-card">
+        <details className="feature-card advanced-panel">
+          <summary>ตัวเลือกขั้นสูง: OCR / ข้อความดิบ</summary>
           <div className="card-heading-row">
             <div className="large-icon"><FileImage size={30} /></div>
             <div>
@@ -300,7 +304,7 @@ export default function ScanPreviewPage() {
               </div>
             </div>
           ) : null}
-        </article>
+        </details>
       </section>
 
       <aside className="preview-side-stack">
@@ -332,7 +336,7 @@ export default function ScanPreviewPage() {
           <h2>ยืนยันข้อมูล</h2>
           <PrimaryButton onClick={handleConfirm} disabled={!canConfirm}>
             <CheckCircle2 size={20} />
-            <span>{redoPhoneRecordId ? 'ยืนยันแทนที่เบอร์' : 'ยืนยัน preview'}</span>
+            <span>{redoPhoneRecordId ? 'ยืนยันแทนที่เบอร์' : 'ยืนยันเบอร์และไปหน้า Flash'}</span>
           </PrimaryButton>
           <PrimaryButton variant="secondary" onClick={handleClear}>
             <RefreshCcw size={20} />
@@ -341,7 +345,7 @@ export default function ScanPreviewPage() {
           {confirmedAt ? (
             <p className="scan-message success">บันทึก preview แล้วเมื่อ {new Date(confirmedAt).toLocaleString('th-TH')}</p>
           ) : null}
-          <p className="muted-note">ขั้นตอนเปิดหน้า Flash และกรอกเบอร์อัตโนมัติจะทำใน MVP-006</p>
+          <p className="muted-note">เส้นทางหลักคือกรอกเบอร์ด้วยมือหรือเลือกเบอร์ที่ตรวจพบ แล้วไปหน้า Flash</p>
         </article>
       </aside>
     </div>

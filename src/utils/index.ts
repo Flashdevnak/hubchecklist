@@ -1,8 +1,10 @@
 import type {
   ActiveResponsibleProfile,
+  AppRoleMode,
   FlashProofParseResult,
   FlashProofResult,
   FlashProofRouteRow,
+  ResponsibleProfileLocal,
   ScanDraft,
   ScanPreviewDraft,
   ValidationResult,
@@ -32,11 +34,94 @@ export function extractBarcodeFromFlashUrl(value: string): string | null {
 export const SCAN_DRAFT_STORAGE_KEY = 'hubchecklist.scanDraft';
 export const SCAN_PREVIEW_DRAFT_STORAGE_KEY = 'hubchecklist.scanPreviewDraft';
 export const FLASH_PROOF_RESULT_DRAFT_STORAGE_KEY = 'hubchecklist.flashProofResultDraft';
+export const ROLE_MODE_STORAGE_KEY = 'hubchecklist.roleMode';
+export const RESPONSIBLE_PROFILES_STORAGE_KEY = 'hubchecklist.responsibleProfiles';
 export const ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS = [
   'hubchecklist.activeResponsibleProfile',
   'hubchecklist.responsibleProfile.active',
   'activeResponsibleProfile',
 ];
+
+export function getRoleMode(): AppRoleMode {
+  const stored = window.localStorage.getItem(ROLE_MODE_STORAGE_KEY);
+  return stored === 'admin' ? 'admin' : 'staff';
+}
+
+export function saveRoleMode(mode: AppRoleMode): void {
+  window.localStorage.setItem(ROLE_MODE_STORAGE_KEY, mode);
+}
+
+export function listResponsibleProfiles(): ResponsibleProfileLocal[] {
+  const rawValue = window.localStorage.getItem(RESPONSIBLE_PROFILES_STORAGE_KEY);
+  if (!rawValue) {
+    const active = getActiveResponsibleProfile();
+    return active ? [profileFromActive(active)] : [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as ResponsibleProfileLocal[];
+    return parsed
+      .filter((profile) => profile.employeeCode && profile.displayName && profile.branch)
+      .map((profile) => ({
+        ...profile,
+        id: profile.id || profile.employeeCode,
+        createdAt: profile.createdAt || new Date().toISOString(),
+        updatedAt: profile.updatedAt || new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export function saveResponsibleProfiles(profiles: ResponsibleProfileLocal[]): void {
+  window.localStorage.setItem(RESPONSIBLE_PROFILES_STORAGE_KEY, JSON.stringify(profiles));
+}
+
+export function upsertResponsibleProfile(values: ActiveResponsibleProfile): ResponsibleProfileLocal {
+  const now = new Date().toISOString();
+  const employeeCode = values.employeeCode.trim();
+  const displayName = values.displayName.trim();
+  const branch = values.branch.trim().toUpperCase();
+  const profiles = listResponsibleProfiles();
+  const existing = profiles.find((profile) => profile.employeeCode === employeeCode);
+  const nextProfile: ResponsibleProfileLocal = {
+    id: existing?.id ?? crypto.randomUUID?.() ?? `${employeeCode}-${Date.now()}`,
+    employeeCode,
+    displayName,
+    branch,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  const nextProfiles = existing
+    ? profiles.map((profile) => (profile.id === existing.id ? nextProfile : profile))
+    : [nextProfile, ...profiles];
+  saveResponsibleProfiles(nextProfiles);
+  saveActiveResponsibleProfile(nextProfile);
+  return nextProfile;
+}
+
+export function deleteResponsibleProfile(profileId: string): void {
+  const profiles = listResponsibleProfiles().filter((profile) => profile.id !== profileId);
+  saveResponsibleProfiles(profiles);
+  const active = getActiveResponsibleProfile();
+  const deletedWasActive = profiles.every((profile) => profile.employeeCode !== active?.employeeCode);
+  if (active && deletedWasActive) {
+    clearActiveResponsibleProfile();
+  }
+}
+
+export function saveActiveResponsibleProfile(profile: ActiveResponsibleProfile): void {
+  const value = JSON.stringify({
+    employeeCode: profile.employeeCode.trim(),
+    displayName: profile.displayName.trim(),
+    branch: profile.branch.trim().toUpperCase(),
+  });
+  ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS.forEach((key) => window.localStorage.setItem(key, value));
+}
+
+export function clearActiveResponsibleProfile(): void {
+  ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+}
 
 export function isFlashProofUrl(input: string): boolean {
   const trimmed = input.trim();
@@ -185,6 +270,16 @@ export function getActiveResponsibleProfile(): ActiveResponsibleProfile | null {
   }
 
   return null;
+}
+
+function profileFromActive(profile: ActiveResponsibleProfile): ResponsibleProfileLocal {
+  const now = new Date().toISOString();
+  return {
+    ...profile,
+    id: profile.employeeCode,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export function saveScanDraft(draft: ScanDraft): void {

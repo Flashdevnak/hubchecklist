@@ -1,20 +1,17 @@
 # QA Checklist
 
-## MVP-014 Required Checks
+## MVP-015 Required Checks
 
 - [x] `npm install` passes
 - [x] `npx tsc -b` passes
 - [x] `npm run build` passes
 - [x] `npx cap sync android` passes
-- [x] `npx cap doctor` passes
 - [x] Java 17 is installed at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`
 - [x] Java works when `JAVA_HOME` and `PATH` are set for the current process
-- [x] Android SDK common paths were checked
 - [x] Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`
 - [x] Android debug APK build passes on local machine
 - [x] APK path is documented
 - [x] `android/local.properties` was not committed
-- [x] Expected `android/local.properties` content is documented
 - [x] Package name is `com.flashops.hubchecklist`
 - [x] Android WebView plugin file exists
 - [x] `FlashProofWebViewPlugin` is registered in `MainActivity`
@@ -22,9 +19,19 @@
 - [x] Flash WebView allowlist remains restricted to `https://api.flashexpress.com/gw/nws/web/proof/go/`
 - [x] App works without Supabase env keys
 - [x] App works without R2 signed upload endpoint
-- [x] Real device QA checklist is updated
-- [x] APK build result is documented
-- [x] No fake APK success was added
+- [x] Scan page no longer shows generic Placeholder badge
+- [x] Scan page has one scan-again/reset action
+- [x] Missing responsible profile reason is visible before next step
+- [x] Responsible profile create/select/edit/delete flow is local-first
+- [x] Staff navigation is simplified
+- [x] Admin navigation is separate
+- [x] Phone preview flow is clearer and advanced OCR is collapsible
+- [x] Flash fallback/manual parser remains honest and advanced
+- [x] Vehicle checklist photo progress is clearer
+- [x] Export keeps exact 21.6 ZIP path and clearer steps
+- [x] Backup/Cleanup guard remains intact
+- [x] Supabase/R2 status is compact
+- [x] No fake secure login was added
 - [ ] Real device Flash WebView test passes
 - [x] Real device Flash WebView test remains marked pending
 - [x] No new product features were added

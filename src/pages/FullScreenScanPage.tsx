@@ -2,6 +2,7 @@ import { Camera, Keyboard, RefreshCcw, ScanLine, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
+import WarningCard from '../components/WarningCard';
 import { getVehicleRecordById, updateRecordWithAudit } from '../services/vehicleRecords';
 import type { ActiveResponsibleProfile, ScanDraft } from '../types';
 import {
@@ -57,12 +58,9 @@ export default function FullScreenScanPage() {
 
   const handleOpenScanner = () => {
     if ('BarcodeDetector' in window) {
-      setScannerMessage(
-        'อุปกรณ์รองรับ BarcodeDetector แล้ว แต่การเปิดกล้องจริงจะเชื่อมต่อใน MVP ถัดไป กรุณากรอกลิงก์หรือบาร์โค้ดเพื่อทดสอบงานตอนนี้',
-      );
+      setScannerMessage('อุปกรณ์รองรับ BarcodeDetector แล้ว แต่กล้องจริงยังเป็นโหมดทดสอบใน MVP นี้ กรุณากรอกลิงก์หรือบาร์โค้ดเพื่อทำงานต่อ');
       return;
     }
-
     setScannerMessage(unsupportedScannerMessage);
   };
 
@@ -116,13 +114,13 @@ export default function FullScreenScanPage() {
   };
 
   return (
-    <div className="scan-page">
+    <div className="scan-page clean-scan-page">
       <section className="scan-hero">
         <div className="scan-frame" aria-label="พื้นที่สแกน QR">
           <div className="scan-corners" />
           <ScanLine size={72} />
           <strong>วาง QR ให้อยู่ในกรอบ</strong>
-          <span>กล้องจริงยังเป็นฐานเตรียมเชื่อมต่อ Manual input ใช้งานได้ใน MVP-004</span>
+          <span>สแกนหรือกรอกลิงก์ Flash เพื่อดึงบาร์โค้ดรถ จากนั้นไปกรอกเบอร์คนขับ</span>
         </div>
 
         <div className="scan-actions">
@@ -132,7 +130,7 @@ export default function FullScreenScanPage() {
           </PrimaryButton>
           <PrimaryButton variant="secondary" onClick={() => document.getElementById('manual-qr-input')?.focus()}>
             <Keyboard size={20} />
-            <span>กรอกลิงก์/บาร์โค้ดเอง</span>
+            <span>กรอกเอง</span>
           </PrimaryButton>
         </div>
 
@@ -140,6 +138,29 @@ export default function FullScreenScanPage() {
       </section>
 
       <section className="scan-panel">
+        {activeProfile ? (
+          <article className="profile-mini-card">
+            <UserCog size={20} />
+            <div>
+              <span>ผู้รับผิดชอบ</span>
+              <strong>{activeProfile.employeeCode} {activeProfile.displayName} / {activeProfile.branch}</strong>
+            </div>
+          </article>
+        ) : (
+          <WarningCard
+            title="กรุณาเลือกผู้รับผิดชอบก่อนเริ่มงาน"
+            tone="danger"
+            action={
+              <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>
+                <UserCog size={20} />
+                <span>เลือกผู้รับผิดชอบ</span>
+              </PrimaryButton>
+            }
+          >
+            ปุ่มไปขั้นตอนถัดไปจะเปิดใช้งานหลังจากมีผู้รับผิดชอบและ QR ถูกต้อง
+          </WarningCard>
+        )}
+
         <div className="scan-form">
           <label htmlFor="manual-qr-input">ลิงก์ QR หรือบาร์โค้ดรถ</label>
           <textarea
@@ -147,42 +168,26 @@ export default function FullScreenScanPage() {
             value={manualInput}
             onChange={(event) => setManualInput(event.target.value)}
             placeholder="https://api.flashexpress.com/gw/nws/web/proof/go/NAK1R7XJ45 หรือ NAK1R7XJ45"
-            rows={4}
+            rows={3}
           />
         </div>
 
-        {!activeProfile ? (
-          <div className="scan-message danger">
-            <strong>กรุณาเลือกผู้รับผิดชอบก่อนเริ่มสแกน</strong>
-            <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>
-              <UserCog size={20} />
-              <span>ไปหน้าเลือกผู้รับผิดชอบ</span>
-            </PrimaryButton>
-          </div>
-        ) : null}
-
-        <article className="scan-result-card">
+        <article className="scan-result-card compact-result">
           <div className="scan-result-heading">
             <h2>ผลตรวจ QR</h2>
             <StatusBadge
-              label={redoRecordId ? 'โหมดสแกน QR ใหม่' : parseResult.isValid ? 'พร้อมตรวจต่อ' : 'รอข้อมูลถูกต้อง'}
+              label={redoRecordId ? 'โหมดสแกนใหม่' : parseResult.isValid ? 'ถูกต้อง' : 'ยังไม่ถูกต้อง'}
               tone={parseResult.isValid ? 'success' : 'warning'}
             />
           </div>
 
           <div className="scan-result-grid">
-            <span>sourceUrl</span>
-            <strong>{parseResult.sourceUrl || '-'}</strong>
-            <span>vehicleBarcode</span>
-            <strong>{parseResult.vehicleBarcode || '-'}</strong>
-            <span>validation</span>
+            <span>สถานะ</span>
             <strong>{parseResult.error ?? parseResult.warning ?? 'ข้อมูลถูกต้อง'}</strong>
-            <span>ผู้รับผิดชอบ</span>
-            <strong>
-              {activeProfile
-                ? `${activeProfile.employeeCode} ${activeProfile.displayName} / ${activeProfile.branch}`
-                : '-'}
-            </strong>
+            <span>บาร์โค้ดรถ</span>
+            <strong>{parseResult.vehicleBarcode || '-'}</strong>
+            <span>ลิงก์ Flash</span>
+            <strong>{parseResult.sourceUrl || '-'}</strong>
           </div>
         </article>
 

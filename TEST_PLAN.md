@@ -1,15 +1,14 @@
 # Test Plan
 
-## MVP-014
+## MVP-015
 
-Goal: verify Android APK build readiness, record the successful debug APK build, and define the remaining real device checks without claiming Flash live automation before physical testing.
+Goal: verify the UI/UX polish and local staff/admin operating model without changing business logic or claiming secure auth/cloud/Flash production success.
 
 ## Commands Run
 
 ```powershell
 java -version
 Write-Output "JAVA_HOME=$env:JAVA_HOME"
-& "C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot\bin\java.exe" -version
 npm.cmd install
 npx.cmd tsc -b
 npm.cmd run build
@@ -20,15 +19,30 @@ cd android
 
 ## Results
 
-- Java at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`: passed with OpenJDK 17.0.19.
-- Android SDK at `C:\Users\myhou\AppData\Local\Android\Sdk`: present.
-- `android/local.properties`: present locally with `sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk`; ignored by Git.
-- `npm.cmd install`: passed, with npm audit warnings.
-- `npx.cmd tsc -b`: passed.
-- `npm.cmd run build`: passed, with known Vite large chunk warning from XLSX/ZIP libraries.
-- `npx.cmd cap sync android`: passed.
-- `.\gradlew.bat assembleDebug`: passed from the `android` folder.
-- APK generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
+- `npm.cmd install`: must pass, with existing npm audit warnings acceptable.
+- `npx.cmd tsc -b`: must pass.
+- `npm.cmd run build`: must pass, with known Vite large chunk warning from XLSX/ZIP libraries acceptable.
+- `npx.cmd cap sync android`: must pass.
+- `.\gradlew.bat assembleDebug`: must pass from the `android` folder when SDK is available.
+
+## MVP-015 UX Checks
+
+- Switch between Staff mode and Admin mode; mode persists in localStorage.
+- Confirm header shows current mode and local-login notice.
+- Confirm Supabase/R2 status is compact and does not dominate operational pages.
+- Staff mode bottom nav shows only today, responsible profile, scan, photos, and own work.
+- Admin mode bottom nav shows dashboard, records, export, backup, and settings.
+- Responsible profile page can create/select/edit/delete `25845 Tui / BNAK`.
+- Scan page has no generic Placeholder badge.
+- Scan page has one scan-again/reset action.
+- Scan page explains why next is disabled when no responsible profile exists.
+- Scan preview has progress steps and a large phone input.
+- OCR/manual raw text controls are under advanced options.
+- Flash page clearly separates Android WebView action from Web/PWA fallback.
+- Vehicle checklist shows a large photo progress banner and keeps audit collapsible.
+- Dashboard remains card-based and usable on mobile.
+- Export page keeps exact 21.6 ZIP behavior and adds simple steps.
+- Backup/Cleanup still requires confirmed backup and the exact confirmation phrase.
 
 ## Android Project Checks
 

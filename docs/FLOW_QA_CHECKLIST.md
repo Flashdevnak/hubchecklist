@@ -5,13 +5,19 @@ Use this checklist during web, PWA, and Android device testing. Record pass/fail
 | Area | Test | Expected result | Pass/Fail notes |
 | --- | --- | --- | --- |
 | App shell | Open app with no hash | Dashboard route loads without crash | |
+| Role mode | Switch Staff/Admin mode | Mode persists locally and header shows current mode | |
+| Role mode | Staff mode navigation | Only staff workflow items crowd the bottom nav | |
+| Role mode | Admin mode navigation | Dashboard/records/export/backup/settings are available separately | |
 | Missing env | Run without Supabase keys | Supabase notice says not configured; app still works | |
 | Missing R2 | Run without signed upload endpoint | Photo mode says local-only; no fake upload success | |
 | Login | Open LoginPage | Page renders; no fake auth success required | |
 | Responsible profile | Save `25845`, `Tui`, `BNAK` | Profile persists and active profile is used by scan/export defaults | |
+| Responsible profile | Edit/select/delete profile | Local profile list updates without fake backend login | |
 | QR scan | Enter Flash URL manually | `NAK1R7XJ45` is extracted | |
+| QR scan | No responsible profile selected | Next button is disabled and warning explains why | |
 | QR scanner fallback | Tap camera scan where browser unsupported | Honest manual-input fallback appears | |
 | Scan preview | Enter phone `0643042911` | Phone validates and preview can be confirmed | |
+| Scan preview | Open advanced OCR | OCR/raw text tools are collapsible and not in main path | |
 | OCR fallback | Paste OCR text | Phone candidates are extracted or user can type manually | |
 | Flash PWA | Open FlashSearchPage in browser | PWA fallback explains auto-fill limitation; no fake result | |
 | Flash Android | Open FlashSearchPage in Android app | WebView plugin opens allowed Flash URL and handles errors clearly | |
@@ -30,6 +36,8 @@ Use this checklist during web, PWA, and Android device testing. Record pass/fail
 | Dashboard | Search barcode/phone/route/responsible | Results filter correctly | |
 | Dashboard | Use status/date/branch/sort filters | Cards remain readable and correct | |
 | Dashboard mobile | Test narrow viewport | No horizontal overflow; buttons are large | |
+| Staff home | Open dashboard in Staff mode | Shows active profile, own totals, pending photos, complete count | |
+| Admin dashboard | Open dashboard in Admin mode | Shows all records, filters, alerts, export/backup shortcuts | |
 | Export | Generate backup ZIP | ZIP contains `workbook.xlsx`, `photos/`, `flash-screenshots/`, manifest | |
 | Export workbook | Open workbook | Sheet `21.6` exists with A:K, M:U, W:AE, AG:AQ blocks | |
 | Export photos | Inspect photo cells | Existing local photos are linked; missing photos show `ยังไม่มีรูป` | |

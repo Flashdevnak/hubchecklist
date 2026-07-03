@@ -1,5 +1,4 @@
 import type { PageDefinition } from '../types';
-import StatusBadge from './StatusBadge';
 
 interface PageHeaderProps {
   page: PageDefinition;
@@ -20,7 +19,6 @@ export default function PageHeader({ page }: PageHeaderProps) {
           <p>{page.description}</p>
         </div>
       </div>
-      <StatusBadge label="ยังไม่ได้พัฒนา / Placeholder" tone="warning" />
     </header>
   );
 }
