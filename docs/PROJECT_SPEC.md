@@ -1,12 +1,17 @@
 # Project Specification
 
-## MVP-015 UI/UX Polish and Staff/Admin Role Flow
+## MVP-016 Real Camera Scan and Fast Staff Flow
 
-MVP-015 improves the mobile-first operational UI and adds a local staff/admin mode switch. This is a UI-level operating model only: it stores the selected mode locally, does not fake secure login, and can later be replaced by Supabase Auth.
+MVP-016 makes the staff scan path real-operation ready. The Scan page opens the device camera, detects QR codes with browser APIs when supported, extracts the vehicle barcode, stops the camera after success, and keeps phone entry on the same screen when the Flash QR does not contain a driver phone.
 
 ## Verified Locally
 
 - TypeScript passes after UI/role changes.
+- `navigator.mediaDevices.getUserMedia` camera path is implemented.
+- BarcodeDetector QR scan loop is implemented when the browser/WebView supports it.
+- Android `CAMERA` permission is declared.
+- Camera permission errors show a Thai fallback message.
+- Driver phone cache is local-first and keyed by vehicle barcode.
 - Staff/Admin mode is local-first and labeled as not connected to central login.
 - Staff navigation hides admin-heavy tools.
 - Admin navigation separates dashboard, records, export, backup, settings, and audit-oriented review.
@@ -21,6 +26,9 @@ MVP-015 improves the mobile-first operational UI and adds a local staff/admin mo
 - Pending/complete photo counts.
 - Large actions for starting scan and continuing pending photos.
 - Bottom navigation limited to staff workflow.
+- Scan page is one screen: profile, camera/manual input, barcode result, phone input, and sticky continue action.
+- QR is treated as barcode/proof link only; phone is never faked from QR.
+- Cached phone can speed up repeat work but remains editable.
 
 ## Admin/Supervisor Mode
 
@@ -35,6 +43,9 @@ MVP-015 improves the mobile-first operational UI and adds a local staff/admin mo
 - Scan page uses one scan-again/reset action.
 - Scan result card is compact and uses staff-friendly labels.
 - Missing responsible profile warning explains why next is disabled.
+- Scanner test-mode warning is removed.
+- Camera preview replaces the inactive scanner box after tapping camera.
+- Sticky scan action is lifted above bottom nav.
 - Phone preview has progress steps and advanced OCR collapse.
 - Flash manual parser is advanced and does not pretend to be live automation.
 - Checklist shows photo progress prominently and keeps audit history available.
@@ -79,6 +90,7 @@ See:
 ## Remaining Production Tasks
 
 - Real Android device QA.
+- Real camera scan validation on Samsung S23 FE and Galaxy Tab A7 Lite.
 - Physical Android Flash WebView test against the real Flash proof page.
 - Secure Supabase Auth replacing local role mode.
 - Android release signing.

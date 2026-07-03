@@ -21,6 +21,7 @@ export default function ResponsibleProfilePage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState('');
   const [message, setMessage] = useState('');
+  const returnTo = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('returnTo');
 
   const canSave = useMemo(
     () => Boolean(form.employeeCode.trim() && form.displayName.trim() && form.branch.trim()),
@@ -46,6 +47,7 @@ export default function ResponsibleProfilePage() {
     setForm(emptyForm);
     setEditingId('');
     refresh();
+    if (returnTo === 'scan') window.location.hash = '/scan';
   };
 
   const handleEdit = (profile: ResponsibleProfileLocal) => {
@@ -62,6 +64,7 @@ export default function ResponsibleProfilePage() {
     saveActiveResponsibleProfile(profile);
     setMessage(`เลือกใช้งาน ${profile.employeeCode} ${profile.displayName} / ${profile.branch}`);
     refresh();
+    if (returnTo === 'scan') window.location.hash = '/scan';
   };
 
   const handleDelete = (profile: ResponsibleProfileLocal) => {

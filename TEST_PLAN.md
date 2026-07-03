@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-015
+## MVP-016
 
-Goal: verify the UI/UX polish and local staff/admin operating model without changing business logic or claiming secure auth/cloud/Flash production success.
+Goal: verify real camera QR scanning and the faster one-screen staff scan flow without faking driver phone extraction, secure auth, cloud upload, or Flash live success.
 
 ## Commands Run
 
@@ -43,6 +43,21 @@ cd android
 - Dashboard remains card-based and usable on mobile.
 - Export page keeps exact 21.6 ZIP behavior and adds simple steps.
 - Backup/Cleanup still requires confirmed backup and the exact confirmation phrase.
+
+## MVP-016 Camera And Staff Flow Checks
+
+- Tap `เปิดกล้องสแกน QR`; real camera preview appears.
+- Deny camera permission; clear Thai message appears and manual input remains available.
+- Scan Flash proof URL `https://api.flashexpress.com/gw/nws/web/proof/go/NAK1RH9A274`.
+- Confirm vehicle barcode becomes `NAK1RH9A274`.
+- Confirm camera stops after successful scan.
+- Confirm no test-mode scanner warning appears.
+- Confirm QR does not claim to include driver phone.
+- If no cached phone exists, phone input appears on Scan page.
+- Enter `0643042911`, confirm, and continue to Flash page.
+- Repeat same vehicle barcode; cached phone option appears and remains editable.
+- Confirm bottom sticky action is not hidden by bottom navigation.
+- Confirm raw vehicle barcode manual fallback works.
 
 ## Android Project Checks
 

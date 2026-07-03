@@ -15,7 +15,12 @@ Use this checklist during web, PWA, and Android device testing. Record pass/fail
 | Responsible profile | Edit/select/delete profile | Local profile list updates without fake backend login | |
 | QR scan | Enter Flash URL manually | `NAK1R7XJ45` is extracted | |
 | QR scan | No responsible profile selected | Next button is disabled and warning explains why | |
-| QR scanner fallback | Tap camera scan where browser unsupported | Honest manual-input fallback appears | |
+| QR scanner camera | Tap camera scan | Real camera preview appears | |
+| QR scanner success | Scan Flash proof QR | Camera stops and vehicle barcode is extracted | |
+| QR scanner fallback | Deny camera or unsupported detector | Honest manual-input fallback appears | |
+| Phone limitation | Scan Flash QR | App does not claim QR contains driver phone | |
+| Phone on scan | Phone missing after QR | Compact phone input appears on same Scan page | |
+| Phone cache | Repeat same barcode after phone confirmation | Latest phone option appears and remains editable | |
 | Scan preview | Enter phone `0643042911` | Phone validates and preview can be confirmed | |
 | Scan preview | Open advanced OCR | OCR/raw text tools are collapsible and not in main path | |
 | OCR fallback | Paste OCR text | Phone candidates are extracted or user can type manually | |

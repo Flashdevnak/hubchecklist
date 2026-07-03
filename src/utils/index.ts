@@ -34,6 +34,7 @@ export function extractBarcodeFromFlashUrl(value: string): string | null {
 export const SCAN_DRAFT_STORAGE_KEY = 'hubchecklist.scanDraft';
 export const SCAN_PREVIEW_DRAFT_STORAGE_KEY = 'hubchecklist.scanPreviewDraft';
 export const FLASH_PROOF_RESULT_DRAFT_STORAGE_KEY = 'hubchecklist.flashProofResultDraft';
+export const DRIVER_PHONE_CACHE_STORAGE_KEY = 'hubchecklist.driverPhoneCache';
 export const ROLE_MODE_STORAGE_KEY = 'hubchecklist.roleMode';
 export const RESPONSIBLE_PROFILES_STORAGE_KEY = 'hubchecklist.responsibleProfiles';
 export const ACTIVE_RESPONSIBLE_PROFILE_STORAGE_KEYS = [
@@ -229,6 +230,41 @@ export function formatThaiPhone(phone: string): string {
   const normalizedPhone = phone.replace(/\D/g, '');
   if (normalizedPhone.length !== 10) return phone;
   return `${normalizedPhone.slice(0, 3)}-${normalizedPhone.slice(3, 6)}-${normalizedPhone.slice(6)}`;
+}
+
+export function getCachedDriverPhone(vehicleBarcode: string): string | null {
+  const normalizedBarcode = normalizeVehicleBarcode(vehicleBarcode);
+  if (!normalizedBarcode) return null;
+  const rawValue = window.localStorage.getItem(DRIVER_PHONE_CACHE_STORAGE_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const cache = JSON.parse(rawValue) as Record<string, { phone: string; updatedAt: string }>;
+    const cached = cache[normalizedBarcode]?.phone;
+    return cached && validateThaiPhoneNumber(cached).isValid ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCachedDriverPhone(vehicleBarcode: string, phone: string): void {
+  const normalizedBarcode = normalizeVehicleBarcode(vehicleBarcode);
+  const normalizedPhone = phone.replace(/\D/g, '');
+  if (!normalizedBarcode || !validateThaiPhoneNumber(normalizedPhone).isValid) return;
+
+  const rawValue = window.localStorage.getItem(DRIVER_PHONE_CACHE_STORAGE_KEY);
+  let cache: Record<string, { phone: string; updatedAt: string }> = {};
+  try {
+    cache = rawValue ? JSON.parse(rawValue) as Record<string, { phone: string; updatedAt: string }> : {};
+  } catch {
+    cache = {};
+  }
+
+  cache[normalizedBarcode] = {
+    phone: normalizedPhone,
+    updatedAt: new Date().toISOString(),
+  };
+  window.localStorage.setItem(DRIVER_PHONE_CACHE_STORAGE_KEY, JSON.stringify(cache));
 }
 
 export function parseFlashProofInput(input: string): FlashProofParseResult {

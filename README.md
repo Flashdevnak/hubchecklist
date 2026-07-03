@@ -2,7 +2,7 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
-MVP-015 polishes the mobile UI/UX and adds a local staff/admin operating mode. It does **not** implement secure Supabase Auth, production R2 backend, app store release, or fake Flash live automation success.
+MVP-016 adds real camera QR scanning and a faster one-screen staff scan flow. It does **not** fake driver phone extraction from QR, secure Supabase Auth, production R2 backend, app store release, or Flash live automation success.
 
 ## Current QA Result
 
@@ -18,6 +18,9 @@ MVP-015 polishes the mobile UI/UX and adds a local staff/admin operating mode. I
 - Staff/Admin mode is local-first and clearly labeled as not connected to central login.
 - Staff navigation is simplified for profile, scan, phone, Flash, photos, and own work.
 - Admin navigation keeps dashboard, records, export, backup, settings, and audit-oriented tools separate.
+- Scan page opens the real camera with `getUserMedia` and BarcodeDetector when available.
+- QR scan extracts vehicle barcode automatically and stops the camera after a successful scan.
+- Driver phone is entered on the Scan page when missing; cached phone can be reused after staff checks it.
 - Physical device testing is still pending.
 
 ## MVP Status
@@ -39,6 +42,7 @@ MVP-015 polishes the mobile UI/UX and adds a local staff/admin operating mode. I
 | MVP-013 Android QA readiness | Complete | Docs/checklists added; APK build needs Java/Android SDK |
 | MVP-014 Android APK build readiness | Complete | Debug APK build passed; real device QA pending |
 | MVP-015 UI/UX polish + role flow | Complete | Local staff/admin mode, cleaner mobile workflow |
+| MVP-016 Real camera scan + fast staff flow | Complete | Camera scanner and one-screen phone flow implemented |
 
 ## Key Docs
 
@@ -82,6 +86,7 @@ adb install android/app/build/outputs/apk/debug/app-debug.apk
 - Real Android device QA on Samsung S23 FE and Galaxy Tab A7 Lite.
 - iPad browser fallback QA.
 - Physical Android Flash live automation validation.
+- Real camera permission/scan validation on physical Android devices.
 - Android release signing/app store packaging.
 - Production R2 signed upload backend.
 - Production R2 delete backend.

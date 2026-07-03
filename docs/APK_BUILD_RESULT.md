@@ -72,7 +72,7 @@ From `android`:
 
 ## Build Result
 
-PASSED.
+PASSED. MVP-016 rebuild required after real camera scan changes.
 
 Manual build result reported after Android Studio SDK installation:
 
@@ -84,8 +84,8 @@ BUILD SUCCESSFUL in 3m 30s
 Fresh verification in this session:
 
 ```text
-BUILD SUCCESSFUL in 11s
-82 actionable tasks: 20 executed, 62 up-to-date
+MVP-016: BUILD SUCCESSFUL in 11s
+82 actionable tasks: 27 executed, 55 up-to-date
 ```
 
 Passed:
@@ -95,6 +95,12 @@ Passed:
 - `npm.cmd run build`
 - `npx.cmd cap sync android`
 - `.\gradlew.bat assembleDebug`
+
+MVP-016 adds Android camera permission for the real scanner:
+
+```text
+android.permission.CAMERA
+```
 
 ## APK Path
 
@@ -124,4 +130,4 @@ https://api.flashexpress.com/gw/nws/web/proof/go/
 
 ## Not Yet Verified
 
-The debug APK build is complete, but production readiness is not claimed. Flash live automation still requires physical Android device testing against the real Flash proof page.
+The debug APK build is complete, but production readiness is not claimed. Real camera scanning and Flash live automation still require physical Android device testing against the real Flash proof page.

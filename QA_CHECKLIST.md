@@ -1,6 +1,6 @@
 # QA Checklist
 
-## MVP-015 Required Checks
+## MVP-016 Required Checks
 
 - [x] `npm install` passes
 - [x] `npx tsc -b` passes
@@ -12,6 +12,7 @@
 - [x] Android debug APK build passes on local machine
 - [x] APK path is documented
 - [x] `android/local.properties` was not committed
+- [x] Android camera permission exists
 - [x] Package name is `com.flashops.hubchecklist`
 - [x] Android WebView plugin file exists
 - [x] `FlashProofWebViewPlugin` is registered in `MainActivity`
@@ -20,8 +21,15 @@
 - [x] App works without Supabase env keys
 - [x] App works without R2 signed upload endpoint
 - [x] Scan page no longer shows generic Placeholder badge
+- [x] Scan page opens real camera preview with `getUserMedia`
+- [x] BarcodeDetector scan loop extracts QR/barcode when supported
+- [x] Camera stops after successful scan
+- [x] Test-mode camera warning was removed
 - [x] Scan page has one scan-again/reset action
 - [x] Missing responsible profile reason is visible before next step
+- [x] Phone input appears on Scan page when QR has no driver phone
+- [x] Driver phone cache is local-first by vehicle barcode
+- [x] Cached phone is offered but remains editable
 - [x] Responsible profile create/select/edit/delete flow is local-first
 - [x] Staff navigation is simplified
 - [x] Admin navigation is separate
@@ -32,6 +40,7 @@
 - [x] Backup/Cleanup guard remains intact
 - [x] Supabase/R2 status is compact
 - [x] No fake secure login was added
+- [x] No fake driver phone extraction from QR was added
 - [ ] Real device Flash WebView test passes
 - [x] Real device Flash WebView test remains marked pending
 - [x] No new product features were added

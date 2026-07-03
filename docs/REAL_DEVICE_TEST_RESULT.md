@@ -1,8 +1,8 @@
 # Real Device Test Result
 
-## MVP-015 Status
+## MVP-016 Status
 
-The debug APK has been generated successfully. MVP-015 UI/UX and role-flow changes still need real device testing.
+The debug APK has been generated successfully. MVP-016 real camera scan and fast staff flow still need physical device confirmation.
 
 APK path:
 
@@ -15,6 +15,11 @@ Do not mark Flash live automation passed until it has been tested on a physical 
 Additional MVP-015 checks:
 
 - [ ] Staff mode bottom navigation is clean on Samsung S23 FE
+- [ ] Tap `เปิดกล้องสแกน QR` and confirm real camera preview opens
+- [ ] Scan real Flash QR and confirm vehicle barcode extraction
+- [ ] Confirm camera stops after successful scan
+- [ ] Confirm phone input appears on Scan page when no cached phone exists
+- [ ] Confirm cached phone option appears on repeat barcode
 - [ ] Scan page has no generic Placeholder badge
 - [ ] Scan page has only one scan-again/reset action
 - [ ] Missing responsible profile warning is clear
