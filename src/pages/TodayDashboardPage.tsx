@@ -1,8 +1,7 @@
-import { ClipboardCheck, Edit3, History, ImagePlus, Search, UserCog } from 'lucide-react';
+﻿import { ClipboardCheck, Edit3, History, ImagePlus, Search, UserCog } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PrimaryButton from '../components/PrimaryButton';
 import StatusBadge from '../components/StatusBadge';
-import WarningCard from '../components/WarningCard';
 import { formatBytes as formatBackupBytes, getBackupCleanupSummary } from '../services/backupCleanup';
 import {
   type DashboardDateMode,
@@ -21,14 +20,14 @@ import {
 import { getPhotoStorageMode, listVehiclePhotos } from '../services/photos';
 import { getVehicleRecordStorageStatus, listAuditEntries, listVehicleRecords } from '../services/vehicleRecords';
 import type { EditHistoryEntry, VehiclePhoto, VehicleRecord } from '../types';
-import { getActiveResponsibleProfile, getRoleMode } from '../utils';
+import { getActiveResponsibleProfile, getRoleMode, upsertResponsibleProfile } from '../utils';
 
 const STATUS_FILTERS: Array<{ id: DashboardStatusFilter; label: string }> = [
-  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'all', label: 'à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”' },
   { id: 'active', label: 'Active' },
-  { id: 'READY_FOR_PHOTO', label: 'รอถ่ายรูป' },
-  { id: 'PENDING_PHOTO', label: 'ขาดรูป' },
-  { id: 'COMPLETE', label: 'รูปครบ' },
+  { id: 'READY_FOR_PHOTO', label: 'à¸£à¸­à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›' },
+  { id: 'PENDING_PHOTO', label: 'à¸‚à¸²à¸”à¸£à¸¹à¸›' },
+  { id: 'COMPLETE', label: 'à¸£à¸¹à¸›à¸„à¸£à¸š' },
   { id: 'VOIDED', label: 'Void' },
   { id: 'edited', label: 'Edited' },
   { id: 'redo', label: 'Redo/Refetch' },
@@ -38,18 +37,23 @@ const STATUS_FILTERS: Array<{ id: DashboardStatusFilter; label: string }> = [
 ];
 
 const SORT_OPTIONS: Array<{ id: DashboardSortMode; label: string }> = [
-  { id: 'latest', label: 'ล่าสุดก่อน' },
-  { id: 'oldest', label: 'เก่าสุดก่อน' },
-  { id: 'status', label: 'สถานะ' },
-  { id: 'responsible', label: 'ผู้รับผิดชอบ' },
-  { id: 'barcode', label: 'บาร์โค้ดรถ' },
-  { id: 'missing_photos', label: 'ขาดรูปก่อน' },
+  { id: 'latest', label: 'à¸¥à¹ˆà¸²à¸ªà¸¸à¸”à¸à¹ˆà¸­à¸™' },
+  { id: 'oldest', label: 'à¹€à¸à¹ˆà¸²à¸ªà¸¸à¸”à¸à¹ˆà¸­à¸™' },
+  { id: 'status', label: 'à¸ªà¸–à¸²à¸™à¸°' },
+  { id: 'responsible', label: 'à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š' },
+  { id: 'barcode', label: 'à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”à¸£à¸–' },
+  { id: 'missing_photos', label: 'à¸‚à¸²à¸”à¸£à¸¹à¸›à¸à¹ˆà¸­à¸™' },
 ];
 
 export default function TodayDashboardPage() {
-  const activeProfile = getActiveResponsibleProfile();
   const roleMode = getRoleMode();
   const today = getLocalDateString(new Date());
+  const [activeProfile, setActiveProfile] = useState(getActiveResponsibleProfile());
+  const [profileForm, setProfileForm] = useState({
+    employeeCode: '25845',
+    displayName: 'Tui',
+    branch: 'BNAK',
+  });
   const [records, setRecords] = useState<VehicleRecord[]>([]);
   const [photos, setPhotos] = useState<VehiclePhoto[]>([]);
   const [audits, setAudits] = useState<EditHistoryEntry[]>([]);
@@ -104,39 +108,64 @@ export default function TodayDashboardPage() {
     }
   };
 
+  const saveStaffProfile = () => {
+    if (!profileForm.employeeCode.trim() || !profileForm.displayName.trim() || !profileForm.branch.trim()) return;
+    const profile = upsertResponsibleProfile(profileForm);
+    setActiveProfile(profile);
+    setBranch(profile.branch);
+  };
+
   if (roleMode === 'staff') {
     const staffSummary = getDashboardSummary(staffRecords, photos, audits);
     const pendingPhotoRecords = staffRecords.filter((record) => getPhotoProgress(record, photos).missingCount > 0 && record.status !== 'VOIDED');
     return (
       <div className="dashboard-page staff-home">
         {!activeProfile ? (
-          <WarningCard
-            title="กรุณาเลือกผู้รับผิดชอบก่อนเริ่มงาน"
-            action={<PrimaryButton onClick={() => { window.location.hash = '/responsible-profile'; }}>เลือกผู้รับผิดชอบ</PrimaryButton>}
-          >
-            เมื่อเลือกแล้ว ระบบจะผูกงานสแกน รูปถ่าย และ Export กับชื่อนั้น
-          </WarningCard>
+          <article className="feature-card staff-setup-card">
+            <div className="scan-result-heading">
+              <div>
+                <h2>เริ่มงานวันนี้</h2>
+                <p className="muted-note">บันทึกผู้รับผิดชอบครั้งแรก แล้วเริ่มสแกนได้ทันที</p>
+              </div>
+              <StatusBadge label="ต้องตั้งค่า" tone="warning" />
+            </div>
+            <div className="profile-form-grid">
+              <label>
+                <span>รหัสพนักงาน</span>
+                <input value={profileForm.employeeCode} onChange={(event) => setProfileForm((current) => ({ ...current, employeeCode: event.target.value }))} />
+              </label>
+              <label>
+                <span>ชื่อ</span>
+                <input value={profileForm.displayName} onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))} />
+              </label>
+              <label>
+                <span>สาขา</span>
+                <input value={profileForm.branch} onChange={(event) => setProfileForm((current) => ({ ...current, branch: event.target.value.toUpperCase() }))} />
+              </label>
+            </div>
+            <PrimaryButton onClick={saveStaffProfile}>บันทึกและเริ่มงาน</PrimaryButton>
+          </article>
         ) : (
           <article className="feature-card primary-card staff-hero-card">
             <div>
-              <StatusBadge label="พร้อมเริ่มงาน" tone="success" />
+              <StatusBadge label="à¸žà¸£à¹‰à¸­à¸¡à¹€à¸£à¸´à¹ˆà¸¡à¸‡à¸²à¸™" tone="success" />
               <h2>{activeProfile.employeeCode} {activeProfile.displayName} / {activeProfile.branch}</h2>
-              <p className="muted-note">โหมดพนักงานแสดงเฉพาะงานที่ต้องใช้หน้างานเร็ว ๆ</p>
+              <p className="muted-note">à¹‚à¸«à¸¡à¸”à¸žà¸™à¸±à¸à¸‡à¸²à¸™à¹à¸ªà¸”à¸‡à¹€à¸‰à¸žà¸²à¸°à¸‡à¸²à¸™à¸—à¸µà¹ˆà¸•à¹‰à¸­à¸‡à¹ƒà¸Šà¹‰à¸«à¸™à¹‰à¸²à¸‡à¸²à¸™à¹€à¸£à¹‡à¸§ à¹†</p>
             </div>
             <div className="scan-actions">
-              <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>เริ่มสแกนรถ</PrimaryButton>
+              <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>à¹€à¸£à¸´à¹ˆà¸¡à¸ªà¹à¸à¸™à¸£à¸–</PrimaryButton>
               <PrimaryButton variant="secondary" onClick={() => { window.location.hash = pendingPhotoRecords[0] ? `/checklist?recordId=${pendingPhotoRecords[0].id}` : '/dashboard'; }}>
-                ถ่ายรูปงานค้าง
+                à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›à¸‡à¸²à¸™à¸„à¹‰à¸²à¸‡
               </PrimaryButton>
             </div>
           </article>
         )}
 
         <section className="dashboard-summary-grid">
-          <SummaryCard label="งานของฉันวันนี้" value={staffSummary.total} />
-          <SummaryCard label="รอถ่ายรูป" value={staffSummary.ready + staffSummary.pending} tone="warning" />
-          <SummaryCard label="รูปครบ" value={staffSummary.complete} tone="success" />
-          <SummaryCard label="รูปในเครื่อง" value={staffSummary.localOnlyPhotos} tone="warning" />
+          <SummaryCard label="à¸‡à¸²à¸™à¸‚à¸­à¸‡à¸‰à¸±à¸™à¸§à¸±à¸™à¸™à¸µà¹‰" value={staffSummary.total} />
+          <SummaryCard label="à¸£à¸­à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›" value={staffSummary.ready + staffSummary.pending} tone="warning" />
+          <SummaryCard label="à¸£à¸¹à¸›à¸„à¸£à¸š" value={staffSummary.complete} tone="success" />
+          <SummaryCard label="à¸£à¸¹à¸›à¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡" value={staffSummary.localOnlyPhotos} tone="warning" />
         </section>
 
         <section className="record-card-grid">
@@ -152,11 +181,11 @@ export default function TodayDashboardPage() {
           {staffRecords.length === 0 ? (
             <article className="feature-card dashboard-empty-state">
               <Search size={38} />
-              <h2>ยังไม่มีงานของฉันวันนี้</h2>
-              <p className="muted-note">เลือกผู้รับผิดชอบแล้วกดเริ่มสแกนรถเพื่อสร้างรายการจากงานจริง</p>
+              <h2>à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸‡à¸²à¸™à¸‚à¸­à¸‡à¸‰à¸±à¸™à¸§à¸±à¸™à¸™à¸µà¹‰</h2>
+              <p className="muted-note">à¹€à¸¥à¸·à¸­à¸à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸šà¹à¸¥à¹‰à¸§à¸à¸”à¹€à¸£à¸´à¹ˆà¸¡à¸ªà¹à¸à¸™à¸£à¸–à¹€à¸žà¸·à¹ˆà¸­à¸ªà¸£à¹‰à¸²à¸‡à¸£à¸²à¸¢à¸à¸²à¸£à¸ˆà¸²à¸à¸‡à¸²à¸™à¸ˆà¸£à¸´à¸‡</p>
               <div className="scan-actions">
-                <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>เริ่มสแกนรถ</PrimaryButton>
-                <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>ผู้รับผิดชอบ</PrimaryButton>
+                <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>à¹€à¸£à¸´à¹ˆà¸¡à¸ªà¹à¸à¸™à¸£à¸–</PrimaryButton>
+                <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š</PrimaryButton>
               </div>
             </article>
           ) : null}
@@ -168,22 +197,22 @@ export default function TodayDashboardPage() {
   return (
     <div className="dashboard-page">
       <section className="dashboard-summary-grid">
-        <SummaryCard label="รถทั้งหมดวันนี้" value={visibleSummary.total} />
-        <SummaryCard label="รอถ่ายรูป" value={visibleSummary.ready} tone="warning" />
-        <SummaryCard label="ขาดรูป" value={visibleSummary.pending} tone="warning" />
-        <SummaryCard label="รูปครบ" value={visibleSummary.complete} tone="success" />
-        <SummaryCard label="ยกเลิก" value={visibleSummary.voided} tone="danger" />
-        <SummaryCard label="มีการแก้ไข" value={visibleSummary.edited} tone="warning" />
+        <SummaryCard label="à¸£à¸–à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸§à¸±à¸™à¸™à¸µà¹‰" value={visibleSummary.total} />
+        <SummaryCard label="à¸£à¸­à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›" value={visibleSummary.ready} tone="warning" />
+        <SummaryCard label="à¸‚à¸²à¸”à¸£à¸¹à¸›" value={visibleSummary.pending} tone="warning" />
+        <SummaryCard label="à¸£à¸¹à¸›à¸„à¸£à¸š" value={visibleSummary.complete} tone="success" />
+        <SummaryCard label="à¸¢à¸à¹€à¸¥à¸´à¸" value={visibleSummary.voided} tone="danger" />
+        <SummaryCard label="à¸¡à¸µà¸à¸²à¸£à¹à¸à¹‰à¹„à¸‚" value={visibleSummary.edited} tone="warning" />
         <SummaryCard label="Redo / Refetch" value={visibleSummary.redoOrRefetch} />
-        <SummaryCard label="รูปในเครื่อง" value={visibleSummary.localOnlyPhotos} tone="warning" />
-        <SummaryCard label="อัปโหลดแล้ว" value={visibleSummary.uploadedPhotos} tone="success" />
+        <SummaryCard label="à¸£à¸¹à¸›à¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡" value={visibleSummary.localOnlyPhotos} tone="warning" />
+        <SummaryCard label="à¸­à¸±à¸›à¹‚à¸«à¸¥à¸”à¹à¸¥à¹‰à¸§" value={visibleSummary.uploadedPhotos} tone="success" />
       </section>
 
       <section className="dashboard-control-grid">
         <article className="feature-card dashboard-search-card">
           <div className="scan-result-heading">
-            <h2>ค้นหารายการรถ</h2>
-            <StatusBadge label={`${filteredRecords.length} รายการ`} tone="neutral" />
+            <h2>à¸„à¹‰à¸™à¸«à¸²à¸£à¸²à¸¢à¸à¸²à¸£à¸£à¸–</h2>
+            <StatusBadge label={`${filteredRecords.length} à¸£à¸²à¸¢à¸à¸²à¸£`} tone="neutral" />
           </div>
           <label className="dashboard-search-input">
             <span>barcode / phone / route / branch / responsible / status</span>
@@ -208,12 +237,12 @@ export default function TodayDashboardPage() {
         </article>
 
         <article className="feature-card">
-          <h2>วันที่ / สาขา / เรียงลำดับ</h2>
+          <h2>à¸§à¸±à¸™à¸—à¸µà¹ˆ / à¸ªà¸²à¸‚à¸² / à¹€à¸£à¸µà¸¢à¸‡à¸¥à¸³à¸”à¸±à¸š</h2>
           <div className="dashboard-quick-actions">
-            <button type="button" className={dateMode === 'today' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('today')}>วันนี้</button>
-            <button type="button" className={dateMode === 'yesterday' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('yesterday')}>เมื่อวาน</button>
-            <button type="button" className={dateMode === 'last7' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('last7')}>7 วันล่าสุด</button>
-            <button type="button" className={dateMode === 'all' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('all')}>ทั้งหมดในเครื่อง</button>
+            <button type="button" className={dateMode === 'today' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('today')}>à¸§à¸±à¸™à¸™à¸µà¹‰</button>
+            <button type="button" className={dateMode === 'yesterday' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('yesterday')}>à¹€à¸¡à¸·à¹ˆà¸­à¸§à¸²à¸™</button>
+            <button type="button" className={dateMode === 'last7' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('last7')}>7 à¸§à¸±à¸™à¸¥à¹ˆà¸²à¸ªà¸¸à¸”</button>
+            <button type="button" className={dateMode === 'all' ? 'filter-chip active' : 'filter-chip'} onClick={() => setQuickDate('all')}>à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡</button>
           </div>
           <div className="dashboard-filters">
             <label>
@@ -237,8 +266,8 @@ export default function TodayDashboardPage() {
           </div>
           {responsibleEmployeeCode ? (
             <p className="scan-message warning">
-              กำลังกรองผู้รับผิดชอบ {responsibleEmployeeCode}
-              <button className="inline-reset-button" type="button" onClick={() => setResponsibleEmployeeCode('')}>ล้างตัวกรอง</button>
+              à¸à¸³à¸¥à¸±à¸‡à¸à¸£à¸­à¸‡à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š {responsibleEmployeeCode}
+              <button className="inline-reset-button" type="button" onClick={() => setResponsibleEmployeeCode('')}>à¸¥à¹‰à¸²à¸‡à¸•à¸±à¸§à¸à¸£à¸­à¸‡</button>
             </p>
           ) : null}
         </article>
@@ -247,8 +276,8 @@ export default function TodayDashboardPage() {
       <section className="dashboard-two-column">
         <article className="feature-card">
           <div className="scan-result-heading">
-            <h2>สรุปผู้รับผิดชอบ</h2>
-            <StatusBadge label={`${responsibleSummary.length} คน`} tone="neutral" />
+            <h2>à¸ªà¸£à¸¸à¸›à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š</h2>
+            <StatusBadge label={`${responsibleSummary.length} à¸„à¸™`} tone="neutral" />
           </div>
           <div className="responsible-summary-grid">
             {responsibleSummary.map((item) => (
@@ -276,7 +305,7 @@ export default function TodayDashboardPage() {
         <article className="feature-card">
           <div className="scan-result-heading">
             <h2>Operational alerts</h2>
-            <StatusBadge label="ไม่บล็อกงาน" tone="warning" />
+            <StatusBadge label="à¹„à¸¡à¹ˆà¸šà¸¥à¹‡à¸­à¸à¸‡à¸²à¸™" tone="warning" />
           </div>
           <div className="alert-grid">
             {alerts.map((alert) => (
@@ -330,16 +359,16 @@ export default function TodayDashboardPage() {
         {filteredRecords.length === 0 ? (
           <article className="feature-card dashboard-empty-state">
             <Search size={38} />
-            <h2>ยังไม่มีรายการที่ตรงกับเงื่อนไข</h2>
-            <p className="muted-note">ลองล้างตัวกรอง หรือเริ่มสแกนรถคันใหม่หลังเลือกผู้รับผิดชอบ</p>
+            <h2>à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸²à¸¢à¸à¸²à¸£à¸—à¸µà¹ˆà¸•à¸£à¸‡à¸à¸±à¸šà¹€à¸‡à¸·à¹ˆà¸­à¸™à¹„à¸‚</h2>
+            <p className="muted-note">à¸¥à¸­à¸‡à¸¥à¹‰à¸²à¸‡à¸•à¸±à¸§à¸à¸£à¸­à¸‡ à¸«à¸£à¸·à¸­à¹€à¸£à¸´à¹ˆà¸¡à¸ªà¹à¸à¸™à¸£à¸–à¸„à¸±à¸™à¹ƒà¸«à¸¡à¹ˆà¸«à¸¥à¸±à¸‡à¹€à¸¥à¸·à¸­à¸à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š</p>
             <div className="scan-actions">
               <PrimaryButton onClick={() => { window.location.hash = '/scan'; }}>
                 <ClipboardCheck size={20} />
-                <span>ไปสแกน</span>
+                <span>à¹„à¸›à¸ªà¹à¸à¸™</span>
               </PrimaryButton>
               <PrimaryButton variant="secondary" onClick={() => { window.location.hash = '/responsible-profile'; }}>
                 <UserCog size={20} />
-                <span>เลือกผู้รับผิดชอบ</span>
+                <span>à¹€à¸¥à¸·à¸­à¸à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸š</span>
               </PrimaryButton>
             </div>
           </article>
@@ -385,20 +414,20 @@ function DashboardRecordCard({ record, records, photos, audits }: {
       <div className="record-action-row">
         <PrimaryButton onClick={() => { window.location.hash = `/checklist?recordId=${record.id}`; }}>
           <ClipboardCheck size={20} />
-          <span>เปิดรายการ</span>
+          <span>à¹€à¸›à¸´à¸”à¸£à¸²à¸¢à¸à¸²à¸£</span>
         </PrimaryButton>
         <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/edit-record?recordId=${record.id}`; }}>
           <Edit3 size={20} />
-          <span>แก้ไข</span>
+          <span>à¹à¸à¹‰à¹„à¸‚</span>
         </PrimaryButton>
         <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/checklist?recordId=${record.id}`; }}>
           <History size={20} />
-          <span>ดูประวัติ</span>
+          <span>à¸”à¸¹à¸›à¸£à¸°à¸§à¸±à¸•à¸´</span>
         </PrimaryButton>
         {progress.missingCount > 0 && record.status !== 'VOIDED' ? (
           <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/checklist?recordId=${record.id}`; }}>
             <ImagePlus size={20} />
-            <span>ถ่ายรูปต่อ</span>
+            <span>à¸–à¹ˆà¸²à¸¢à¸£à¸¹à¸›à¸•à¹ˆà¸­</span>
           </PrimaryButton>
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 # QA Checklist
 
-## MVP-016 Required Checks
+## MVP-017 Required Checks
 
 - [x] `npm install` passes
 - [x] `npx tsc -b` passes
@@ -20,16 +20,20 @@
 - [x] Flash WebView allowlist remains restricted to `https://api.flashexpress.com/gw/nws/web/proof/go/`
 - [x] App works without Supabase env keys
 - [x] App works without R2 signed upload endpoint
+- [x] Staff Home can create/select active profile without leaving the Today screen
+- [x] Staff bottom nav is Today / Scan / Photos / My Work
 - [x] Scan page no longer shows generic Placeholder badge
 - [x] Scan page opens real camera preview with `getUserMedia`
 - [x] BarcodeDetector scan loop extracts QR/barcode when supported
 - [x] Camera stops after successful scan
-- [x] Test-mode camera warning was removed
-- [x] Scan page has one scan-again/reset action
-- [x] Missing responsible profile reason is visible before next step
-- [x] Phone input appears on Scan page when QR has no driver phone
+- [x] Manual QR/barcode input remains available
+- [x] OCR image action is local/lazy-loaded and does not fake confidence or success
+- [x] Scan page shows editable Review fields before create
+- [x] Create record routes directly to Photos/checklist
+- [x] Driver phone is optional; typed phone must still validate
 - [x] Driver phone cache is local-first by vehicle barcode
 - [x] Cached phone is offered but remains editable
+- [x] Parser fixture exists for `NAK1RK8Z54`
 - [x] Responsible profile create/select/edit/delete flow is local-first
 - [x] Staff navigation is simplified
 - [x] Admin navigation is separate
@@ -43,7 +47,7 @@
 - [x] No fake driver phone extraction from QR was added
 - [ ] Real device Flash WebView test passes
 - [x] Real device Flash WebView test remains marked pending
-- [x] No new product features were added
+- [x] No UI redesign or unrelated product feature was added
 
 ## Android SDK Result
 

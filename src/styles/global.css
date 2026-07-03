@@ -448,6 +448,37 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   font-size: 22px;
   font-weight: 900;
 }
+.review-card {
+  display: grid;
+  gap: 12px;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.review-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.review-field.wide {
+  grid-column: 1 / -1;
+}
+.review-field span,
+.ocr-upload-box span {
+  color: var(--muted);
+  font-weight: 900;
+}
+.review-field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  color: var(--text);
+}
 .cached-phone-button {
   min-height: 44px;
   border: 1px solid var(--accent-strong);
@@ -1230,6 +1261,9 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   .preview-edit-grid {
     grid-template-columns: 1fr;
   }
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
   .profile-form-grid,
   .staff-hero-card,
   .step-progress {
@@ -1256,7 +1290,7 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
     position: fixed;
     left: 0; right: 0; bottom: 0;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
     gap: 4px;
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
     background: rgba(255,255,255,0.95);

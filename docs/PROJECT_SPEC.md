@@ -1,5 +1,11 @@
 # Project Specification
 
+## MVP-017 Simple Staff UI and Auto Scan Fill Flow
+
+MVP-017 is complete as a local-first staff workflow update. The primary path is **Home -> Scan -> Review -> Create -> Photos**. Staff can set `25845 Tui / BNAK` from the Today screen, scan QR/barcodes with the camera where supported, paste/manual-enter Flash proof URLs or vehicle barcodes, optionally run local OCR on a proof-paper image, review editable fields, create a vehicle record, and move directly to checklist photos.
+
+MVP-017 does not claim Flash live automation success, production Supabase Auth, production R2 upload, app-store release, or physical device QA completion.
+
 ## MVP-016 Real Camera Scan and Fast Staff Flow
 
 MVP-016 makes the staff scan path real-operation ready. The Scan page opens the device camera, detects QR codes with browser APIs when supported, extracts the vehicle barcode, stops the camera after success, and keeps phone entry on the same screen when the Flash QR does not contain a driver phone.
@@ -17,6 +23,8 @@ MVP-016 makes the staff scan path real-operation ready. The Scan page opens the 
 - Admin navigation separates dashboard, records, export, backup, settings, and audit-oriented review.
 - Responsible profile management is implemented locally.
 - Scan, phone preview, Flash, checklist, dashboard, export, and backup/cleanup pages keep existing local-first behavior.
+- MVP-017 TypeScript verification passes for the simplified staff scan/review/create flow.
+- MVP-017 parser fixture covers `NAK1RK8Z54`, `0643042911`, `DOLLARSOUND`, `131KM`, and `2h15min`.
 
 ## Staff Mode
 

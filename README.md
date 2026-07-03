@@ -2,7 +2,7 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
-MVP-016 adds real camera QR scanning and a faster one-screen staff scan flow. It does **not** fake driver phone extraction from QR, secure Supabase Auth, production R2 backend, app store release, or Flash live automation success.
+MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create -> Photos**, adds QR/barcode/manual intake, adds a local OCR parser foundation for proof-paper images, and rebuilds the Android debug APK. It does **not** fake driver phone extraction from QR, secure Supabase Auth, production R2 backend, app store release, or Flash live automation success.
 
 ## Current QA Result
 
@@ -16,11 +16,13 @@ MVP-016 adds real camera QR scanning and a faster one-screen staff scan flow. It
 - Android debug APK build passes.
 - APK path: `android/app/build/outputs/apk/debug/app-debug.apk`.
 - Staff/Admin mode is local-first and clearly labeled as not connected to central login.
-- Staff navigation is simplified for profile, scan, phone, Flash, photos, and own work.
+- Staff navigation is simplified to Today, Scan, Photos, and My Work.
 - Admin navigation keeps dashboard, records, export, backup, settings, and audit-oriented tools separate.
 - Scan page opens the real camera with `getUserMedia` and BarcodeDetector when available.
-- QR scan extracts vehicle barcode automatically and stops the camera after a successful scan.
-- Driver phone is entered on the Scan page when missing; cached phone can be reused after staff checks it.
+- QR/barcode scan extracts vehicle barcode automatically and stops the camera after a successful scan.
+- Scan now shows an editable Review card before creating the record.
+- Driver phone is optional for record creation; if entered, it must be a valid Thai mobile number.
+- OCR proof-paper image reading is lazy-loaded and local; staff must verify the parsed fields before saving.
 - Physical device testing is still pending.
 
 ## MVP Status
@@ -43,6 +45,7 @@ MVP-016 adds real camera QR scanning and a faster one-screen staff scan flow. It
 | MVP-014 Android APK build readiness | Complete | Debug APK build passed; real device QA pending |
 | MVP-015 UI/UX polish + role flow | Complete | Local staff/admin mode, cleaner mobile workflow |
 | MVP-016 Real camera scan + fast staff flow | Complete | Camera scanner and one-screen phone flow implemented |
+| MVP-017 Simple staff scan/review/create flow | Complete | QR/barcode/manual/OCR parser foundation; real device QA still pending |
 
 ## Key Docs
 

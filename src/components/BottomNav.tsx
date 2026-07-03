@@ -1,9 +1,8 @@
-import { ClipboardCheck, Download, Home, ScanLine, Settings, ShieldCheck, UserCog } from 'lucide-react';
+import { ClipboardCheck, Download, Home, ScanLine, Settings, ShieldCheck } from 'lucide-react';
 import type { AppRoleMode, AppRoute } from '../types';
 
 const staffItems: Array<{ route: AppRoute; label: string; icon: typeof Home }> = [
   { route: 'dashboard', label: 'วันนี้', icon: Home },
-  { route: 'responsible-profile', label: 'ผู้รับผิดชอบ', icon: UserCog },
   { route: 'scan', label: 'สแกน', icon: ScanLine },
   { route: 'checklist', label: 'รูป', icon: ClipboardCheck },
   { route: 'dashboard', label: 'งานของฉัน', icon: ClipboardCheck },

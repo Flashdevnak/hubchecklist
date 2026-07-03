@@ -1,8 +1,8 @@
 # Real Device Test Result
 
-## MVP-016 Status
+## MVP-017 Status
 
-The debug APK has been generated successfully. MVP-016 real camera scan and fast staff flow still need physical device confirmation.
+The debug APK has been generated successfully. MVP-017 simple staff scan/review/create flow, QR/barcode intake, OCR parser foundation, and photo handoff still need physical device confirmation.
 
 APK path:
 
@@ -12,8 +12,17 @@ C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\de
 
 Do not mark Flash live automation passed until it has been tested on a physical Android device with the real Flash proof page.
 
-Additional MVP-015 checks:
+Additional MVP-017 checks:
 
+- [ ] Staff mode bottom navigation shows Today / Scan / Photos / My Work on Samsung S23 FE
+- [ ] Staff Home inline setup can save `25845 Tui / BNAK`
+- [ ] Tap camera scan and confirm real camera preview opens
+- [ ] Scan printed barcode and confirm vehicle barcode extraction
+- [ ] Confirm Review card appears before Create
+- [ ] Confirm blank phone can create a record
+- [ ] Confirm invalid phone blocks Create
+- [ ] Confirm OCR proof-paper image action fills likely fields but does not auto-save
+- [ ] Confirm Create opens Photos/checklist
 - [ ] Staff mode bottom navigation is clean on Samsung S23 FE
 - [ ] Tap `เปิดกล้องสแกน QR` and confirm real camera preview opens
 - [ ] Scan real Flash QR and confirm vehicle barcode extraction
@@ -60,12 +69,15 @@ Use this flow on Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and 
   - `https://api.flashexpress.com/gw/nws/web/proof/go/NAK1R7XJ45`
 - [ ] Confirm vehicleBarcode:
   - `NAK1R7XJ45`
+- [ ] Review/edit fields on Scan page before creating a record
+- [ ] Confirm blank phone can still create the record
+- [ ] Confirm invalid phone is blocked
 - [ ] Enter phone:
   - `0643042911`
-- [ ] Confirm preview
+- [ ] Create vehicle record
+- [ ] Confirm Photos/checklist opens
 - [ ] Test Web/PWA fallback
 - [ ] Test Android WebView Flash flow on real Android device
-- [ ] Create vehicle record
 - [ ] Add required photos
 - [ ] Dashboard check
 - [ ] Export ZIP

@@ -1,8 +1,8 @@
 # Test Plan
 
-## MVP-016
+## MVP-017
 
-Goal: verify real camera QR scanning and the faster one-screen staff scan flow without faking driver phone extraction, secure auth, cloud upload, or Flash live success.
+Goal: verify the simple staff workflow **Home -> Scan -> Review -> Create -> Photos** with QR/barcode/manual intake, local OCR parser foundation, and Android APK rebuild, without faking driver phone extraction, secure auth, cloud upload, or Flash live success.
 
 ## Commands Run
 
@@ -43,6 +43,27 @@ cd android
 - Dashboard remains card-based and usable on mobile.
 - Export page keeps exact 21.6 ZIP behavior and adds simple steps.
 - Backup/Cleanup still requires confirmed backup and the exact confirmation phrase.
+
+## MVP-017 Staff Scan/Review/Create Checks
+
+- Staff Home with no active profile shows inline setup for `25845 Tui / BNAK`.
+- Staff bottom nav shows Today, Scan, Photos, and My Work.
+- Tap camera scan; real camera preview appears.
+- Deny camera permission; clear Thai message appears and manual input remains available.
+- Scan or paste Flash proof URL `https://api.flashexpress.com/gw/nws/web/proof/go/NAK1RH9A274`.
+- Confirm vehicle barcode becomes `NAK1RH9A274`.
+- Confirm camera stops after successful scan.
+- Confirm no test-mode scanner warning appears.
+- Confirm QR does not claim to include driver phone.
+- Review card appears with editable vehicle barcode, driver phone, origin, destination, route, departure, arrival, distance, duration, and company fields.
+- Leave phone blank and confirm record creation is allowed.
+- Enter invalid phone and confirm creation is blocked.
+- Enter `0643042911`, create record, and confirm app opens Photos/checklist for that record.
+- Repeat same vehicle barcode; cached phone option appears and remains editable.
+- Confirm bottom sticky action is not hidden by bottom navigation.
+- Confirm raw vehicle barcode manual fallback works.
+- Use OCR image/text action and confirm parsed values must be reviewed before saving.
+- Parser sample `NAK1RK8Z54` should extract barcode `NAK1RK8Z54`, phone `0643042911`, company `DOLLARSOUND`, distance `131KM`, and duration `2h15min`.
 
 ## MVP-016 Camera And Staff Flow Checks
 

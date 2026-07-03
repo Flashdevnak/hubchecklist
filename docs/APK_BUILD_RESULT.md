@@ -1,6 +1,6 @@
 # APK Build Result
 
-## MVP-014 Result
+## MVP-017 Result
 
 Date: 2026-07-03
 
@@ -72,7 +72,7 @@ From `android`:
 
 ## Build Result
 
-PASSED. MVP-016 rebuild required after real camera scan changes.
+PASSED. MVP-017 rebuild completed after the simplified staff scan/review/create flow and OCR parser foundation.
 
 Manual build result reported after Android Studio SDK installation:
 
@@ -84,8 +84,8 @@ BUILD SUCCESSFUL in 3m 30s
 Fresh verification in this session:
 
 ```text
-MVP-016: BUILD SUCCESSFUL in 11s
-82 actionable tasks: 27 executed, 55 up-to-date
+MVP-017: BUILD SUCCESSFUL in 7s
+82 actionable tasks: 23 executed, 59 up-to-date
 ```
 
 Passed:
@@ -96,7 +96,7 @@ Passed:
 - `npx.cmd cap sync android`
 - `.\gradlew.bat assembleDebug`
 
-MVP-016 adds Android camera permission for the real scanner:
+MVP-017 keeps Android camera permission for the real scanner:
 
 ```text
 android.permission.CAMERA

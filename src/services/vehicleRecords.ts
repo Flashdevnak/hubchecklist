@@ -332,7 +332,7 @@ function validateRecordDraft(draft: VehicleRecordDraft): string[] {
   if (!draft.responsibleEmployeeCode) errors.push('responsibleEmployeeCode จำเป็น');
   if (!draft.responsibleDisplayName) errors.push('responsibleDisplayName จำเป็น');
   if (!validateVehicleBarcode(draft.vehicleBarcode).isValid) errors.push('vehicleBarcode ไม่ถูกต้อง');
-  if (!validateThaiPhoneNumber(draft.driverPhone).isValid) errors.push('driverPhone ไม่ถูกต้อง');
+  if (draft.driverPhone && !validateThaiPhoneNumber(draft.driverPhone).isValid) errors.push('driverPhone ไม่ถูกต้อง');
   return errors;
 }
 
