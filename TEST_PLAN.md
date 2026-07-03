@@ -2,7 +2,7 @@
 
 ## MVP-014
 
-Goal: verify Android APK build readiness, detect local Java/Android SDK setup, run the required web and Capacitor checks, attempt the correct Gradle build, and document the exact result without faking APK success.
+Goal: verify Android APK build readiness, record the successful debug APK build, and define the remaining real device checks without claiming Flash live automation before physical testing.
 
 ## Commands Run
 
@@ -13,22 +13,22 @@ Write-Output "JAVA_HOME=$env:JAVA_HOME"
 npm.cmd install
 npx.cmd tsc -b
 npm.cmd run build
-npx.cmd cap doctor
 npx.cmd cap sync android
-.\android\gradlew.bat -p android assembleDebug
+cd android
+.\gradlew.bat assembleDebug
 ```
 
 ## Results
 
-- Initial shell `java -version`: failed because `java` was not on `PATH`.
-- Initial shell `JAVA_HOME`: empty.
-- Direct Java check at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`: passed with OpenJDK 17.0.19.
+- Java at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`: passed with OpenJDK 17.0.19.
+- Android SDK at `C:\Users\myhou\AppData\Local\Android\Sdk`: present.
+- `android/local.properties`: present locally with `sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk`; ignored by Git.
 - `npm.cmd install`: passed, with npm audit warnings.
 - `npx.cmd tsc -b`: passed.
 - `npm.cmd run build`: passed, with known Vite large chunk warning from XLSX/ZIP libraries.
-- `npx.cmd cap doctor`: passed.
 - `npx.cmd cap sync android`: passed.
-- `.\android\gradlew.bat -p android assembleDebug`: blocked because Android SDK is not installed/configured.
+- `.\gradlew.bat assembleDebug`: passed from the `android` folder.
+- APK generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Android Project Checks
 
@@ -38,17 +38,13 @@ npx.cmd cap sync android
 - `android.permission.INTERNET`: exists
 - Flash allowlist: restricted to `https://api.flashexpress.com/gw/nws/web/proof/go/`
 
-## Exact Android Blocker
+## APK Install Steps
 
-```text
-SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at 'C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\local.properties'.
-```
-
-Expected ignored local config after Android SDK installation:
-
-```properties
-sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
-```
+1. Connect Android device by USB.
+2. Enable Developer Options and USB debugging.
+3. Trust the development computer on the device.
+4. Install with Android Studio or `adb install android/app/build/outputs/apk/debug/app-debug.apk`.
+5. Open the app and confirm it does not crash.
 
 ## Real Device Flow
 
@@ -70,7 +66,9 @@ Use [REAL_DEVICE_TEST_RESULT.md](docs/REAL_DEVICE_TEST_RESULT.md) and [FLOW_QA_C
 
 ## Android Testing
 
-Use [ANDROID_DEVICE_TEST.md](docs/ANDROID_DEVICE_TEST.md). Real device validation remains required after Android SDK is installed and the APK is generated.
+Use [ANDROID_DEVICE_TEST.md](docs/ANDROID_DEVICE_TEST.md). Real device validation remains required after APK installation.
+
+Do not mark Flash live automation passed until a physical Android device has loaded the real Flash proof page and completed the flow.
 
 ## Safety Review
 

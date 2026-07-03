@@ -10,8 +10,9 @@
 - [x] Java 17 is installed at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`
 - [x] Java works when `JAVA_HOME` and `PATH` are set for the current process
 - [x] Android SDK common paths were checked
-- [ ] Android debug APK build passes on local machine
-- [x] Android SDK build blocker is documented exactly
+- [x] Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`
+- [x] Android debug APK build passes on local machine
+- [x] APK path is documented
 - [x] `android/local.properties` was not committed
 - [x] Expected `android/local.properties` content is documented
 - [x] Package name is `com.flashops.hubchecklist`
@@ -24,33 +25,32 @@
 - [x] Real device QA checklist is updated
 - [x] APK build result is documented
 - [x] No fake APK success was added
+- [ ] Real device Flash WebView test passes
+- [x] Real device Flash WebView test remains marked pending
 - [x] No new product features were added
 
 ## Android SDK Result
 
-Checked paths:
+Confirmed path:
 
 ```text
 C:\Users\myhou\AppData\Local\Android\Sdk
-C:\Android\Sdk
-C:\Program Files\Android\Android Studio
-C:\Program Files (x86)\Android\android-sdk
 ```
 
-Result: Android SDK was not found, so `android/local.properties` was not created.
+Result: Android SDK was found at `C:\Users\myhou\AppData\Local\Android\Sdk`.
 
-## Android Build Blocker
+## Android Build Result
 
-Local `.\android\gradlew.bat -p android assembleDebug` result:
+Local `.\gradlew.bat assembleDebug` result from `android`:
 
 ```text
-SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at 'C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\local.properties'.
+BUILD SUCCESSFUL
 ```
 
-Install Android Studio and Android SDK packages, then create ignored local config:
+APK path:
 
-```properties
-sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ## Future QA gates

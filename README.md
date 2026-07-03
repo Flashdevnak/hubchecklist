@@ -2,7 +2,7 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
-MVP-014 verifies Android APK build readiness and documents the exact local blocker. It does **not** implement production R2 backend, app store release, or fake APK success.
+MVP-014 verifies Android APK debug build readiness and records the successful local APK build. It does **not** implement production R2 backend, app store release, or fake Flash live automation success.
 
 ## Current QA Result
 
@@ -12,7 +12,10 @@ MVP-014 verifies Android APK build readiness and documents the exact local block
 - Capacitor Android sync passes.
 - Capacitor doctor passes.
 - Java exists at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot` and works when set for the current process.
-- Android debug APK build is blocked because Android SDK is not installed/configured at `C:\Users\myhou\AppData\Local\Android\Sdk`.
+- Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`.
+- Android debug APK build passes.
+- APK path: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Physical device testing is still pending.
 
 ## MVP Status
 
@@ -31,7 +34,7 @@ MVP-014 verifies Android APK build readiness and documents the exact local block
 | MVP-011 XLSX/ZIP exact 21.6 export | Complete | Browser ZIP/export works locally |
 | MVP-012 Backup Reminder + Cleanup Guard | Complete | Cleanup only confirmed backed-up local payloads |
 | MVP-013 Android QA readiness | Complete | Docs/checklists added; APK build needs Java/Android SDK |
-| MVP-014 Android APK build readiness | Complete | Java verified; SDK blocker documented |
+| MVP-014 Android APK build readiness | Complete | Debug APK build passed; real device QA pending |
 
 ## Key Docs
 
@@ -52,7 +55,7 @@ npx cap sync android
 npx cap doctor
 ```
 
-Android debug build after installing Android SDK:
+Rebuild Android debug APK from the project root:
 
 ```bash
 .\android\gradlew.bat -p android assembleDebug
@@ -64,9 +67,14 @@ Expected SDK local config after Android SDK install:
 sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
 ```
 
+Manual APK install after enabling USB debugging on the Android device:
+
+```bash
+adb install android/app/build/outputs/apk/debug/app-debug.apk
+```
+
 ## Remaining Production Work
 
-- Install Android SDK and rerun `.\android\gradlew.bat -p android assembleDebug`.
 - Real Android device QA on Samsung S23 FE and Galaxy Tab A7 Lite.
 - iPad browser fallback QA.
 - Android release signing/app store packaging.

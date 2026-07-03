@@ -2,29 +2,40 @@
 
 ## MVP-014 Android APK Build and Real Device QA Readiness
 
-MVP-014 verifies local Android APK build readiness. It checks Java, searches for Android SDK on Windows, documents the correct ignored `android/local.properties` content, runs the required web and Capacitor checks, attempts the Android debug build with the correct Gradle invocation, and prepares real device QA documentation.
+MVP-014 verifies local Android APK build readiness. It checks Java, confirms Android SDK on Windows, documents the ignored `android/local.properties` content, runs the required web and Capacitor checks, builds the Android debug APK, and prepares real device QA documentation.
 
 ## Verified Locally
 
 - Java exists at `C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot`.
 - OpenJDK 17.0.19 works when called directly and when `JAVA_HOME`/`PATH` are set for the current process.
+- Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`.
+- `android/local.properties` exists locally with `sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk` and is not committed.
 - `npm.cmd install` passes.
 - `npx.cmd tsc -b` passes.
 - `npm.cmd run build` passes.
-- `npx.cmd cap doctor` passes.
 - `npx.cmd cap sync android` passes.
+- `.\gradlew.bat assembleDebug` passes from the `android` folder.
 
 ## Android Build Status
 
-Android debug APK build is blocked locally because Android SDK is not installed/configured at the expected Windows location.
-
-Checked paths:
+Android debug APK build passes.
 
 ```text
-C:\Users\myhou\AppData\Local\Android\Sdk
-C:\Android\Sdk
-C:\Program Files\Android\Android Studio
-C:\Program Files (x86)\Android\android-sdk
+BUILD SUCCESSFUL
+```
+
+Manual build result reported after Android Studio SDK installation:
+
+```text
+BUILD SUCCESSFUL in 3m 30s
+82 actionable tasks: 82 executed
+```
+
+Fresh verification in this session:
+
+```text
+BUILD SUCCESSFUL in 11s
+82 actionable tasks: 20 executed, 62 up-to-date
 ```
 
 Correct build command from project root:
@@ -33,19 +44,7 @@ Correct build command from project root:
 .\android\gradlew.bat -p android assembleDebug
 ```
 
-Exact blocker:
-
-```text
-SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at 'C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\local.properties'.
-```
-
-Expected ignored local config after Android SDK installation:
-
-```properties
-sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
-```
-
-Expected APK path after successful build:
+APK path:
 
 ```text
 android/app/build/outputs/apk/debug/app-debug.apk
@@ -67,10 +66,11 @@ C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\de
 - Validates Thai phone format before WebView automation.
 - Uses timeout and error responses for network/loading/extraction failures.
 - PWA/browser fallback remains honest and does not claim cross-site automation.
+- Flash live automation is not marked passed until physical Android testing against the real Flash proof page is completed.
 
 ## Device QA Required
 
-Real device validation is still required for:
+Debug APK build is complete, but real device validation is still required for:
 
 - Samsung S23 FE
 - Galaxy Tab A7 Lite
@@ -99,6 +99,7 @@ See:
 ## Remaining Production Tasks
 
 - Real Android device QA.
+- Physical Android Flash WebView test against the real Flash proof page.
 - Android release signing.
 - App store build/release process.
 - Production R2 signed upload backend.

@@ -2,7 +2,15 @@
 
 ## MVP-014 Status
 
-Real device testing is prepared but not completed in this local session because the Android SDK is not installed/configured and no debug APK was generated.
+The debug APK has been generated successfully, but real device testing is still pending.
+
+APK path:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Do not mark Flash live automation passed until it has been tested on a physical Android device with the real Flash proof page.
 
 ## Target Devices
 
@@ -13,9 +21,9 @@ Real device testing is prepared but not completed in this local session because 
 
 ## APK Install Checklist
 
-For Android devices after APK build succeeds:
+For Android devices:
 
-- [ ] Build `android/app/build/outputs/apk/debug/app-debug.apk`
+- [x] Build `android/app/build/outputs/apk/debug/app-debug.apk`
 - [ ] Connect device by USB
 - [ ] Enable Developer Options
 - [ ] Enable USB debugging
@@ -54,11 +62,11 @@ Use this flow on Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and 
 
 | Test | Result | Notes |
 | --- | --- | --- |
-| Install APK | Not run | APK not generated locally |
+| Install APK | Pending | APK generated; requires physical device |
 | Open app | Not run | Requires APK/device |
 | Responsible profile | Not run | Use `25845 Tui / BNAK` |
 | QR/manual scan | Not run | Use sample Flash URL |
-| Android WebView Flash | Not run | Requires real device |
+| Android WebView Flash | Not run | Do not mark passed before real Flash proof page test |
 | Photos/camera | Not run | Requires real device |
 | Export/backup | Not run | Validate after install |
 
@@ -66,10 +74,10 @@ Use this flow on Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and 
 
 | Test | Result | Notes |
 | --- | --- | --- |
-| Install APK | Not run | APK not generated locally |
+| Install APK | Pending | APK generated; requires physical device |
 | Open app | Not run | Requires APK/device |
 | Layout/tablet | Not run | Check dashboard/export/backup pages |
-| Android WebView Flash | Not run | Requires real device |
+| Android WebView Flash | Not run | Do not mark passed before real Flash proof page test |
 | Photos/camera | Not run | Requires real device |
 
 ## iPad Browser Fallback
@@ -89,6 +97,10 @@ Use this flow on Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and 
 | PWA Flash fallback | Ready for manual test | Browser cannot automate cross-site Flash |
 | Export/backup | Ready for manual test | Build passes |
 
-## Known Blocker
+## Pending Work
 
-Android SDK is not installed/configured locally. Complete Android SDK setup and rerun APK build before real device installation.
+- Install APK on Samsung S23 FE.
+- Install APK on Galaxy Tab A7 Lite.
+- Validate iPad browser fallback.
+- Validate desktop browser fallback.
+- Test Android WebView Flash flow on a real Android device with the real Flash proof page.

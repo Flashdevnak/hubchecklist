@@ -6,13 +6,19 @@ Date: 2026-07-03
 
 ## Java
 
-JDK path checked:
+Java version:
+
+```text
+OpenJDK 17.0.19
+```
+
+`JAVA_HOME`:
 
 ```text
 C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot
 ```
 
-Java result when called directly:
+Java result:
 
 ```text
 openjdk version "17.0.19" 2026-04-21
@@ -20,120 +26,88 @@ OpenJDK Runtime Environment Temurin-17.0.19+10 (build 17.0.19+10)
 OpenJDK 64-Bit Server VM Temurin-17.0.19+10 (build 17.0.19+10, mixed mode, sharing)
 ```
 
-Current shell note:
-
-- Initial shell had no `JAVA_HOME`.
-- Initial shell had no `java` on `PATH`.
-- Build commands were run with `JAVA_HOME` set for the current process:
-
-```powershell
-$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot'
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
-```
-
 ## Android SDK
 
-Checked paths:
+Android SDK path:
 
 ```text
 C:\Users\myhou\AppData\Local\Android\Sdk
-C:\Android\Sdk
-C:\Program Files\Android\Android Studio
-C:\Program Files (x86)\Android\android-sdk
 ```
 
-Result:
-
-```text
-Android SDK not found at checked paths.
-```
-
-## local.properties
-
-`android/local.properties` was not created because the Android SDK path does not exist locally.
-
-If Android SDK is installed at the expected path, create:
-
-```text
-android/local.properties
-```
-
-with:
-
-```properties
-sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
-```
-
-`android/local.properties` is intentionally ignored by Git and should not be committed.
-
-## Commands Run
-
-```powershell
-npm.cmd install
-npx.cmd tsc -b
-npm.cmd run build
-npx.cmd cap doctor
-npx.cmd cap sync android
-.\android\gradlew.bat -p android assembleDebug
-```
-
-## Build Result
-
-Passed:
-
-- `npm.cmd install`
-- `npx.cmd tsc -b`
-- `npm.cmd run build`
-- `npx.cmd cap doctor`
-- `npx.cmd cap sync android`
-
-Blocked:
-
-- `.\android\gradlew.bat -p android assembleDebug`
-
-Exact blocker:
-
-```text
-SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable or by setting the sdk.dir path in your project's local properties file at 'C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\local.properties'.
-```
-
-## APK Path
-
-APK was not generated because Android SDK is missing.
-
-Expected APK path after successful build:
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
-```
-
-## Android SDK Setup
-
-Install Android Studio, then open:
-
-```text
-Android Studio -> File -> Settings -> Appearance & Behavior -> System Settings -> Android SDK
-```
-
-Install:
-
-- Android SDK Platform
-- Android SDK Build-Tools
-- Android SDK Platform-Tools
-- Android SDK Command-line Tools
-
-Then set current-process variables or user environment variables:
+Current-process environment used for verification:
 
 ```powershell
 $env:ANDROID_HOME='C:\Users\myhou\AppData\Local\Android\Sdk'
 $env:ANDROID_SDK_ROOT='C:\Users\myhou\AppData\Local\Android\Sdk'
 ```
 
-Create `android/local.properties` with the forward-slash path shown above, then rerun:
+## local.properties
+
+`android/local.properties` exists locally and is intentionally ignored by Git.
+
+Content:
+
+```properties
+sdk.dir=C:/Users/myhou/AppData/Local/Android/Sdk
+```
+
+Do not commit `android/local.properties` because it is machine-specific.
+
+## Commands Run
+
+From project root:
 
 ```powershell
-.\android\gradlew.bat -p android assembleDebug
+npm.cmd install
+npx.cmd tsc -b
+npm.cmd run build
+npx.cmd cap sync android
+```
+
+From `android`:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+## Build Result
+
+PASSED.
+
+Manual build result reported after Android Studio SDK installation:
+
+```text
+BUILD SUCCESSFUL in 3m 30s
+82 actionable tasks: 82 executed
+```
+
+Fresh verification in this session:
+
+```text
+BUILD SUCCESSFUL in 11s
+82 actionable tasks: 20 executed, 62 up-to-date
+```
+
+Passed:
+
+- `npm.cmd install`
+- `npx.cmd tsc -b`
+- `npm.cmd run build`
+- `npx.cmd cap sync android`
+- `.\gradlew.bat assembleDebug`
+
+## APK Path
+
+Relative path:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Full Windows path:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ## Android Project Checks
@@ -147,3 +121,7 @@ Create `android/local.properties` with the forward-slash path shown above, then 
 ```text
 https://api.flashexpress.com/gw/nws/web/proof/go/
 ```
+
+## Not Yet Verified
+
+The debug APK build is complete, but production readiness is not claimed. Flash live automation still requires physical Android device testing against the real Flash proof page.
