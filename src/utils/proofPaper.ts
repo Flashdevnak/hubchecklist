@@ -1,8 +1,10 @@
-import type { FlashProofRouteRow } from '../types';
+﻿import type { FlashProofRouteRow } from '../types';
 
 export interface ProofPaperParseResult {
   vehicleBarcode?: string;
   driverPhone?: string;
+  driverPhoneConfidence: 'high' | 'medium' | 'low' | 'none';
+  phoneCandidates: string[];
   companyName?: string;
   origin?: string;
   destination?: string;
@@ -59,10 +61,13 @@ export function parseProofPaperText(rawText: string): ProofPaperParseResult {
   const routeRows = extractRouteRows(text);
   const routeSummary = extractRouteSummary(text);
   const originDestination = extractOriginDestination(routeSummary, routeRows);
+  const phoneResult = extractDriverPhoneCandidates(text);
 
   const result: ProofPaperParseResult = {
     vehicleBarcode: extractVehicleBarcodeFromAnyInput(text) || undefined,
-    driverPhone: extractDriverPhone(text),
+    driverPhone: phoneResult.bestPhone,
+    driverPhoneConfidence: phoneResult.confidence,
+    phoneCandidates: phoneResult.candidates,
     companyName: extractCompany(text),
     origin: originDestination.origin,
     destination: originDestination.destination,
@@ -89,16 +94,47 @@ export function parseProofPaperText(rawText: string): ProofPaperParseResult {
     };
   }
 
-  if (!result.vehicleBarcode) result.warnings.push('ยังอ่านบาร์รถไม่ได้');
+  if (!result.vehicleBarcode) result.warnings.push('à¸¢à¸±à¸‡à¸­à¹ˆà¸²à¸™à¸šà¸²à¸£à¹Œà¸£à¸–à¹„à¸¡à¹ˆà¹„à¸”à¹‰');
   if (!result.driverPhone) result.warnings.push('ยังอ่านเบอร์คนขับไม่ได้');
-  if (!result.routeSummary) result.warnings.push('ยังอ่านเส้นทางไม่ได้');
-  if (lines.length > 0) result.warnings.push('OCR ทดลอง กรุณาตรวจสอบข้อมูลก่อนบันทึก');
+  if (result.driverPhoneConfidence === 'low' || result.phoneCandidates.length > 1) {
+    result.warnings.push('กรุณาตรวจสอบเบอร์คนขับ');
+  }
+  if (!result.routeSummary) result.warnings.push('à¸¢à¸±à¸‡à¸­à¹ˆà¸²à¸™à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰');
+  if (lines.length > 0) result.warnings.push('OCR à¸—à¸”à¸¥à¸­à¸‡ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¹ˆà¸­à¸™à¸šà¸±à¸™à¸—à¸¶à¸');
   return result;
 }
 
 export function extractDriverPhone(rawText: string): string | undefined {
-  const normalized = normalizeThaiDigits(rawText).replace(/[^\d\n]/g, ' ');
-  return normalized.match(/\b0[689]\d{8}\b/)?.[0];
+  return extractDriverPhoneCandidates(rawText).bestPhone;
+}
+
+export function extractDriverPhoneCandidates(rawText: string): {
+  bestPhone?: string;
+  candidates: string[];
+  confidence: 'high' | 'medium' | 'low' | 'none';
+} {
+  const text = normalizePhoneOcrText(rawText);
+  const candidates = findPhoneCandidates(text);
+  if (candidates.length === 0) return { candidates: [], confidence: 'none' };
+
+  const lines = text.split(/\r?\n/);
+  const scored = candidates.map((phone) => ({
+    phone,
+    score: scorePhoneCandidate(phone, lines, text),
+  })).sort((a, b) => b.score - a.score);
+  const uniqueCandidates = scored.map((item) => item.phone);
+  const best = scored[0];
+  const second = scored[1];
+
+  if (best.score >= 8 && (!second || best.score - second.score >= 3)) {
+    return { bestPhone: best.phone, candidates: uniqueCandidates, confidence: 'high' };
+  }
+
+  if (uniqueCandidates.length === 1 && best.score >= 4) {
+    return { bestPhone: best.phone, candidates: uniqueCandidates, confidence: 'medium' };
+  }
+
+  return { candidates: uniqueCandidates, confidence: 'low' };
 }
 
 export function extractRouteSummary(rawText: string): string | undefined {
@@ -173,6 +209,46 @@ function normalizeOcrText(rawText: string): string {
 function normalizeThaiDigits(input: string): string {
   const thaiDigits = '๐๑๒๓๔๕๖๗๘๙';
   return input.replace(/[๐-๙]/g, (digit) => String(thaiDigits.indexOf(digit)));
+}
+
+function normalizePhoneOcrText(rawText: string): string {
+  return normalizeThaiDigits(rawText)
+    .replace(/[０-９]/g, (digit) => String('０１２３４５６７８９'.indexOf(digit)))
+    .replace(/[Oo〇]/g, '0')
+    .replace(/\u00a0/g, ' ');
+}
+
+function findPhoneCandidates(text: string): string[] {
+  const candidates = new Set<string>();
+  const relaxedPhonePattern = /0[689](?:[\s\-().]*\d){8}/g;
+
+  for (const match of text.matchAll(relaxedPhonePattern)) {
+    const phone = match[0].replace(/\D/g, '');
+    if (/^0[689]\d{8}$/.test(phone)) candidates.add(phone);
+  }
+
+  return [...candidates];
+}
+
+function scorePhoneCandidate(phone: string, lines: string[], fullText: string): number {
+  let score = 1;
+  const labelPattern = /(พนักงานขับรถ|คนขับ|เบอร์โทร|เบอร์|โทร|driver|phone|mobile|tel)/i;
+
+  lines.forEach((line, index) => {
+    const compactLine = line.replace(/\D/g, '');
+    if (!compactLine.includes(phone)) return;
+    if (labelPattern.test(line)) score += 8;
+    if (index > 0 && labelPattern.test(lines[index - 1])) score += 6;
+    if (index + 1 < lines.length && labelPattern.test(lines[index + 1])) score += 4;
+  });
+
+  const phoneIndex = fullText.indexOf(phone);
+  const labelMatch = fullText.match(labelPattern);
+  if (phoneIndex >= 0 && labelMatch?.index !== undefined && Math.abs(phoneIndex - labelMatch.index) < 80) {
+    score += 4;
+  }
+
+  return score;
 }
 
 function extractCompany(rawText: string): string | undefined {

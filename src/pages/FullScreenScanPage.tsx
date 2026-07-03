@@ -79,6 +79,8 @@ export default function FullScreenScanPage() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createMessage, setCreateMessage] = useState('');
   const [forceDuplicate, setForceDuplicate] = useState(false);
+  const [ocrPhoneCandidates, setOcrPhoneCandidates] = useState<string[]>([]);
+  const [ocrPhoneReviewRequired, setOcrPhoneReviewRequired] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
@@ -104,7 +106,7 @@ export default function FullScreenScanPage() {
     review.driverPhone.trim() ? validateThaiPhoneNumber(review.driverPhone) : { isValid: true }
   ), [review.driverPhone]);
   const barcodeValidation = useMemo(() => parseFlashProofInput(review.vehicleBarcode), [review.vehicleBarcode]);
-  const canCreate = Boolean(activeProfile && barcodeValidation.isValid && review.vehicleBarcode && phoneValidation.isValid);
+  const canCreate = Boolean(activeProfile && barcodeValidation.isValid && review.vehicleBarcode && phoneValidation.isValid && !ocrPhoneReviewRequired);
   const sourceUrl = review.vehicleBarcode ? `${FLASH_PROOF_BASE_URL}${review.vehicleBarcode}` : '';
 
   useEffect(() => {
@@ -228,10 +230,11 @@ export default function FullScreenScanPage() {
       const cached = getCachedDriverPhone(parsed.vehicleBarcode);
       setCachedPhone(cached);
     }
+    const autoFillPhone = shouldAutoFillOcrPhone(parsed);
     setReview((current) => ({
       ...current,
       vehicleBarcode: parsed.vehicleBarcode ?? current.vehicleBarcode,
-      driverPhone: parsed.driverPhone ?? current.driverPhone,
+      driverPhone: autoFillPhone ? parsed.driverPhone ?? current.driverPhone : current.driverPhone,
       origin: parsed.origin ?? current.origin,
       destination: parsed.destination ?? current.destination,
       routeSummary: parsed.routeSummary ?? current.routeSummary,
@@ -242,6 +245,8 @@ export default function FullScreenScanPage() {
       companyName: parsed.companyName ?? current.companyName,
       ocrRawText: rawText,
     }));
+    setOcrPhoneCandidates(parsed.phoneCandidates);
+    setOcrPhoneReviewRequired(parsed.phoneCandidates.length > 1 || parsed.driverPhoneConfidence === 'low');
     setScannerMessage(parsed.warnings.length ? parsed.warnings.join(' / ') : 'อ่านข้อมูลจากรูปใบรถแล้ว');
   };
 
@@ -280,6 +285,8 @@ export default function FullScreenScanPage() {
     setCachedPhone(null);
     setCreateMessage('');
     setForceDuplicate(false);
+    setOcrPhoneCandidates([]);
+    setOcrPhoneReviewRequired(false);
   };
 
   const handleCreateRecord = () => {
@@ -392,7 +399,13 @@ export default function FullScreenScanPage() {
 
   const updateReview = (field: keyof ReviewDraft, value: string) => {
     setReview((current) => ({ ...current, [field]: field === 'vehicleBarcode' ? value.trim().toUpperCase() : value }));
+    if (field === 'driverPhone') setOcrPhoneReviewRequired(false);
     setForceDuplicate(false);
+  };
+
+  const selectOcrPhone = (phone: string) => {
+    updateReview('driverPhone', phone);
+    setOcrPhoneReviewRequired(false);
   };
 
   return (
@@ -492,6 +505,25 @@ export default function FullScreenScanPage() {
               ใช้เบอร์ล่าสุด {formatThaiPhone(cachedPhone)}
             </button>
           ) : null}
+          {ocrPhoneReviewRequired ? (
+            <div className="phone-candidate-list">
+              <p className="form-error">กรุณาตรวจสอบเบอร์คนขับ</p>
+              {ocrPhoneCandidates.length > 0 ? (
+                <div className="phone-candidate-grid">
+                  {ocrPhoneCandidates.map((phone) => (
+                    <button
+                      className={review.driverPhone.replace(/\D/g, '') === phone ? 'phone-chip active' : 'phone-chip'}
+                      key={phone}
+                      type="button"
+                      onClick={() => selectOcrPhone(phone)}
+                    >
+                      {formatThaiPhone(phone)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {review.driverPhone && !phoneValidation.isValid ? <p className="form-error">{phoneValidation.error}</p> : null}
           {barcodeValidation.error ? <p className="form-error">{barcodeValidation.error}</p> : null}
           {createMessage ? <p className="scan-message warning compact-message">{createMessage}</p> : null}
@@ -553,5 +585,13 @@ function ReviewInput({
         placeholder={placeholder}
       />
     </label>
+  );
+}
+
+function shouldAutoFillOcrPhone(parsed: ProofPaperParseResult): boolean {
+  return Boolean(
+    parsed.driverPhone &&
+    parsed.phoneCandidates.length <= 1 &&
+    (parsed.driverPhoneConfidence === 'high' || parsed.driverPhoneConfidence === 'medium'),
   );
 }
