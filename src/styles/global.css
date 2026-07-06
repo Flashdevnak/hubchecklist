@@ -479,6 +479,41 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
   background: #fff;
   color: var(--text);
 }
+.readonly-review-field {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+.readonly-review-field strong {
+  font-size: 22px;
+  color: var(--charcoal);
+}
+.unified-template-table {
+  display: grid;
+  gap: 8px;
+}
+.unified-template-row {
+  display: grid;
+  grid-template-columns: 40px minmax(220px, 1.5fr) minmax(100px, .65fr) minmax(120px, .65fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.unified-template-row.header {
+  background: var(--charcoal);
+  color: #fff;
+  font-weight: 900;
+}
+.unified-template-row small {
+  display: block;
+  color: var(--muted);
+  font-weight: 800;
+  margin-top: 3px;
+}
 .cached-phone-button {
   min-height: 44px;
   border: 1px solid var(--accent-strong);
@@ -1262,6 +1297,10 @@ h2, h3 { margin: 0 0 12px; letter-spacing: -0.02em; }
     grid-template-columns: 1fr;
   }
   .review-grid {
+    grid-template-columns: 1fr;
+  }
+  .unified-template-row,
+  .unified-template-row.header {
     grid-template-columns: 1fr;
   }
   .profile-form-grid,

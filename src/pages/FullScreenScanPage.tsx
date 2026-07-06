@@ -81,6 +81,7 @@ export default function FullScreenScanPage() {
   const [forceDuplicate, setForceDuplicate] = useState(false);
   const [ocrPhoneCandidates, setOcrPhoneCandidates] = useState<string[]>([]);
   const [ocrPhoneReviewRequired, setOcrPhoneReviewRequired] = useState(false);
+  const [clockNow, setClockNow] = useState(new Date());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
@@ -100,6 +101,11 @@ export default function FullScreenScanPage() {
     }
 
     return () => stopCamera();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const phoneValidation = useMemo(() => (
@@ -295,6 +301,7 @@ export default function FullScreenScanPage() {
     setCreateMessage('');
 
     if (redoRecordId) {
+      const departure = getCurrentDepartureStamp();
       const updated = updateRecordWithAudit(
         redoRecordId,
         {
@@ -306,6 +313,8 @@ export default function FullScreenScanPage() {
           firstBranch: review.origin,
           lastBranch: review.destination,
           plannedDepartureTime: review.plannedDepartureTime,
+          actualDepartureTime: departure.time,
+          actualDepartureDateTime: departure.iso,
         },
         'redo QR scan confirmed',
         'user',
@@ -378,10 +387,20 @@ export default function FullScreenScanPage() {
   };
 
   const buildFlashResult = (profile: ActiveResponsibleProfile): FlashProofResult => ({
+    ...(() => {
+      const departure = getCurrentDepartureStamp();
+      return {
+        actualDepartureTime: departure.time,
+        actualDepartureDateTime: departure.iso,
+      };
+    })(),
     sourceUrl,
     vehicleBarcode: review.vehicleBarcode,
     driverPhone: review.driverPhone.replace(/\D/g, ''),
     companyName: review.companyName,
+    targetBranch: review.destination,
+    transferLoadRate: '',
+    smallParcelPriority: '',
     routeSummary: review.routeSummary || [review.origin, review.destination].filter(Boolean).join(' -> '),
     firstBranch: review.origin,
     lastBranch: review.destination,
@@ -392,6 +411,9 @@ export default function FullScreenScanPage() {
     message: isFlashProofUrl(sourceUrl) ? 'Created from staff scan review' : 'Created from manual review',
     flashPageStatus: 'not_fetched',
     extractedAt: new Date().toISOString(),
+    sourceFlags: getSourceFlags(review.ocrRawText, manualInput),
+    phoneCandidates: ocrPhoneCandidates,
+    warnings: ocrPhoneReviewRequired ? ['กรุณาตรวจสอบเบอร์คนขับ'] : [],
     responsibleEmployeeCode: profile.employeeCode,
     responsibleDisplayName: profile.displayName,
     branch: profile.branch,
@@ -491,8 +513,8 @@ export default function FullScreenScanPage() {
           <div className="review-grid">
             <ReviewInput label="บาร์รถ" value={review.vehicleBarcode} onChange={(value) => updateReview('vehicleBarcode', value)} />
             <ReviewInput label="เบอร์คนขับ" value={review.driverPhone} onChange={(value) => updateReview('driverPhone', value)} placeholder="0643042911 (ไม่บังคับ)" inputMode="numeric" />
-            <ReviewInput label="ต้นทาง" value={review.origin} onChange={(value) => updateReview('origin', value)} placeholder="BNAK" />
-            <ReviewInput label="ปลายทาง" value={review.destination} onChange={(value) => updateReview('destination', value)} placeholder="NE6" />
+            <ReviewInput label="สาขาที่พ่วง / ปลายทาง" value={review.destination} onChange={(value) => updateReview('destination', value)} placeholder="NE6" />
+            <ReadOnlyReviewLine label="เวลาปล่อยรถจริงตอนบันทึก" value={formatTime(clockNow)} />
             <ReviewInput label="เส้นทาง" value={review.routeSummary} onChange={(value) => updateReview('routeSummary', value)} placeholder="LH...BNAK...NE..." wide />
             <ReviewInput label="เวลาออกตามแผน" value={review.plannedDepartureTime} onChange={(value) => updateReview('plannedDepartureTime', value)} placeholder="22:00" />
             <ReviewInput label="เวลาถึงปลายทาง" value={review.plannedArrivalTime} onChange={(value) => updateReview('plannedArrivalTime', value)} placeholder="00:15" />
@@ -504,6 +526,9 @@ export default function FullScreenScanPage() {
             <button className="cached-phone-button" type="button" onClick={() => updateReview('driverPhone', cachedPhone)}>
               ใช้เบอร์ล่าสุด {formatThaiPhone(cachedPhone)}
             </button>
+          ) : null}
+          {!review.plannedDepartureTime ? (
+            <p className="scan-message warning compact-message">ยังไม่พบเวลาปล่อยรถตามแผน กรุณาตรวจสอบ</p>
           ) : null}
           {ocrPhoneReviewRequired ? (
             <div className="phone-candidate-list">
@@ -588,10 +613,39 @@ function ReviewInput({
   );
 }
 
+function ReadOnlyReviewLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="review-field readonly-review-field">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function shouldAutoFillOcrPhone(parsed: ProofPaperParseResult): boolean {
   return Boolean(
     parsed.driverPhone &&
     parsed.phoneCandidates.length <= 1 &&
     (parsed.driverPhoneConfidence === 'high' || parsed.driverPhoneConfidence === 'medium'),
   );
+}
+
+function getCurrentDepartureStamp(): { time: string; iso: string } {
+  const now = new Date();
+  return {
+    time: formatTime(now),
+    iso: now.toISOString(),
+  };
+}
+
+function formatTime(value: Date): string {
+  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+}
+
+function getSourceFlags(ocrRawText: string, manualInput: string): FlashProofResult['sourceFlags'] {
+  const flags: NonNullable<FlashProofResult['sourceFlags']> = [];
+  if (manualInput.trim()) flags.push(isFlashProofUrl(manualInput) ? 'QR' : 'BARCODE');
+  if (ocrRawText.trim()) flags.push('OCR');
+  if (flags.length === 0) flags.push('MANUAL');
+  return [...new Set(flags)];
 }

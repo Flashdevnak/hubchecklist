@@ -2,6 +2,27 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-001 Frontline Flow
+
+1. Frontline Home shows active responsible person and today/pending/complete summary.
+2. Tap `สแกนใบรถ`.
+3. Scan QR/barcode, paste barcode, or use local OCR image fallback.
+4. Review one unified row.
+5. Confirm planned departure is filled from proof when detected.
+6. Confirm actual departure is read-only live device time.
+7. Save row; actual departure time is captured fresh on save.
+8. Photos opens directly with 3 slots: branch photo 1, branch photo 2, outbound after release.
+9. Finish returns to Today/Scan next.
+
+## RESET-001 Backoffice Flow
+
+1. Switch to Backoffice in the same APK.
+2. Review all rows from Dashboard/Records.
+3. Edit hidden fields such as `transferLoadRate`, `smallParcelPriority`, and corrected actual departure time with audit reason.
+4. Review OCR confidence/candidates, route details, photos, and audit.
+5. Export ZIP; workbook `21.6` must use the 11 unified headers.
+6. Backup/Cleanup guard still requires confirmed backup before cleanup.
+
 | Area | Test | Expected result | Pass/Fail notes |
 | --- | --- | --- | --- |
 | App shell | Open app with no hash | Dashboard route loads without crash | |

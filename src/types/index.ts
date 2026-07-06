@@ -107,6 +107,13 @@ export interface FlashProofResult {
   responsibleEmployeeCode?: string;
   responsibleDisplayName?: string;
   branch?: string;
+  targetBranch?: string;
+  transferLoadRate?: string;
+  actualDepartureDateTime?: string;
+  smallParcelPriority?: string;
+  sourceFlags?: Array<'QR' | 'BARCODE' | 'OCR' | 'FLASH' | 'MANUAL'>;
+  phoneCandidates?: string[];
+  warnings?: string[];
 }
 
 export interface FlashProofPluginResponse {
@@ -180,12 +187,17 @@ export interface VehicleRecord {
   id: string;
   workDate: string;
   branch: string;
+  responsibleCode?: string;
+  responsibleName?: string;
+  responsibleBranch?: string;
   responsibleEmployeeCode: string;
   responsibleDisplayName: string;
   scannerUserId?: string;
   scannerName?: string;
   sourceUrl: string;
   vehicleBarcode: string;
+  targetBranch?: string;
+  transferLoadRate?: string;
   driverPhone: string;
   driverName?: string;
   companyName?: string;
@@ -194,7 +206,12 @@ export interface VehicleRecord {
   lastBranch?: string;
   plannedDepartureTime?: string;
   actualDepartureTime?: string;
+  actualDepartureDateTime?: string;
+  smallParcelPriority?: string;
   routeRows: RouteRow[];
+  sourceFlags?: Array<'QR' | 'BARCODE' | 'OCR' | 'FLASH' | 'MANUAL'>;
+  phoneCandidates?: string[];
+  warnings?: string[];
   checklistType: ChecklistType;
   requiredPhotos: string[];
   flashPageStatus?: string;
@@ -252,6 +269,8 @@ export interface VehiclePhoto {
 export interface VehicleRecordDraft {
   workDate: string;
   branch: string;
+  targetBranch?: string;
+  transferLoadRate?: string;
   responsibleEmployeeCode: string;
   responsibleDisplayName: string;
   sourceUrl: string;
@@ -264,7 +283,12 @@ export interface VehicleRecordDraft {
   lastBranch?: string;
   plannedDepartureTime?: string;
   actualDepartureTime?: string;
+  actualDepartureDateTime?: string;
+  smallParcelPriority?: string;
   routeRows: FlashProofRouteRow[];
+  sourceFlags?: Array<'QR' | 'BARCODE' | 'OCR' | 'FLASH' | 'MANUAL'>;
+  phoneCandidates?: string[];
+  warnings?: string[];
   flashPageStatus?: string;
   flashHtmlSnapshot?: string;
   ocrRawText?: string;

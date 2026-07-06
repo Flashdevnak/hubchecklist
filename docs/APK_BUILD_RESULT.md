@@ -1,6 +1,6 @@
 # APK Build Result
 
-## MVP-017 Result
+## RESET-001 Result
 
 Date: 2026-07-03
 
@@ -72,7 +72,7 @@ From `android`:
 
 ## Build Result
 
-PASSED. MVP-017 rebuild completed after the simplified staff scan/review/create flow and OCR parser foundation.
+PASSED. RESET-001 rebuild must complete TypeScript, web build, Capacitor sync, and Android `assembleDebug` before commit/push.
 
 Manual build result reported after Android Studio SDK installation:
 
@@ -84,8 +84,7 @@ BUILD SUCCESSFUL in 3m 30s
 Fresh verification in this session:
 
 ```text
-MVP-017: BUILD SUCCESSFUL in 7s
-82 actionable tasks: 23 executed, 59 up-to-date
+RESET-001: assembleDebug completed successfully on 2026-07-06
 ```
 
 Passed:

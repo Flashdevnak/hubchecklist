@@ -17,8 +17,8 @@ interface AppShellProps {
   onRoleChange: (mode: AppRoleMode) => void;
 }
 
-const staffRoutes: AppRoute[] = ['dashboard', 'responsible-profile', 'scan', 'scan-preview', 'flash-search', 'checklist'];
-const adminRoutes: AppRoute[] = ['dashboard', 'export', 'backup-cleanup', 'admin-settings', 'user-management', 'edit-record'];
+const staffRoutes: AppRoute[] = ['dashboard', 'scan', 'checklist'];
+const adminRoutes: AppRoute[] = ['dashboard', 'checklist', 'export', 'backup-cleanup', 'admin-settings', 'user-management', 'edit-record', 'flash-search'];
 
 export default function AppShell({
   activeProfile,

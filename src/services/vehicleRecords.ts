@@ -305,6 +305,8 @@ function buildVehicleRecordDraft(draft: FlashProofResult): VehicleRecordDraft {
   return {
     workDate,
     branch: draft.branch ?? previewDraft?.branch ?? '',
+    targetBranch: draft.targetBranch ?? draft.lastBranch,
+    transferLoadRate: draft.transferLoadRate ?? '',
     responsibleEmployeeCode: draft.responsibleEmployeeCode ?? previewDraft?.responsibleEmployeeCode ?? '',
     responsibleDisplayName: draft.responsibleDisplayName ?? previewDraft?.responsibleDisplayName ?? '',
     sourceUrl: draft.sourceUrl,
@@ -317,7 +319,12 @@ function buildVehicleRecordDraft(draft: FlashProofResult): VehicleRecordDraft {
     lastBranch: draft.lastBranch,
     plannedDepartureTime: draft.plannedDepartureTime,
     actualDepartureTime: draft.actualDepartureTime,
+    actualDepartureDateTime: draft.actualDepartureDateTime,
+    smallParcelPriority: draft.smallParcelPriority ?? '',
     routeRows: draft.routeRows,
+    sourceFlags: draft.sourceFlags,
+    phoneCandidates: draft.phoneCandidates,
+    warnings: draft.warnings,
     flashPageStatus: draft.flashPageStatus,
     flashHtmlSnapshot: draft.htmlSnapshot,
     ocrRawText: previewDraft?.ocrRawText,
@@ -343,6 +350,9 @@ function createRecord(draft: VehicleRecordDraft): VehicleRecord {
   return {
     id,
     ...draft,
+    responsibleCode: draft.responsibleEmployeeCode,
+    responsibleName: draft.responsibleDisplayName,
+    responsibleBranch: draft.branch,
     routeRows: draft.routeRows.map((row, index) => ({
       id: createId(),
       recordId: id,
@@ -378,9 +388,7 @@ function getChecklistType(rows: unknown[]): ChecklistType {
 }
 
 export function getRequiredPhotosForChecklist(checklistType: ChecklistType): string[] {
-  return checklistType === 'MULTI_DROP'
-    ? ['branchDropPhoto1', 'branchDropPhoto2', 'dropPhotoAfterDeparture']
-    : ['loadingPhoto', 'dropPhotoAfterDeparture'];
+  return ['branchDropPhoto1', 'branchDropPhoto2', 'dropPhotoAfterDeparture'];
 }
 
 function createDuplicateKey(candidate: Pick<VehicleRecordDraft, 'workDate' | 'branch' | 'vehicleBarcode' | 'driverPhone' | 'sourceUrl'>): string {

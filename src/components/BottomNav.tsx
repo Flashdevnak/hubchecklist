@@ -11,9 +11,11 @@ const staffItems: Array<{ route: AppRoute; label: string; icon: typeof Home }> =
 const adminItems: Array<{ route: AppRoute; label: string; icon: typeof Home }> = [
   { route: 'dashboard', label: 'Dashboard', icon: Home },
   { route: 'dashboard', label: 'Records', icon: ShieldCheck },
+  { route: 'checklist', label: 'Photos', icon: ClipboardCheck },
   { route: 'export', label: 'Export', icon: Download },
   { route: 'backup-cleanup', label: 'Backup', icon: ClipboardCheck },
   { route: 'admin-settings', label: 'Settings', icon: Settings },
+  { route: 'user-management', label: 'Audit', icon: ShieldCheck },
 ];
 
 interface BottomNavProps {

@@ -1,5 +1,24 @@
 # QA Checklist
 
+## RESET-001 Required Checks
+
+- [x] One Android app / one APK only
+- [x] Frontline mode is Today / Scan / Photos / My Work only
+- [x] Backoffice mode exposes records/photos/export/backup/settings/audit-oriented tools
+- [x] Central unified table template exists in `src/config/unifiedTableTemplate.ts`
+- [x] Unified export sheet `21.6` uses the same 11-column header order
+- [x] Column 5 `transferLoadRate` exists, is hidden from Frontline, and is editable in Backoffice
+- [x] Column 9 `plannedDepartureTime` auto-fills from proof/OCR route data when possible
+- [x] Column 10 `actualDepartureTime` is read-only in Frontline and captured from device time on save
+- [x] QR/barcode/manual/OCR all feed one review row
+- [x] OCR remains local/lazy-loaded and review-first
+- [x] Multiple/uncertain phone candidates require staff selection
+- [x] Sample 1 parser fixture returns `NAK1RK8Z54` / `0653762402`
+- [x] Sample 2 parser fixture returns `NAK1RP4745` / `0981299480`
+- [x] Frontline photo flow maps to branch photo 1, branch photo 2, outbound after release photo
+- [x] No fake Flash/OCR/Supabase/R2 success added
+- [ ] Physical Android device QA is still pending
+
 ## MVP-017 Required Checks
 
 - [x] `npm install` passes

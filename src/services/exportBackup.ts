@@ -1,5 +1,6 @@
-import ExcelJS from 'exceljs';
+﻿import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
+import { getUnifiedHeaderLabel, UNIFIED_TABLE_TEMPLATE } from '../config/unifiedTableTemplate';
 import type { EditHistoryEntry, PhotoType, VehiclePhoto, VehicleRecord, VehicleRecordStatus } from '../types';
 import { listVehiclePhotos, PHOTO_TYPE_LABELS } from './photos';
 import { listAuditEntries, listVehicleRecords } from './vehicleRecords';
@@ -60,17 +61,17 @@ export interface ExportSummary {
 }
 
 const APP_VERSION = '0.1.0-mvp011';
-const MISSING_PHOTO_TEXT = 'ยังไม่มีรูป';
-const LOCAL_PHOTO_MISSING_TEXT = 'รูปอยู่ในเครื่อง / ไม่พบไฟล์ใน export';
+const MISSING_PHOTO_TEXT = 'à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸¹à¸›';
+const LOCAL_PHOTO_MISSING_TEXT = 'à¸£à¸¹à¸›à¸­à¸¢à¸¹à¹ˆà¹ƒà¸™à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡ / à¹„à¸¡à¹ˆà¸žà¸šà¹„à¸Ÿà¸¥à¹Œà¹ƒà¸™ export';
 
 const NORMAL_PHOTOS: PhotoType[] = ['loadingPhoto', 'dropPhotoAfterDeparture'];
 const DROP_PHOTOS: PhotoType[] = ['branchDropPhoto1', 'branchDropPhoto2', 'dropPhotoAfterDeparture'];
 
 const BLOCKS = {
-  mainDrop: { titleCell: 'A1', startCol: 1, headers: ['ผู้รับผิดชอบสาขา', 'วันที่', 'บาร์โค้ดรถ', 'สาขาที่พ่วง / รายละเอียดเส้นทาง', 'อัตราบรรทุกสาขาที่พ่วง', 'รูปถ่ายสาขาที่พ่วง 1', 'รูปถ่ายสาขาที่พ่วง 2', 'รูปถ่าย Drop สาขา หลังปล่อยรถ', 'เวลาปล่อยรถตามแผน', 'เวลาปล่อยรถจริง', 'งานถุงออกก่อนหรือไม่'] },
-  mainVehicle: { titleCell: 'M1', startCol: 13, headers: ['ผู้รับผิดชอบสาขา', 'วันที่', 'บาร์โค้ดรถ', 'สาขาปล่อยรถ / รายละเอียดเส้นทาง', 'รูปถ่ายการบรรทุก', 'รูปถ่าย Drop สาขา หลังปล่อยรถ', 'เวลาปล่อยรถตามแผน', 'เวลาปล่อยรถจริง', 'งานถุงออกก่อนหรือไม่'] },
-  extraVehicle: { titleCell: 'W1', startCol: 23, headers: ['ผู้รับผิดชอบสาขา', 'วันที่', 'บาร์โค้ดรถ', 'สาขาปล่อยรถ / รายละเอียดเส้นทาง', 'รูปถ่ายการบรรทุก', 'รูปถ่าย Drop สาขา หลังปล่อยรถ', 'เวลาปล่อยรถตามแผน', 'เวลาปล่อยรถจริง', 'งานถุงออกก่อนหรือไม่'] },
-  extraDrop: { titleCell: 'AG1', startCol: 33, headers: ['ผู้รับผิดชอบสาขา', 'วันที่', 'บาร์โค้ดรถ', 'สาขาปล่อยรถ / รายละเอียดเส้นทาง', 'อัตราบรรทุกสาขาที่พ่วง', 'รูปถ่ายสาขาที่พ่วง 1', 'รูปถ่ายสาขาที่พ่วง 2', 'รูปถ่าย Drop สาขา หลังปล่อยรถ', 'เวลาปล่อยรถตามแผน', 'เวลาปล่อยรถจริง', 'งานถุงออกก่อนหรือไม่'] },
+  mainDrop: { titleCell: 'A1', startCol: 1, headers: ['à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸šà¸ªà¸²à¸‚à¸²', 'à¸§à¸±à¸™à¸—à¸µà¹ˆ', 'à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”à¸£à¸–', 'à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡ / à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡', 'à¸­à¸±à¸•à¸£à¸²à¸šà¸£à¸£à¸—à¸¸à¸à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡ 1', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡ 2', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢ Drop à¸ªà¸²à¸‚à¸² à¸«à¸¥à¸±à¸‡à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸•à¸²à¸¡à¹à¸œà¸™', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸ˆà¸£à¸´à¸‡', 'à¸‡à¸²à¸™à¸–à¸¸à¸‡à¸­à¸­à¸à¸à¹ˆà¸­à¸™à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ'] },
+  mainVehicle: { titleCell: 'M1', startCol: 13, headers: ['à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸šà¸ªà¸²à¸‚à¸²', 'à¸§à¸±à¸™à¸—à¸µà¹ˆ', 'à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”à¸£à¸–', 'à¸ªà¸²à¸‚à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸– / à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸à¸²à¸£à¸šà¸£à¸£à¸—à¸¸à¸', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢ Drop à¸ªà¸²à¸‚à¸² à¸«à¸¥à¸±à¸‡à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸•à¸²à¸¡à¹à¸œà¸™', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸ˆà¸£à¸´à¸‡', 'à¸‡à¸²à¸™à¸–à¸¸à¸‡à¸­à¸­à¸à¸à¹ˆà¸­à¸™à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ'] },
+  extraVehicle: { titleCell: 'W1', startCol: 23, headers: ['à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸šà¸ªà¸²à¸‚à¸²', 'à¸§à¸±à¸™à¸—à¸µà¹ˆ', 'à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”à¸£à¸–', 'à¸ªà¸²à¸‚à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸– / à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸à¸²à¸£à¸šà¸£à¸£à¸—à¸¸à¸', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢ Drop à¸ªà¸²à¸‚à¸² à¸«à¸¥à¸±à¸‡à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸•à¸²à¸¡à¹à¸œà¸™', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸ˆà¸£à¸´à¸‡', 'à¸‡à¸²à¸™à¸–à¸¸à¸‡à¸­à¸­à¸à¸à¹ˆà¸­à¸™à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ'] },
+  extraDrop: { titleCell: 'AG1', startCol: 33, headers: ['à¸œà¸¹à¹‰à¸£à¸±à¸šà¸œà¸´à¸”à¸Šà¸­à¸šà¸ªà¸²à¸‚à¸²', 'à¸§à¸±à¸™à¸—à¸µà¹ˆ', 'à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”à¸£à¸–', 'à¸ªà¸²à¸‚à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸– / à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡', 'à¸­à¸±à¸•à¸£à¸²à¸šà¸£à¸£à¸—à¸¸à¸à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡ 1', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢à¸ªà¸²à¸‚à¸²à¸—à¸µà¹ˆà¸žà¹ˆà¸§à¸‡ 2', 'à¸£à¸¹à¸›à¸–à¹ˆà¸²à¸¢ Drop à¸ªà¸²à¸‚à¸² à¸«à¸¥à¸±à¸‡à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸•à¸²à¸¡à¹à¸œà¸™', 'à¹€à¸§à¸¥à¸²à¸›à¸¥à¹ˆà¸­à¸¢à¸£à¸–à¸ˆà¸£à¸´à¸‡', 'à¸‡à¸²à¸™à¸–à¸¸à¸‡à¸­à¸­à¸à¸à¹ˆà¸­à¸™à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆ'] },
 } as const;
 
 export function buildExportFilters(values: Partial<ExportFilters> = {}): ExportFilters {
@@ -251,26 +252,28 @@ export function sanitizeExportFileName(value: string): string {
 
 function createSheet21_6(workbook: ExcelJS.Workbook, data: ExportData): void {
   const sheet = workbook.addWorksheet('21.6', { views: [{ state: 'frozen', ySplit: 2 }] });
-  setupBlock(sheet, 'mainDrop', 'Main drop / รถหลักพ่วงสาขา');
-  setupBlock(sheet, 'mainVehicle', 'Main vehicle / รถหลัก');
-  setupBlock(sheet, 'extraVehicle', 'Extra vehicle / รถเสริม');
-  setupBlock(sheet, 'extraDrop', 'Extra drop / รถเสริมพ่วงสาขา');
+  sheet.mergeCells(1, 1, 1, UNIFIED_TABLE_TEMPLATE.length);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = 'Unified Vehicle Proof Table / RESET-001';
+  titleCell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF111827' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  const rowCounters: Record<keyof typeof BLOCKS, number> = {
-    mainDrop: 3,
-    mainVehicle: 3,
-    extraVehicle: 3,
-    extraDrop: 3,
-  };
+  UNIFIED_TABLE_TEMPLATE.forEach((column, index) => {
+    const cell = sheet.getCell(2, index + 1);
+    cell.value = getUnifiedHeaderLabel(column);
+    cell.font = { bold: true };
+    cell.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE044' } };
+    cell.border = thinBorder();
+    sheet.getColumn(index + 1).width = column.dataType === 'photo' ? 24 : 18;
+  });
 
-  data.activeRecords.forEach((record) => {
-    const blockName = mapRecordTo21_6Block(record);
-    const block = BLOCKS[blockName];
-    const rowNumber = rowCounters[blockName];
-    rowCounters[blockName] += 1;
-    const rowValues = getBlockRowValues(record, blockName, data.photoEntries, rowNumber);
+  data.activeRecords.forEach((record, recordIndex) => {
+    const rowNumber = recordIndex + 3;
+    const rowValues = getUnifiedRowValues(record, data.photoEntries, rowNumber);
     rowValues.forEach((value, index) => {
-      const cell = sheet.getCell(rowNumber, block.startCol + index);
+      const cell = sheet.getCell(rowNumber, index + 1);
       if (typeof value === 'object' && value !== null && 'text' in value) {
         cell.value = value;
         cell.font = { color: { argb: 'FF0563C1' }, underline: true };
@@ -281,6 +284,30 @@ function createSheet21_6(workbook: ExcelJS.Workbook, data: ExportData): void {
       cell.border = thinBorder();
     });
   });
+}
+
+function getUnifiedRowValues(record: VehicleRecord, entries: ExportPhotoEntry[], rowNumber: number): Array<string | ExcelJS.CellHyperlinkValue> {
+  return [
+    getResponsibleText(record),
+    record.workDate,
+    record.vehicleBarcode,
+    record.targetBranch || record.lastBranch || record.routeSummary || '',
+    record.transferLoadRate || '',
+    getUnifiedPhotoCellValue(record, 'branchDropPhoto1', entries, rowNumber, 6),
+    getUnifiedPhotoCellValue(record, 'branchDropPhoto2', entries, rowNumber, 7),
+    getUnifiedPhotoCellValue(record, 'dropPhotoAfterDeparture', entries, rowNumber, 8),
+    record.plannedDepartureTime || '',
+    record.actualDepartureTime || '',
+    record.smallParcelPriority || '',
+  ];
+}
+
+function getUnifiedPhotoCellValue(record: VehicleRecord, photoType: PhotoType, entries: ExportPhotoEntry[], rowNumber: number, columnNumber: number): string | ExcelJS.CellHyperlinkValue {
+  const entry = entries.find((item) => item.record.id === record.id && item.photoType === photoType);
+  if (!entry) return MISSING_PHOTO_TEXT;
+  entry.linkedCellIn21_6 = `${getColumnLetter(columnNumber)}${rowNumber}`;
+  if (!entry.existsInZip) return entry.missingReason || MISSING_PHOTO_TEXT;
+  return { text: getPhotoLinkText(photoType), hyperlink: entry.relativePath };
 }
 
 function setupBlock(sheet: ExcelJS.Worksheet, blockName: keyof typeof BLOCKS, title: string): void {
@@ -411,7 +438,7 @@ function createBackupManifestSheet(workbook: ExcelJS.Workbook, data: ExportData)
 
 function buildPhotoEntries(records: VehicleRecord[], photos: VehiclePhoto[], filters: ExportFilters): ExportPhotoEntry[] {
   return records.flatMap((record) => {
-    const requiredPhotoTypes = (record.checklistType === 'MULTI_DROP' ? DROP_PHOTOS : NORMAL_PHOTOS);
+    const requiredPhotoTypes: PhotoType[] = ['branchDropPhoto1', 'branchDropPhoto2', 'dropPhotoAfterDeparture'];
     return requiredPhotoTypes.map((photoType) => {
       const photo = photos.find((item) => item.recordId === record.id && item.photoType === photoType) ?? null;
       const dataUrl = photo ? getPhotoDataUrl(photo) : '';
@@ -485,10 +512,10 @@ function getResponsibleText(record: VehicleRecord): string {
 }
 
 function getPhotoLinkText(photoType: PhotoType): string {
-  if (photoType === 'loadingPhoto') return 'ดูรูปบรรทุก';
-  if (photoType === 'dropPhotoAfterDeparture') return 'ดูรูป Drop';
-  if (photoType === 'branchDropPhoto1') return 'ดูรูปพ่วงสาขา 1';
-  return 'ดูรูปพ่วงสาขา 2';
+  if (photoType === 'loadingPhoto') return 'à¸”à¸¹à¸£à¸¹à¸›à¸šà¸£à¸£à¸—à¸¸à¸';
+  if (photoType === 'dropPhotoAfterDeparture') return 'à¸”à¸¹à¸£à¸¹à¸› Drop';
+  if (photoType === 'branchDropPhoto1') return 'à¸”à¸¹à¸£à¸¹à¸›à¸žà¹ˆà¸§à¸‡à¸ªà¸²à¸‚à¸² 1';
+  return 'à¸”à¸¹à¸£à¸¹à¸›à¸žà¹ˆà¸§à¸‡à¸ªà¸²à¸‚à¸² 2';
 }
 
 function getPhotoColumn(blockName: keyof typeof BLOCKS, photoType: PhotoType): number {
@@ -507,9 +534,9 @@ function getHorizontalAlign(index: number): 'left' | 'center' {
 }
 
 function getColumnWidth(header: string): number {
-  if (header.includes('รูป')) return 22;
-  if (header.includes('รายละเอียด')) return 34;
-  if (header.includes('บาร์โค้ด')) return 18;
+  if (header.includes('à¸£à¸¹à¸›')) return 22;
+  if (header.includes('à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”')) return 34;
+  if (header.includes('à¸šà¸²à¸£à¹Œà¹‚à¸„à¹‰à¸”')) return 18;
   return 16;
 }
 

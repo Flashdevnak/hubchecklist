@@ -1,5 +1,19 @@
 # Real Device Test Result
 
+## RESET-001 Status
+
+The app remains one APK with Frontline and Backoffice modes inside the same app. RESET-001 web/Android build can be generated locally, but physical device validation is still pending.
+
+Do not mark these passed until tested on hardware:
+
+- [ ] Samsung S23 FE Frontline full-screen scanner
+- [ ] Galaxy Tab A7 Lite Frontline full-screen scanner
+- [ ] QR/barcode detection on real camera
+- [ ] OCR image capture from proof paper
+- [ ] Actual departure time capture from device clock
+- [ ] Android Flash WebView optional enrichment against the real Flash proof page
+- [ ] Photo capture/compression for all three unified photo columns
+
 ## MVP-017 Status
 
 The debug APK has been generated successfully. MVP-017 simple staff scan/review/create flow, QR/barcode intake, OCR parser foundation, and photo handoff still need physical device confirmation.

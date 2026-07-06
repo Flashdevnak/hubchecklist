@@ -22,11 +22,15 @@ export default function EditRecordPage() {
     driverPhone: '',
     driverName: '',
     companyName: '',
+    targetBranch: '',
+    transferLoadRate: '',
     routeSummary: '',
     firstBranch: '',
     lastBranch: '',
     plannedDepartureTime: '',
     actualDepartureTime: '',
+    actualDepartureDateTime: '',
+    smallParcelPriority: '',
     checklistType: 'NORMAL_ROUTE' as ChecklistType,
     branch: '',
     responsibleEmployeeCode: '',
@@ -44,11 +48,15 @@ export default function EditRecordPage() {
         driverPhone: found.driverPhone,
         driverName: found.driverName ?? '',
         companyName: found.companyName ?? '',
+        targetBranch: found.targetBranch ?? found.lastBranch ?? '',
+        transferLoadRate: found.transferLoadRate ?? '',
         routeSummary: found.routeSummary ?? '',
         firstBranch: found.firstBranch ?? '',
         lastBranch: found.lastBranch ?? '',
         plannedDepartureTime: found.plannedDepartureTime ?? '',
         actualDepartureTime: found.actualDepartureTime ?? '',
+        actualDepartureDateTime: found.actualDepartureDateTime ?? '',
+        smallParcelPriority: found.smallParcelPriority ?? '',
         checklistType: found.checklistType,
         branch: found.branch,
         responsibleEmployeeCode: found.responsibleEmployeeCode,
@@ -85,11 +93,15 @@ export default function EditRecordPage() {
       driverPhone: form.driverPhone,
       driverName: form.driverName || undefined,
       companyName: form.companyName || undefined,
+      targetBranch: form.targetBranch || undefined,
+      transferLoadRate: form.transferLoadRate || undefined,
       routeSummary: form.routeSummary || undefined,
       firstBranch: form.firstBranch || undefined,
       lastBranch: form.lastBranch || undefined,
       plannedDepartureTime: form.plannedDepartureTime || undefined,
       actualDepartureTime: form.actualDepartureTime || undefined,
+      actualDepartureDateTime: form.actualDepartureDateTime || undefined,
+      smallParcelPriority: form.smallParcelPriority || undefined,
       checklistType: form.checklistType,
       branch: form.branch,
       responsibleEmployeeCode: form.responsibleEmployeeCode,
@@ -121,10 +133,14 @@ export default function EditRecordPage() {
             <EditInput label="driverPhone" value={form.driverPhone} onChange={(value) => setForm({ ...form, driverPhone: value })} />
             <EditInput label="driverName" value={form.driverName} onChange={(value) => setForm({ ...form, driverName: value })} />
             <EditInput label="companyName" value={form.companyName} onChange={(value) => setForm({ ...form, companyName: value })} />
+            <EditInput label="targetBranch" value={form.targetBranch} onChange={(value) => setForm({ ...form, targetBranch: value })} />
+            <EditInput label="transferLoadRate" value={form.transferLoadRate} onChange={(value) => setForm({ ...form, transferLoadRate: value })} />
             <EditInput label="firstBranch" value={form.firstBranch} onChange={(value) => setForm({ ...form, firstBranch: value })} />
             <EditInput label="lastBranch" value={form.lastBranch} onChange={(value) => setForm({ ...form, lastBranch: value })} />
             <EditInput label="plannedDepartureTime" value={form.plannedDepartureTime} onChange={(value) => setForm({ ...form, plannedDepartureTime: value })} />
             <EditInput label="actualDepartureTime" value={form.actualDepartureTime} onChange={(value) => setForm({ ...form, actualDepartureTime: value })} />
+            <EditInput label="actualDepartureDateTime" value={form.actualDepartureDateTime} onChange={(value) => setForm({ ...form, actualDepartureDateTime: value })} />
+            <EditInput label="smallParcelPriority" value={form.smallParcelPriority} onChange={(value) => setForm({ ...form, smallParcelPriority: value })} />
             <EditInput label="branch" value={form.branch} onChange={(value) => setForm({ ...form, branch: value })} />
             <EditInput label="responsibleEmployeeCode" value={form.responsibleEmployeeCode} onChange={(value) => setForm({ ...form, responsibleEmployeeCode: value })} />
             <label>
@@ -197,11 +213,15 @@ const editableFields = [
   'driverPhone',
   'driverName',
   'companyName',
+  'targetBranch',
+  'transferLoadRate',
   'routeSummary',
   'firstBranch',
   'lastBranch',
   'plannedDepartureTime',
   'actualDepartureTime',
+  'actualDepartureDateTime',
+  'smallParcelPriority',
   'checklistType',
   'branch',
   'responsibleEmployeeCode',

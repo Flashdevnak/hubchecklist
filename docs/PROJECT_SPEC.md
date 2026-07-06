@@ -1,5 +1,23 @@
 # Project Specification
 
+## RESET-001 Frontline / Backoffice Unified Table Rebuild
+
+RESET-001 defines the app as one Android app / one APK with two clearly separated modes:
+
+- Frontline collects data only: Today -> full-screen Scan -> Review one unified row -> Photos -> Done.
+- Backoffice manages system/data: Dashboard/Records -> Photos -> Export -> Backup -> Settings -> Audit/admin tools.
+
+The operational table is centralized in `src/config/unifiedTableTemplate.ts` and contains the 11 required Chinese/Thai headers. Frontline sees only the fields needed to collect a row. Backoffice can review/edit hidden fields, OCR candidates, raw details, photos, export, backup, and audit.
+
+Important field behavior:
+
+- Column 5 `transferLoadRate` exists in the model/export and is hidden from Frontline.
+- Column 9 `plannedDepartureTime` is filled from proof QR/barcode/OCR/Flash parser data where possible and remains editable for correction.
+- Column 10 `actualDepartureTime` is read-only in Frontline and captured from the current device time at save; `actualDepartureDateTime` stores the ISO timestamp.
+- Photo columns map to branch photo 1, branch photo 2, and outbound after release photo.
+
+OCR is local/lazy-loaded and review-first. It must not fake phone, route, or Flash data. Physical device QA is still pending.
+
 ## MVP-017 Simple Staff UI and Auto Scan Fill Flow
 
 MVP-017 is complete as a local-first staff workflow update. The primary path is **Home -> Scan -> Review -> Create -> Photos**. Staff can set `25845 Tui / BNAK` from the Today screen, scan QR/barcodes with the camera where supported, paste/manual-enter Flash proof URLs or vehicle barcodes, optionally run local OCR on a proof-paper image, review editable fields, create a vehicle record, and move directly to checklist photos.

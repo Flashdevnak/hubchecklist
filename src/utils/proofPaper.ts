@@ -211,6 +211,24 @@ function normalizeThaiDigits(input: string): string {
   return input.replace(/[๐-๙]/g, (digit) => String(thaiDigits.indexOf(digit)));
 }
 
+export function extractCompanyName(rawText: string): string | undefined {
+  return extractCompany(rawText);
+}
+
+export function extractOriginBranch(rawText: string): string | undefined {
+  const rows = extractRouteRows(rawText);
+  return extractOriginDestination(extractRouteSummary(rawText), rows).origin;
+}
+
+export function extractDestinationBranch(rawText: string): string | undefined {
+  const rows = extractRouteRows(rawText);
+  return extractOriginDestination(extractRouteSummary(rawText), rows).destination;
+}
+
+export function extractPlannedArrivalTime(rawText: string): string | undefined {
+  return extractDestinationArrivalTime(rawText);
+}
+
 function normalizePhoneOcrText(rawText: string): string {
   return normalizeThaiDigits(rawText)
     .replace(/[０-９]/g, (digit) => String('０１２３４５６７８９'.indexOf(digit)))
@@ -253,7 +271,8 @@ function scorePhoneCandidate(phone: string, lines: string[], fullText: string): 
 
 function extractCompany(rawText: string): string | undefined {
   const text = normalizeOcrText(rawText);
-  return text.match(/\bDOLL(?:ARSOUND)?\b/i)?.[0].toUpperCase();
+  const labeled = text.match(/\b(?:company|บริษัท)\s*[:：]?\s*([A-Z][A-Z0-9]{2,24})\b/i)?.[1];
+  return (labeled ?? text.match(/\b(?:DOLL(?:ARSOUND)?|DBEX(?:PRESS)?)\b/i)?.[0])?.toUpperCase();
 }
 
 function extractOriginDestination(routeSummary?: string, rows: FlashProofRouteRow[] = []) {

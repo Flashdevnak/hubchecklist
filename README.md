@@ -2,6 +2,13 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
+RESET-001 rebuilds the product as **one Android app / one APK** with two modes inside the same app:
+
+- **Frontline**: Today -> full-screen Scan -> Review one unified table row -> Photos -> Done.
+- **Backoffice**: Dashboard/Records -> Photos -> Export -> Backup -> Settings -> Audit/admin tools.
+
+The app now uses a central unified table template for the 11 required columns. Column 5 `transferLoadRate` is hidden from Frontline but appears in Backoffice/export. Column 9 `plannedDepartureTime` is auto-filled from QR/barcode/OCR/Flash parser data when possible. Column 10 `actualDepartureTime` is read-only for Frontline and captured from current device time at save.
+
 MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create -> Photos**, adds QR/barcode/manual intake, adds a local OCR parser foundation for proof-paper images, and rebuilds the Android debug APK. It does **not** fake driver phone extraction from QR, secure Supabase Auth, production R2 backend, app store release, or Flash live automation success.
 
 ## Current QA Result
@@ -46,6 +53,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | MVP-015 UI/UX polish + role flow | Complete | Local staff/admin mode, cleaner mobile workflow |
 | MVP-016 Real camera scan + fast staff flow | Complete | Camera scanner and one-screen phone flow implemented |
 | MVP-017 Simple staff scan/review/create flow | Complete | QR/barcode/manual/OCR parser foundation; real device QA still pending |
+| RESET-001 Frontline/Backoffice unified table rebuild | Complete | One APK, mode separation, unified table export, real device QA still pending |
 
 ## Key Docs
 

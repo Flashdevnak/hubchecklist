@@ -1,5 +1,26 @@
 # Test Plan
 
+## RESET-001
+
+Goal: verify one APK with separated Frontline and Backoffice modes, one unified table, full-screen scan/review/photo capture, export mapping, and Android debug APK build.
+
+Checks:
+
+- Start in Frontline mode and confirm bottom nav has only Today, Scan, Photos, My Work.
+- Save responsible profile `25845 Tui / BNAK` from Today if missing.
+- Scan or paste Flash URL/barcode; Review shows one row, not debug cards.
+- Confirm planned departure auto-fills from route text such as `LH-6W7.2-BNAK-NE1-20:00-BD-1-RO`.
+- Confirm actual departure time is read-only, updates live, and saves current device `HH:mm`.
+- Use OCR fixture/sample 1 and sample 2; phone values must be `0653762402` and `0981299480`.
+- If multiple phone candidates are detected, choose from chips before Create is enabled.
+- Save row and confirm Photos opens directly.
+- Capture branch photo 1, branch photo 2, and outbound after release photo.
+- Switch to Backoffice and confirm Settings shows the unified header template.
+- Backoffice Edit can edit `transferLoadRate`, `actualDepartureTime`, `actualDepartureDateTime`, and `smallParcelPriority` with audit reason.
+- Export ZIP and verify workbook `21.6` has the 11 unified headers in order.
+- Backup/Cleanup guard remains blocked unless backup is confirmed.
+- Do not mark physical device Flash/WebView QA passed until tested on Samsung S23 FE or Galaxy Tab A7 Lite.
+
 ## MVP-017
 
 Goal: verify the simple staff workflow **Home -> Scan -> Review -> Create -> Photos** with QR/barcode/manual intake, local OCR parser foundation, and Android APK rebuild, without faking driver phone extraction, secure auth, cloud upload, or Flash live success.

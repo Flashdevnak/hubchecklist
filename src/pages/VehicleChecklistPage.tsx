@@ -12,6 +12,7 @@ import {
 } from '../services/photos';
 import { getVehicleRecordById, restoreRecordWithAudit, voidRecordWithAudit } from '../services/vehicleRecords';
 import type { PhotoType, VehiclePhoto, VehicleRecord } from '../types';
+import { getRoleMode } from '../utils';
 
 export default function VehicleChecklistPage() {
   const [record, setRecord] = useState<VehicleRecord | null>(null);
@@ -92,6 +93,7 @@ export default function VehicleChecklistPage() {
 
   const completion = getPhotoCompletionStatus(record);
   const storageMode = getPhotoStorageMode();
+  const roleMode = getRoleMode();
 
   return (
     <div className="record-page">
@@ -170,7 +172,7 @@ export default function VehicleChecklistPage() {
         </article>
       </section>
 
-      <aside className="preview-side-stack">
+      {roleMode === 'admin' ? <aside className="preview-side-stack">
         <article className="feature-card action-card">
           <h2>จัดการรายการ</h2>
           <PrimaryButton variant="secondary" onClick={() => { window.location.hash = `/edit-record?recordId=${record.id}`; }}>
@@ -207,7 +209,7 @@ export default function VehicleChecklistPage() {
         <article className="feature-card">
           <AuditHistory recordId={record.id} />
         </article>
-      </aside>
+      </aside> : null}
     </div>
   );
 }
