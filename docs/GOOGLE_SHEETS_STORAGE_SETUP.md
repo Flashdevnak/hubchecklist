@@ -13,6 +13,8 @@ VITE_APP_CLIENT_MODE=central
 
 Opening `/exec` in a browser should return a JSON health response from `doGet`.
 
+The `/exec` URL is not the employee app website. Android and Vercel builds use it as the API endpoint through `VITE_APPS_SCRIPT_WEB_APP_URL`.
+
 The app calls `bootstrap` on startup to load Settings, Hubs, ResponsibleStaff, AdminDevices status, and policy values. Frontline staff do not configure or see Apps Script URL/token fields.
 
 Settings keys used by central admin auth:

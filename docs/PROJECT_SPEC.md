@@ -1,5 +1,18 @@
 # Project Specification
 
+## RESET-008 Final Production Deployment Fix
+
+RESET-008 keeps one app with two delivery paths:
+
+- Android APK for staff Android phones/tablets.
+- Vercel Web/PWA for iPhone, iPad, and desktop.
+
+Google Apps Script `/exec` is backend API only. It now returns a clear `doGet` health response and should not be used as the employee app URL.
+
+Vercel deployment uses `npm run build`, output `dist`, and environment variables `VITE_APPS_SCRIPT_WEB_APP_URL` and `VITE_APP_CLIENT_MODE=central`.
+
+Backoffice stays centrally protected by AdminDevices and central Admin PIN. Employees do not configure backend URL/token or approve devices.
+
 ## RESET-006-007-FINAL-PLUS Central Backend and Flow Hardening
 
 Status: implemented in code and ready for build verification.

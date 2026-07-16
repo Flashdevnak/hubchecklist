@@ -681,16 +681,16 @@ function AdminApp({ activeRecord, onEmployeeModeChange, onLock, onOpenRecord, on
   return (
     <section className="admin-layout">
       <aside className="admin-sidebar">
-        <NavButton active={step === 'dashboard'} icon={<Home size={18} />} label="Dashboard" onClick={() => onStepChange('dashboard')} />
-        <NavButton active={step === 'hubs'} icon={<MapPin size={18} />} label="Hubs" onClick={() => onStepChange('hubs')} />
-        <NavButton active={step === 'staff'} icon={<UserRound size={18} />} label="Responsible" onClick={() => onStepChange('staff')} />
-        <NavButton active={step === 'records'} icon={<ClipboardList size={18} />} label="Records" onClick={() => onStepChange('records')} />
-        <NavButton active={step === 'photos'} icon={<Camera size={18} />} label="Photos" onClick={() => onStepChange('photos')} />
-        <NavButton active={step === 'export'} icon={<Download size={18} />} label="Export" onClick={() => onStepChange('export')} />
-        <NavButton active={step === 'backup'} icon={<Shield size={18} />} label="Backup" onClick={() => onStepChange('backup')} />
-        <NavButton active={step === 'settings'} icon={<Settings size={18} />} label="Settings" onClick={() => onStepChange('settings')} />
-        <NavButton active={step === 'audit'} icon={<FileText size={18} />} label="Audit" onClick={() => onStepChange('audit')} />
-        <NavButton active={step === 'admin-devices'} icon={<Shield size={18} />} label="AdminDevices" onClick={() => onStepChange('admin-devices')} />
+        <NavButton active={step === 'dashboard'} icon={<Home size={18} />} label="ภาพรวม" onClick={() => onStepChange('dashboard')} />
+        <NavButton active={step === 'hubs'} icon={<MapPin size={18} />} label="ฮับ" onClick={() => onStepChange('hubs')} />
+        <NavButton active={step === 'staff'} icon={<UserRound size={18} />} label="ผู้รับผิดชอบ" onClick={() => onStepChange('staff')} />
+        <NavButton active={step === 'records'} icon={<ClipboardList size={18} />} label="รายการ" onClick={() => onStepChange('records')} />
+        <NavButton active={step === 'photos'} icon={<Camera size={18} />} label="รูปภาพ" onClick={() => onStepChange('photos')} />
+        <NavButton active={step === 'export'} icon={<Download size={18} />} label="ส่งออก" onClick={() => onStepChange('export')} />
+        <NavButton active={step === 'backup'} icon={<Shield size={18} />} label="สำรองข้อมูล" onClick={() => onStepChange('backup')} />
+        <NavButton active={step === 'settings'} icon={<Settings size={18} />} label="ตั้งค่า" onClick={() => onStepChange('settings')} />
+        <NavButton active={step === 'audit'} icon={<FileText size={18} />} label="ประวัติ" onClick={() => onStepChange('audit')} />
+        <NavButton active={step === 'admin-devices'} icon={<Shield size={18} />} label="อุปกรณ์แอดมิน" onClick={() => onStepChange('admin-devices')} />
       </aside>
       <div className="admin-content">
         {step === 'dashboard' ? <AdminDashboard records={records} /> : null}

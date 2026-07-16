@@ -1,5 +1,17 @@
 # QA Checklist
 
+## RESET-008 Final Deployment Checks
+
+- [x] `vercel.json` exists with Vite build, `dist` output, and SPA fallback
+- [x] `docs/VERCEL_DEPLOYMENT.md` explains Vercel app URL vs Apps Script API URL
+- [x] Apps Script `doGet` health says `/exec` is backend API and POST is for app actions
+- [x] Backoffice nav uses Thai production labels
+- [x] Frontline staff do not configure backend URL/token
+- [x] Android/Web builds use `VITE_APPS_SCRIPT_WEB_APP_URL`
+- [x] Mojibake scan passes across src/docs/Apps Script
+- [ ] Vercel deployment itself remains manual and is not claimed complete
+- [ ] Physical Android/iPhone/iPad QA remains manual and is not claimed complete
+
 ## RESET-006-007-FINAL-PLUS Required Checks
 
 - [x] `doGet` exists so Apps Script `/exec` opens with a health response

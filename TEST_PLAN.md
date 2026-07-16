@@ -1,5 +1,27 @@
 # Test Plan
 
+## RESET-008 Final Deployment
+
+Vercel/Web/PWA:
+
+- Confirm `npm run build` produces `dist`.
+- Confirm `vercel.json` uses `npm run build` and `dist`.
+- In Vercel, set `VITE_APPS_SCRIPT_WEB_APP_URL` and `VITE_APP_CLIENT_MODE=central`.
+- Open the Vercel URL on iPhone Safari and Add to Home Screen.
+- Confirm staff never see Google Apps Script URL/token fields.
+
+Apps Script:
+
+- Deploy a new Apps Script Web App version after updating `Code.gs`.
+- Open `/exec` in a browser and confirm the health response says it is the backend API.
+- Confirm the Vercel URL, not `/exec`, is used as the employee website.
+
+Android:
+
+- Create `.env` with `VITE_APPS_SCRIPT_WEB_APP_URL` and `VITE_APP_CLIENT_MODE=central`.
+- Run build, Capacitor sync, and `assembleDebug`.
+- Install APK and confirm Frontline opens by default.
+
 ## RESET-006-007-FINAL-PLUS
 
 Central backend:

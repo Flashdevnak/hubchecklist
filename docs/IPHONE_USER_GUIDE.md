@@ -2,6 +2,8 @@
 
 iPhone and iPad users use the Web/PWA version. They do not install the Android APK.
 
+Use the Vercel app URL on iPhone/iPad. Do not open the Google Apps Script `/exec` URL as the app; `/exec` is only the backend API.
+
 ## RESET-006-007-FINAL-PLUS PWA Behavior
 
 - iPhone users open the same Web/PWA app.

@@ -2,6 +2,14 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-008 Deployment Flow Checks
+
+1. Open Apps Script `/exec`; confirm health API response only.
+2. Open Vercel URL; confirm the app UI loads.
+3. Android APK opens Frontline with central backend bundled from `.env`.
+4. New device cannot enter Backoffice until AdminDevices approval.
+5. Frontline scan/photo flow works without staff backend setup.
+
 ## RESET-006-007-FINAL-PLUS Flow Checks
 
 1. App opens Frontline by default.

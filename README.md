@@ -2,6 +2,15 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
+RESET-008 prepares final production deployment paths:
+
+- Android APK bundles the central Apps Script backend URL from `.env`.
+- Web/PWA deploys to Vercel with `dist` output.
+- Vercel URL is the actual iPhone/iPad/Desktop app URL.
+- Apps Script `/exec` is API/backend only and returns a health response when opened.
+- Employees never configure backend URL/token on device.
+- Backoffice remains protected by central AdminDevices approval and central Admin PIN verification.
+
 RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
 
 - `VITE_APPS_SCRIPT_WEB_APP_URL` provides the central Apps Script `/exec` URL at build time.

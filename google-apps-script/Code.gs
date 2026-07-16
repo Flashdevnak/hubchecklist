@@ -65,9 +65,9 @@ function doGet() {
   return json_({
     ok: true,
     service: 'Hub Photo Proof API',
-    message: 'Apps Script Web App is running',
     method: 'GET',
-    note: 'Use POST for application actions',
+    message: 'Apps Script Web App is running. Use POST for app actions.',
+    note: 'This /exec URL is the backend API, not the employee Web/PWA app.',
     serverTime: new Date().toISOString(),
   });
 }

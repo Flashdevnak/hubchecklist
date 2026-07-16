@@ -1,5 +1,46 @@
 # APK Build Result
 
+## RESET-008 Result
+
+Fresh verification on 2026-07-16:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Use `.env` with `VITE_APPS_SCRIPT_WEB_APP_URL` and `VITE_APP_CLIENT_MODE=central` before production Android APK builds. Do not ask employees to configure backend URL/token.
+
+Web/PWA and Vercel build result:
+
+```text
+dist/ generated with index.html and production assets
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 4s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+APK generated:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Relative APK path:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+RESET-008 also verifies Apps Script syntax and mojibake scan.
+
 ## RESET-006-007-FINAL-PLUS Result
 
 Fresh verification on 2026-07-16:

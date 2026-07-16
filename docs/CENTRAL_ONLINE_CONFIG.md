@@ -2,6 +2,8 @@
 
 RESET-006-007-FINAL-PLUS uses Google Sheets + Apps Script as the free central backend.
 
+The employee Web/PWA URL should be the Vercel deployment URL. The Apps Script `/exec` URL is the backend API URL bundled into the app at build/deploy time.
+
 ## Environment
 
 Set these values before building the APK/Web/PWA:

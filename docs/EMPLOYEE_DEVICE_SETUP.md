@@ -9,6 +9,15 @@ Hub Photo Proof is one system with two delivery paths:
 
 Admin builds the app with `VITE_APPS_SCRIPT_WEB_APP_URL` so employee devices use central configuration automatically.
 
+Before Android APK build, admin creates `.env`:
+
+```env
+VITE_APPS_SCRIPT_WEB_APP_URL=https://script.google.com/macros/s/xxxx/exec
+VITE_APP_CLIENT_MODE=central
+```
+
+The APK bundles this backend URL. Employees do not enter it.
+
 Employee handoff:
 
 1. Install APK or PWA.
