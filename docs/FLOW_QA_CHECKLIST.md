@@ -2,6 +2,16 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-005B Employee Device PIN Flow
+
+1. Fresh install opens Frontline.
+2. Normal Backoffice entry with no PIN shows contact-admin message.
+3. Staff cannot create a first-time Admin PIN.
+4. Hidden setup rejects wrong setup token.
+5. Hidden setup accepts the configured admin setup token.
+6. Admin enables Employee Device Mode before handoff.
+7. Normal Backoffice entry is hidden after Employee Device Mode is enabled.
+
 ## RESET-005A Export / Watermark Flow
 
 1. Capture a photo with GPS allowed and confirm the preview has a readable watermark.

@@ -1,5 +1,26 @@
 # Project Specification
 
+## RESET-005B Employee Device Admin PIN Protection
+
+RESET-005B changes first PIN setup so employees cannot create their own Backoffice PIN on a fresh install.
+
+Rules:
+
+- Frontline opens by default.
+- Normal Backoffice entry never creates the first PIN.
+- If no local Admin PIN exists, the normal Backoffice entry shows `ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล`.
+- Hidden setup requires `VITE_ADMIN_SETUP_TOKEN`.
+- Backoffice Settings can lock the current device into Employee Device Mode.
+- Employee Device Mode hides the normal Backoffice entry and keeps the phone Frontline-only.
+- Existing admin devices with a local PIN can still unlock Backoffice offline.
+
+Google Apps Script reserves central settings keys:
+
+- `ADMIN_PIN_ENABLED`
+- `ADMIN_PIN_HASH`
+
+Central PIN verification is reserved for later hardening. RESET-005B enforces the local MVP protection path and documents that it is not enterprise security.
+
 ## RESET-005A Export And Watermark Simplification
 
 RESET-005A simplifies user-facing exports while keeping complete metadata internally.

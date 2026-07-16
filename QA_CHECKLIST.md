@@ -1,5 +1,16 @@
 # QA Checklist
 
+## RESET-005B Required Checks
+
+- [x] Fresh install does not expose normal first-time Admin PIN setup
+- [x] If no Admin PIN exists, Backoffice shows contact-admin message
+- [x] Hidden setup requires `VITE_ADMIN_SETUP_TOKEN`
+- [x] Employee Device Mode hides the normal Backoffice entry
+- [x] Backoffice remains available on admin devices with an existing PIN
+- [x] Google Apps Script URL and token remain hidden from Frontline
+- [x] Apps Script reserves `ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` settings keys
+- [ ] Central Google Sheets PIN verification is reserved for a later hardening pass
+
 ## RESET-005A Required Checks
 
 - [x] Excel export uses simplified 15 columns
@@ -20,7 +31,8 @@
 - [x] One codebase supports Android APK and Web/PWA
 - [x] App opens Employee Frontline by default
 - [x] Backoffice requires local Admin PIN
-- [x] First Backoffice entry shows first-time PIN setup when no PIN exists
+- [x] First Backoffice entry shows contact-admin lockout when no PIN exists
+- [x] First PIN setup is hidden behind admin-only setup token flow
 - [x] Backoffice can be locked again
 - [x] Admin PIN can be changed in Backoffice Settings
 - [x] Google Apps Script URL/token settings are hidden from Frontline

@@ -1,5 +1,22 @@
 # Test Plan
 
+## RESET-005B
+
+Goal: verify employees cannot create their own Backoffice PIN on fresh installs.
+
+- Clear local app data or install on a fresh browser/device.
+- Open the app and confirm Frontline opens.
+- Tap the normal Backoffice gear.
+- Confirm it shows `ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล`.
+- Confirm there is no normal staff-visible first-time setup form.
+- Configure `VITE_ADMIN_SETUP_TOKEN` for an admin build/session.
+- Long-press or double-click the app title to open hidden admin setup.
+- Enter wrong setup token and confirm setup is rejected.
+- Enter correct setup token, set Admin PIN, and confirm Backoffice unlocks.
+- In Backoffice Settings, enable `ล็อกเครื่องนี้เป็นเครื่องพนักงาน`.
+- Confirm the normal Backoffice gear is hidden after locking.
+- Confirm Google URL/token remain visible only inside unlocked Backoffice Settings.
+
 ## RESET-005A
 
 Goal: verify simplified export, watermarked photo evidence, merged responsible value, and hub-based Google Sheets views.
@@ -37,7 +54,8 @@ Admin lock:
 
 - Fresh open loads Employee Frontline.
 - Tap the small Backoffice gear.
-- If no PIN exists, set a first-time Admin PIN.
+- If no PIN exists, confirm normal entry shows the contact-admin message instead of first-time PIN setup.
+- Use the hidden admin setup token flow only on an admin-controlled device when first PIN setup is required.
 - Lock Backoffice.
 - Reopen Backoffice and confirm the PIN is required.
 - Confirm wrong PIN is rejected.

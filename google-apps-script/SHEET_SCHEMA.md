@@ -73,6 +73,15 @@ Photo date/time/GPS remain in metadata and are also rendered directly onto the p
 - `Settings`
 - `ExportLogs`
 
+## Settings Keys
+
+RESET-005B reserves these Settings keys for central admin PIN hardening:
+
+- `ADMIN_PIN_ENABLED`
+- `ADMIN_PIN_HASH`
+
+The current app still enforces the local MVP protection path: fresh employee installs cannot create a PIN from the normal Backoffice entry, and admin setup requires the hidden setup token.
+
 ## Photo Upload Limitation
 
 The app sends compressed, watermarked base64 image data. Apps Script uploads it to Drive when possible. Very large photos can exceed Apps Script request/runtime limits; failed sync remains queued locally.

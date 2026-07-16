@@ -1,5 +1,56 @@
 # APK Build Result
 
+## RESET-005B Result
+
+RESET-005B protects first-time Admin PIN setup on employee devices.
+
+Fresh RESET-005B verification on 2026-07-16:
+
+```powershell
+npm.cmd install
+npx.cmd tsc -b
+npm.cmd run build
+npx.cmd cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Result:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 4s
+82 actionable tasks: 20 executed, 62 up-to-date
+```
+
+APK generated:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Relative APK path:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Staff-facing security result:
+
+- Fresh installs do not show normal first-time Backoffice PIN setup.
+- Missing Admin PIN shows `ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล`.
+- Employee Device Mode hides the normal Backoffice entry and keeps Frontline only.
+- Google Sheets URL/token and shared secret settings remain inside Backoffice.
+
 ## RESET-005A Result
 
 RESET-005A simplifies export columns and updates photo watermark/export/Google Sheets behavior. The APK path remains:

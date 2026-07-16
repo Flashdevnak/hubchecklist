@@ -64,6 +64,8 @@ HubChecklist Photos/<date>/<vehicleBarcode>/
 - The shared secret is stored only in localStorage on the device.
 - Employees do not see the Apps Script URL or token in Frontline.
 - Backoffice uses local device PIN protection only; it is not enterprise identity management.
+- Apps Script reserves `ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` settings keys for future central PIN hardening.
+- RESET-005B prevents employees from creating the first local PIN from the normal Backoffice entry.
 - Never commit a real shared secret.
 - Apps Script rejects missing or incorrect tokens.
 

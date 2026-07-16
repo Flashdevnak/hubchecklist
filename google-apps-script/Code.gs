@@ -104,6 +104,7 @@ function ensureSheets_() {
   Object.keys(HEADERS).forEach(function (sheetName) {
     ensureHeaders_(getOrCreateSheet_(sheetName), HEADERS[sheetName]);
   });
+  ensureDefaultSettings_();
 }
 
 function ensureHeaders_(sheet, headers) {
@@ -115,6 +116,19 @@ function ensureHeaders_(sheet, headers) {
   if (firstRow.join('|') !== headers.join('|')) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
+}
+
+function ensureDefaultSettings_() {
+  const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
+  ensureHeaders_(sheet, HEADERS.Settings);
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false');
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '');
+}
+
+function upsertSettingDefault_(sheet, key, value) {
+  const rowIndex = findRowByValue_(sheet, 1, key);
+  if (rowIndex > 0) return;
+  sheet.appendRow([key, value, new Date().toISOString()]);
 }
 
 function syncRecord_(record, photoMetadata) {

@@ -73,3 +73,4 @@ Photo columns contain the Drive URL or file name when available. Date/time/GPS a
 - Do not commit real secrets.
 - The Apps Script rejects requests with a missing or incorrect token.
 - This is a free central storage bridge, not enterprise identity management.
+- `ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` are reserved in the `Settings` sheet for future central PIN verification.

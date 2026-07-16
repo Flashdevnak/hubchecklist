@@ -24,6 +24,7 @@ import {
   getPendingSyncCount,
   changeAdminPin,
   hasAdminPin,
+  isEmployeeDeviceMode,
   listAudit,
   listHubs,
   listRecords,
@@ -36,6 +37,7 @@ import {
   saveResponsibleStaff,
   saveSettings,
   setAdminPin,
+  setEmployeeDeviceMode,
   submitRecordWithGoogleSync,
   testGoogleConnection,
   verifyAdminPin,
@@ -54,11 +56,13 @@ type BarcodeDetectorShape = new (options?: { formats?: string[] }) => {
 export default function App() {
   const [mode, setMode] = useState<AppMode>('frontline');
   const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'setup' | null>(null);
+  const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'notice' | 'setup-token' | null>(null);
+  const [employeeMode, setEmployeeMode] = useState(isEmployeeDeviceMode());
   const [frontlineStep, setFrontlineStep] = useState<FrontlineStep>('home');
   const [adminStep, setAdminStep] = useState<AdminStep>('dashboard');
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeRecordId, setActiveRecordId] = useState('');
+  const hiddenAdminTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     ensureSeedData();
@@ -66,7 +70,27 @@ export default function App() {
   }, []);
 
   const openBackoffice = () => {
-    setAdminPinPanel(hasAdminPin() ? 'unlock' : 'setup');
+    if (employeeMode) return;
+    setAdminPinPanel(hasAdminPin() ? 'unlock' : 'notice');
+  };
+
+  const hiddenAdminEntry = () => {
+    if (hasAdminPin()) {
+      setAdminPinPanel('unlock');
+      return;
+    }
+    if (!employeeMode) setAdminPinPanel('setup-token');
+  };
+
+  const startHiddenAdminPress = () => {
+    if (hiddenAdminTimerRef.current) window.clearTimeout(hiddenAdminTimerRef.current);
+    hiddenAdminTimerRef.current = window.setTimeout(hiddenAdminEntry, 1800);
+  };
+
+  const cancelHiddenAdminPress = () => {
+    if (!hiddenAdminTimerRef.current) return;
+    window.clearTimeout(hiddenAdminTimerRef.current);
+    hiddenAdminTimerRef.current = null;
   };
 
   const unlockBackoffice = () => {
@@ -80,6 +104,7 @@ export default function App() {
     setAdminUnlocked(false);
     setMode('frontline');
     setAdminPinPanel(null);
+    setEmployeeMode(isEmployeeDeviceMode());
   };
 
   const reload = () => setRefreshKey((value) => value + 1);
@@ -90,13 +115,21 @@ export default function App() {
     <div className="reset-app">
       <header className="reset-topbar">
         <div>
-          <strong>Hub Photo Proof</strong>
+          <strong
+            onDoubleClick={hiddenAdminEntry}
+            onPointerCancel={cancelHiddenAdminPress}
+            onPointerDown={startHiddenAdminPress}
+            onPointerLeave={cancelHiddenAdminPress}
+            onPointerUp={cancelHiddenAdminPress}
+          >
+            Hub Photo Proof
+          </strong>
           <span>{mode === 'admin' && adminUnlocked ? 'Admin Backoffice' : 'Employee Frontline'}</span>
         </div>
         <div className="header-actions">
           {mode === 'admin' && adminUnlocked ? (
             <button className="secondary-action compact-action" onClick={lockBackoffice} type="button"><Lock size={17} /> ล็อกหลังบ้าน</button>
-          ) : (
+          ) : employeeMode ? null : (
             <button className="icon-button neutral" aria-label="หลังบ้าน" onClick={openBackoffice} type="button"><Settings size={18} /></button>
           )}
         </div>
@@ -118,6 +151,7 @@ export default function App() {
         ) : (
           <AdminApp
             activeRecord={activeRecord}
+            onEmployeeModeChange={() => setEmployeeMode(isEmployeeDeviceMode())}
             onLock={lockBackoffice}
             onOpenRecord={(recordId) => setActiveRecordId(recordId)}
             onReload={reload}
@@ -142,14 +176,20 @@ export default function App() {
   );
 }
 
-function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'setup'; onCancel: () => void; onSuccess: () => void }) {
+function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'notice' | 'setup-token'; onCancel: () => void; onSuccess: () => void }) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [setupToken, setSetupToken] = useState('');
   const [message, setMessage] = useState('');
-  const isSetup = mode === 'setup';
+  const isSetup = mode === 'setup-token';
+  const isNotice = mode === 'notice';
 
   const submit = () => {
     if (isSetup) {
+      if (!verifyAdminSetupToken(setupToken)) {
+        setMessage('โทเคนตั้งค่าผู้ดูแลไม่ถูกต้อง');
+        return;
+      }
       if (pin.trim().length < 4) {
         setMessage('PIN ต้องมีอย่างน้อย 4 ตัว');
         return;
@@ -175,26 +215,41 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'setup'
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <article className="pin-panel">
-        <h2>{isSetup ? 'ตั้งค่า PIN แอดมินครั้งแรก' : 'ใส่ PIN แอดมิน'}</h2>
-        <p>การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร</p>
-        <label>
-          <span>Admin PIN</span>
-          <input autoFocus inputMode="numeric" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
-        </label>
-        {isSetup ? (
-          <label>
-            <span>ยืนยัน PIN</span>
-            <input inputMode="numeric" type="password" value={confirmPin} onChange={(event) => setConfirmPin(event.target.value)} />
-          </label>
-        ) : null}
+        <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice ? 'หลังบ้านถูกล็อก' : 'ใส่ PIN แอดมิน'}</h2>
+        <p>{isNotice ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' : 'การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร'}</p>
+        {isNotice ? null : (
+          <>
+            {isSetup ? (
+              <label>
+                <span>Admin setup token</span>
+                <input autoFocus type="password" value={setupToken} onChange={(event) => setSetupToken(event.target.value)} />
+              </label>
+            ) : null}
+            <label>
+              <span>Admin PIN</span>
+              <input autoFocus={!isSetup} inputMode="numeric" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
+            </label>
+            {isSetup ? (
+              <label>
+                <span>ยืนยัน PIN</span>
+                <input inputMode="numeric" type="password" value={confirmPin} onChange={(event) => setConfirmPin(event.target.value)} />
+              </label>
+            ) : null}
+          </>
+        )}
         {message ? <p className="simple-message">{message}</p> : null}
         <div className="admin-form">
           <button className="secondary-action" onClick={onCancel} type="button">ยกเลิก</button>
-          <button className="primary-action" onClick={submit} type="button">{isSetup ? 'ตั้งค่าและเข้าหลังบ้าน' : 'เข้าหลังบ้าน'}</button>
+          {isNotice ? null : <button className="primary-action" onClick={submit} type="button">{isSetup ? 'ตั้งค่าและเข้าหลังบ้าน' : 'เข้าหลังบ้าน'}</button>}
         </div>
       </article>
     </div>
   );
+}
+
+function verifyAdminSetupToken(token: string): boolean {
+  const configured = import.meta.env.VITE_ADMIN_SETUP_TOKEN as string | undefined;
+  return Boolean(configured && token && token === configured);
 }
 
 function FrontlineApp({ activeRecord, onOpenRecord, onReload, onStepChange, records, step }: {
@@ -521,8 +576,9 @@ function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: stri
   );
 }
 
-function AdminApp({ activeRecord, onLock, onOpenRecord, onReload, onStepChange, records, step }: {
+function AdminApp({ activeRecord, onEmployeeModeChange, onLock, onOpenRecord, onReload, onStepChange, records, step }: {
   activeRecord: ProofRecord | null;
+  onEmployeeModeChange: () => void;
   onLock: () => void;
   onOpenRecord: (recordId: string) => void;
   onReload: () => void;
@@ -551,7 +607,7 @@ function AdminApp({ activeRecord, onLock, onOpenRecord, onReload, onStepChange, 
         {step === 'photos' ? <AdminPhotos records={records} /> : null}
         {step === 'export' ? <ExportPanel records={records} /> : null}
         {step === 'backup' ? <BackupPanel /> : null}
-        {step === 'settings' ? <SettingsPanel onLock={onLock} onReload={onReload} /> : null}
+        {step === 'settings' ? <SettingsPanel onEmployeeModeChange={onEmployeeModeChange} onLock={onLock} onReload={onReload} /> : null}
         {step === 'audit' ? <AuditPanel /> : null}
       </div>
     </section>
@@ -727,13 +783,14 @@ function BackupPanel() {
   );
 }
 
-function SettingsPanel({ onLock, onReload }: { onLock: () => void; onReload: () => void }) {
+function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeModeChange: () => void; onLock: () => void; onReload: () => void }) {
   const [settings, setSettings] = useState(getSettings());
   const [pendingSyncCount, setPendingSyncCount] = useState(getPendingSyncCount());
   const [syncMessage, setSyncMessage] = useState('');
   const [currentPin, setCurrentPin] = useState('');
   const [nextPin, setNextPin] = useState('');
   const [pinMessage, setPinMessage] = useState('');
+  const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
   const save = () => {
     saveSettings(settings);
     setPendingSyncCount(getPendingSyncCount());
@@ -774,6 +831,14 @@ function SettingsPanel({ onLock, onReload }: { onLock: () => void; onReload: () 
     setPendingSyncCount(0);
     onReload();
   };
+  const toggleEmployeeDeviceMode = (enabled: boolean) => {
+    if (enabled && !window.confirm('ล็อกเครื่องนี้เป็นเครื่องพนักงาน? หลังบ้านจะถูกซ่อนและต้องให้ผู้ดูแลปลดล็อกจากเครื่องแอดมินหรือรีเซ็ตข้อมูลเครื่องนี้')) return;
+    setEmployeeDeviceMode(enabled);
+    setEmployeeDeviceModeState(enabled);
+    onEmployeeModeChange();
+    onReload();
+    if (enabled) onLock();
+  };
   return (
     <section className="admin-stack">
       <h1>Settings</h1>
@@ -785,6 +850,14 @@ function SettingsPanel({ onLock, onReload }: { onLock: () => void; onReload: () 
         <input checked={settings.watermarkEnabled} onChange={(event) => setSettings({ ...settings, watermarkEnabled: event.target.checked })} type="checkbox" />
         เปิด watermark บนรูป
       </label>
+      <article className="admin-detail-card">
+        <h2>Employee Device Mode</h2>
+        <p>เปิดก่อนส่งเครื่องให้พนักงาน เพื่อซ่อนปุ่มหลังบ้านและปิดการตั้งค่า PIN ครั้งแรกบนเครื่องพนักงาน</p>
+        <label className="checkbox-row">
+          <input checked={employeeDeviceMode} onChange={(event) => toggleEmployeeDeviceMode(event.target.checked)} type="checkbox" />
+          ล็อกเครื่องนี้เป็นเครื่องพนักงาน
+        </label>
+      </article>
       <article className="admin-detail-card">
         <h2>Google Sheets Sync</h2>
         <div className="admin-form">

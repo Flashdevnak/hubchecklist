@@ -30,6 +30,13 @@ RESET-005A simplifies reporting:
 - `manifest.json` still keeps full photo metadata.
 - Google Sheets writes to `Records_All` and also updates a hub-specific sheet for easier viewing.
 
+RESET-005B protects Backoffice setup on employee devices:
+
+- A fresh install no longer lets staff create the first Admin PIN from the normal Backoffice entry.
+- If no local Admin PIN exists, the app shows `ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล`.
+- First PIN setup is hidden behind an admin setup token (`VITE_ADMIN_SETUP_TOKEN`).
+- Backoffice Settings includes Employee Device Mode to hide the Backoffice entry before handing a phone to staff.
+
 Frontline no longer exposes OCR proof-paper parsing, Flash WebView technical flow, Supabase/R2 warnings, placeholder cards, or debug data. OCR/Flash code may remain in the repository for previous compatibility, but it is not part of the RESET-003 Frontline workflow.
 
 RESET-001 rebuilds the product as **one Android app / one APK** with two modes inside the same app:

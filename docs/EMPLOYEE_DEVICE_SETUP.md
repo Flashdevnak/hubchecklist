@@ -7,11 +7,14 @@ Hub Photo Proof is one system with two delivery paths:
 
 ## Android APK
 
-1. Install the debug APK or future signed APK provided by admin.
-2. Open Hub Photo Proof.
-3. Allow camera permission when scanning.
-4. Allow location permission for photo GPS if prompted.
-5. Use Frontline only. Backoffice requires the local admin PIN.
+1. Admin installs the debug APK or future signed APK.
+2. Admin configures Google Sheets URL/token if this device should sync.
+3. Admin sets or confirms the Backoffice PIN.
+4. Admin enables `ล็อกเครื่องนี้เป็นเครื่องพนักงาน` in Backoffice Settings.
+5. Admin locks Backoffice and hands the phone to staff.
+6. Staff opens Hub Photo Proof and uses Frontline only.
+7. Staff allows camera permission when scanning.
+8. Staff allows location permission for photo GPS if prompted.
 
 APK path after local build:
 
@@ -30,6 +33,8 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 - The app opens Frontline by default.
 - Employees cannot see Google Apps Script URL, sync token, export, backup, settings, audit, or admin records.
+- Employees cannot create a first-time Backoffice PIN from a fresh install.
+- If Backoffice has not been configured, the app tells staff to contact the admin.
 - If scan is unavailable, use manual input.
 - If GPS is unavailable, the app shows a warning and never creates fake coordinates.
 - Submitted records save locally first and sync later when configured.

@@ -1,5 +1,14 @@
 # Real Device Test Result
 
+## RESET-005B Status
+
+RESET-005B build readiness is implemented, but physical device validation remains pending.
+
+- [ ] Fresh Android install blocks first-time PIN setup for staff
+- [ ] Employee Device Mode hides Backoffice entry on staff phone
+- [ ] Admin device with existing PIN can still unlock Backoffice
+- [ ] iPhone/PWA fresh browser profile blocks first-time PIN setup for staff
+
 ## RESET-005A Status
 
 RESET-005A code/build readiness is implemented, but physical and live Google Sheet validation remain pending.

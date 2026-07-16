@@ -118,6 +118,7 @@ const AUDIT_KEY = 'reset003.audit';
 const SETTINGS_KEY = 'reset003.settings';
 const SYNC_QUEUE_KEY = 'reset003.googleSyncQueue';
 const ADMIN_PIN_KEY = 'reset003.adminPin';
+const EMPLOYEE_DEVICE_MODE_KEY = 'reset003.employeeDeviceMode';
 
 const DEFAULT_SETTINGS: AppSettings = {
   gpsMandatory: false,
@@ -199,6 +200,19 @@ export function saveSettings(settings: AppSettings): void {
 
 export function hasAdminPin(): boolean {
   return Boolean(window.localStorage.getItem(ADMIN_PIN_KEY));
+}
+
+export function isEmployeeDeviceMode(): boolean {
+  return window.localStorage.getItem(EMPLOYEE_DEVICE_MODE_KEY) === 'true';
+}
+
+export function setEmployeeDeviceMode(enabled: boolean): void {
+  window.localStorage.setItem(EMPLOYEE_DEVICE_MODE_KEY, enabled ? 'true' : 'false');
+  addAudit({
+    action: enabled ? 'employee_device_mode_enabled' : 'employee_device_mode_disabled',
+    detail: enabled ? 'This device was locked to Frontline employee mode' : 'This device was unlocked from employee mode',
+    actor: 'admin',
+  });
 }
 
 export function setAdminPin(pin: string): boolean {
