@@ -1,5 +1,20 @@
 # Real Device Test Result
 
+## RESET-005 Status
+
+RESET-005 code/build readiness is implemented, but physical device QA is still pending.
+
+Do not mark these passed until tested on hardware/browser:
+
+- [ ] Samsung S23 FE Frontline fits width with no horizontal scroll
+- [ ] Galaxy Tab A7 Lite Frontline and Backoffice fit width
+- [ ] iPhone Safari PWA Add to Home Screen works
+- [ ] iPad browser fallback works
+- [ ] Desktop Backoffice unlock/settings/export works
+- [ ] Backoffice PIN setup/unlock/change/lock works on each target browser/device
+- [ ] Android APK shows the new launcher icon after reinstall
+- [ ] Camera/photo/GPS permission flows work on Android and iPhone Safari
+
 ## RESET-004 Status
 
 Free Google Sheets storage code and Apps Script files are added. Physical device sync validation is still pending because the user's Google Apps Script Web App URL must be deployed and configured first.

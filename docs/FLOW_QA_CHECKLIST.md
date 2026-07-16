@@ -2,6 +2,18 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-005 Admin Lock And Device Flow
+
+1. Open app and confirm Employee Frontline is shown first.
+2. Confirm no export, backup, settings, audit, Google URL, or token appears in Frontline.
+3. Tap Backoffice gear and set Admin PIN on first use.
+4. Lock Backoffice and verify PIN is required to enter again.
+5. Confirm Settings can change Admin PIN.
+6. Test Frontline on 360x740, 390x844, 412x915, 430x932, 800x1340, and 1024x768.
+7. Confirm no horizontal scroll and no hidden submit buttons.
+8. Confirm iPhone/iPad Safari can use manual barcode/photo fallback.
+9. Confirm Android APK uses the new app icon.
+
 ## RESET-004 Google Sheets Sync Flow
 
 1. Open Backoffice -> Settings.

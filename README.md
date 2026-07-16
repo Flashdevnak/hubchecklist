@@ -14,6 +14,14 @@ RESET-004 adds optional **free central storage** with Google Sheets + Google App
 - Apps Script files live in `google-apps-script/` and create `Records`, `Photos`, `Hubs`, `ResponsibleStaff`, and `Audit` sheets.
 - Base64 photo upload to Google Drive is implemented as best-effort and can be limited by Apps Script/Drive quotas.
 
+RESET-005 finalizes one deployable system:
+
+- The app opens Employee Frontline by default.
+- Backoffice is protected by a local device Admin PIN.
+- Google Sheets URL/token/settings are visible only after Backoffice unlock.
+- Android APK, Web/PWA, iPhone/iPad Safari, tablet, and desktop browser paths share the same codebase.
+- PWA and Android launcher icons use the new original Hub Photo Proof icon.
+
 Frontline no longer exposes OCR proof-paper parsing, Flash WebView technical flow, Supabase/R2 warnings, placeholder cards, or debug data. OCR/Flash code may remain in the repository for previous compatibility, but it is not part of the RESET-003 Frontline workflow.
 
 RESET-001 rebuilds the product as **one Android app / one APK** with two modes inside the same app:
@@ -70,6 +78,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | RESET-001 Frontline/Backoffice unified table rebuild | Complete | One APK, mode separation, unified table export, real device QA still pending |
 | RESET-003 Simple hub barcode photo proof app | Complete | Frontline hub/responsible/barcode/photo submit; Admin backoffice/export; device QA pending |
 | RESET-004 Free Google Sheets storage sync | Complete | Optional Apps Script sync, Drive photo upload, pending queue; live Sheet setup/test still manual |
+| RESET-005 Final PWA/admin lock/responsive/icon pass | Complete | Admin PIN, PWA docs/icons, Android icon, responsive hardening; real device QA still pending |
 
 ## Key Docs
 
@@ -80,6 +89,10 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 - [Real device test result](docs/REAL_DEVICE_TEST_RESULT.md)
 - [Project spec](docs/PROJECT_SPEC.md)
 - [Google Sheets storage setup](docs/GOOGLE_SHEETS_STORAGE_SETUP.md)
+- [Web/PWA deployment](docs/WEB_PWA_DEPLOYMENT.md)
+- [iPhone user guide](docs/IPHONE_USER_GUIDE.md)
+- [Employee device setup](docs/EMPLOYEE_DEVICE_SETUP.md)
+- [App icon](docs/APP_ICON.md)
 
 ## Google Sheets Sync
 

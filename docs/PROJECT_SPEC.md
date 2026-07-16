@@ -1,5 +1,38 @@
 # Project Specification
 
+## RESET-005 Final One-System Pass
+
+RESET-005 keeps one codebase, one Android APK, and one Web/PWA. Android users install the APK; iPhone/iPad users use the HTTPS Web/PWA link; desktop/admin users use a web browser.
+
+Protected modes:
+
+- Employee Frontline is the default launch mode.
+- Backoffice requires a local device Admin PIN.
+- First Backoffice entry creates the PIN when none exists.
+- Admin can lock Backoffice and change the PIN in Settings.
+- This is local device PIN protection only, not enterprise identity/security.
+
+Frontline remains simple:
+
+- Hub selection
+- Responsible staff selection filtered by hub
+- QR/barcode scan or manual input
+- Locked current date
+- Drop condition
+- Photo capture with timestamp/GPS metadata
+- Submit local-first with optional Google sync
+
+Backoffice contains dashboard, hubs, responsible staff, records, photos, export, backup, Google Sheets Sync settings, settings, and audit. Google Apps Script URL/token are never shown in Frontline.
+
+PWA/icon support:
+
+- `public/manifest.webmanifest`
+- PWA icons under `public/icons/`
+- Android launcher icons under `android/app/src/main/res/mipmap-*`
+- Source icon at `src/assets/app-icon.svg`
+
+Responsive rules are hardened for Android phones/tablets, iPhone/iPad Safari, and desktop browser.
+
 ## RESET-004 Free Central Storage
 
 RESET-004 adds optional free central storage using Google Sheets, Google Apps Script, and Google Drive. It does not add Firebase, Supabase, R2, or paid storage.

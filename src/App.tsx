@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, ClipboardList, Download, FileText, Home, MapPin, Plus, QrCode, RefreshCcw, Save, Settings, Shield, Trash2, UserRound, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, ClipboardList, Download, FileText, Home, Lock, MapPin, Plus, QrCode, RefreshCcw, Save, Settings, Shield, Trash2, UserRound } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,6 +22,8 @@ import {
   getRecordById,
   getSettings,
   getPendingSyncCount,
+  changeAdminPin,
+  hasAdminPin,
   listAudit,
   listHubs,
   listRecords,
@@ -33,8 +35,11 @@ import {
   saveRecords,
   saveResponsibleStaff,
   saveSettings,
+  setAdminPin,
   submitRecordWithGoogleSync,
   testGoogleConnection,
+  verifyAdminPin,
+  resetLocalTestData,
   updatePhotoSlotsForDropCount,
   upsertRecord,
 } from './services/reset003';
@@ -47,7 +52,9 @@ type BarcodeDetectorShape = new (options?: { formats?: string[] }) => {
 };
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>(() => (window.localStorage.getItem('reset003.mode') === 'admin' ? 'admin' : 'frontline'));
+  const [mode, setMode] = useState<AppMode>('frontline');
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'setup' | null>(null);
   const [frontlineStep, setFrontlineStep] = useState<FrontlineStep>('home');
   const [adminStep, setAdminStep] = useState<AdminStep>('dashboard');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -58,9 +65,21 @@ export default function App() {
     setRefreshKey((value) => value + 1);
   }, []);
 
-  const setAppMode = (nextMode: AppMode) => {
-    window.localStorage.setItem('reset003.mode', nextMode);
-    setMode(nextMode);
+  const openBackoffice = () => {
+    setAdminPinPanel(hasAdminPin() ? 'unlock' : 'setup');
+  };
+
+  const unlockBackoffice = () => {
+    setAdminUnlocked(true);
+    setMode('admin');
+    setAdminStep('dashboard');
+    setAdminPinPanel(null);
+  };
+
+  const lockBackoffice = () => {
+    setAdminUnlocked(false);
+    setMode('frontline');
+    setAdminPinPanel(null);
   };
 
   const reload = () => setRefreshKey((value) => value + 1);
@@ -72,16 +91,19 @@ export default function App() {
       <header className="reset-topbar">
         <div>
           <strong>Hub Photo Proof</strong>
-          <span>Frontline + Admin Backoffice</span>
+          <span>{mode === 'admin' && adminUnlocked ? 'Admin Backoffice' : 'Employee Frontline'}</span>
         </div>
-        <div className="mode-toggle" aria-label="เลือกโหมด">
-          <button className={mode === 'frontline' ? 'active' : ''} onClick={() => setAppMode('frontline')} type="button">หน้างาน</button>
-          <button className={mode === 'admin' ? 'active' : ''} onClick={() => setAppMode('admin')} type="button">หลังบ้าน</button>
+        <div className="header-actions">
+          {mode === 'admin' && adminUnlocked ? (
+            <button className="secondary-action compact-action" onClick={lockBackoffice} type="button"><Lock size={17} /> ล็อกหลังบ้าน</button>
+          ) : (
+            <button className="icon-button neutral" aria-label="หลังบ้าน" onClick={openBackoffice} type="button"><Settings size={18} /></button>
+          )}
         </div>
       </header>
 
       <main className="reset-main">
-        {mode === 'frontline' ? (
+        {mode === 'frontline' || !adminUnlocked ? (
           <FrontlineApp
             activeRecord={activeRecord}
             onOpenRecord={(recordId) => {
@@ -96,6 +118,7 @@ export default function App() {
         ) : (
           <AdminApp
             activeRecord={activeRecord}
+            onLock={lockBackoffice}
             onOpenRecord={(recordId) => setActiveRecordId(recordId)}
             onReload={reload}
             onStepChange={setAdminStep}
@@ -105,7 +128,9 @@ export default function App() {
         )}
       </main>
 
-      {mode === 'frontline' ? (
+      {adminPinPanel ? <AdminPinPanel mode={adminPinPanel} onCancel={() => setAdminPinPanel(null)} onSuccess={unlockBackoffice} /> : null}
+
+      {mode === 'frontline' || !adminUnlocked ? (
         <nav className="reset-bottom-nav">
           <NavButton active={frontlineStep === 'home'} icon={<Home size={20} />} label="วันนี้" onClick={() => setFrontlineStep('home')} />
           <NavButton active={frontlineStep === 'scan'} icon={<QrCode size={20} />} label="สแกน" onClick={() => setFrontlineStep('scan')} />
@@ -113,6 +138,61 @@ export default function App() {
           <NavButton active={frontlineStep === 'my-work'} icon={<ClipboardList size={20} />} label="งานของฉัน" onClick={() => setFrontlineStep('my-work')} />
         </nav>
       ) : null}
+    </div>
+  );
+}
+
+function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'setup'; onCancel: () => void; onSuccess: () => void }) {
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [message, setMessage] = useState('');
+  const isSetup = mode === 'setup';
+
+  const submit = () => {
+    if (isSetup) {
+      if (pin.trim().length < 4) {
+        setMessage('PIN ต้องมีอย่างน้อย 4 ตัว');
+        return;
+      }
+      if (pin !== confirmPin) {
+        setMessage('PIN ไม่ตรงกัน');
+        return;
+      }
+      if (!setAdminPin(pin)) {
+        setMessage('ตั้ง PIN ไม่สำเร็จ');
+        return;
+      }
+      onSuccess();
+      return;
+    }
+    if (!verifyAdminPin(pin)) {
+      setMessage('PIN ไม่ถูกต้อง');
+      return;
+    }
+    onSuccess();
+  };
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <article className="pin-panel">
+        <h2>{isSetup ? 'ตั้งค่า PIN แอดมินครั้งแรก' : 'ใส่ PIN แอดมิน'}</h2>
+        <p>การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร</p>
+        <label>
+          <span>Admin PIN</span>
+          <input autoFocus inputMode="numeric" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
+        </label>
+        {isSetup ? (
+          <label>
+            <span>ยืนยัน PIN</span>
+            <input inputMode="numeric" type="password" value={confirmPin} onChange={(event) => setConfirmPin(event.target.value)} />
+          </label>
+        ) : null}
+        {message ? <p className="simple-message">{message}</p> : null}
+        <div className="admin-form">
+          <button className="secondary-action" onClick={onCancel} type="button">ยกเลิก</button>
+          <button className="primary-action" onClick={submit} type="button">{isSetup ? 'ตั้งค่าและเข้าหลังบ้าน' : 'เข้าหลังบ้าน'}</button>
+        </div>
+      </article>
     </div>
   );
 }
@@ -366,7 +446,7 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
     setWorkingRecord(result.record);
     setMessage(result.sync.message);
     onReload();
-    if (result.sync.queued) window.alert('บันทึกในเครื่องแล้ว รอซิงก์');
+    if (result.sync.queued) window.alert('บันทึกแล้ว ระบบจะซิงก์ให้อัตโนมัติ');
     onDone();
   };
 
@@ -439,8 +519,9 @@ function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: stri
   );
 }
 
-function AdminApp({ activeRecord, onOpenRecord, onReload, onStepChange, records, step }: {
+function AdminApp({ activeRecord, onLock, onOpenRecord, onReload, onStepChange, records, step }: {
   activeRecord: ProofRecord | null;
+  onLock: () => void;
   onOpenRecord: (recordId: string) => void;
   onReload: () => void;
   onStepChange: (step: AdminStep) => void;
@@ -468,7 +549,7 @@ function AdminApp({ activeRecord, onOpenRecord, onReload, onStepChange, records,
         {step === 'photos' ? <AdminPhotos records={records} /> : null}
         {step === 'export' ? <ExportPanel records={records} /> : null}
         {step === 'backup' ? <BackupPanel /> : null}
-        {step === 'settings' ? <SettingsPanel onReload={onReload} /> : null}
+        {step === 'settings' ? <SettingsPanel onLock={onLock} onReload={onReload} /> : null}
         {step === 'audit' ? <AuditPanel /> : null}
       </div>
     </section>
@@ -642,10 +723,13 @@ function BackupPanel() {
   );
 }
 
-function SettingsPanel({ onReload }: { onReload: () => void }) {
+function SettingsPanel({ onLock, onReload }: { onLock: () => void; onReload: () => void }) {
   const [settings, setSettings] = useState(getSettings());
   const [pendingSyncCount, setPendingSyncCount] = useState(getPendingSyncCount());
   const [syncMessage, setSyncMessage] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [nextPin, setNextPin] = useState('');
+  const [pinMessage, setPinMessage] = useState('');
   const save = () => {
     saveSettings(settings);
     setPendingSyncCount(getPendingSyncCount());
@@ -665,6 +749,25 @@ function SettingsPanel({ onReload }: { onReload: () => void }) {
     const result = await retryPendingSync();
     setSyncMessage(result.message);
     setPendingSyncCount(getPendingSyncCount());
+    onReload();
+  };
+  const saveNewPin = () => {
+    if (nextPin.trim().length < 4) {
+      setPinMessage('PIN ใหม่ต้องมีอย่างน้อย 4 ตัว');
+      return;
+    }
+    if (!changeAdminPin(currentPin, nextPin)) {
+      setPinMessage('PIN ปัจจุบันไม่ถูกต้อง');
+      return;
+    }
+    setCurrentPin('');
+    setNextPin('');
+    setPinMessage('เปลี่ยน PIN แอดมินแล้ว');
+  };
+  const resetData = () => {
+    if (!window.confirm('ยืนยันล้างข้อมูลทดสอบในเครื่อง? Records, audit และคิวซิงก์จะถูกลบจากเครื่องนี้')) return;
+    resetLocalTestData();
+    setPendingSyncCount(0);
     onReload();
   };
   return (
@@ -706,6 +809,22 @@ function SettingsPanel({ onReload }: { onReload: () => void }) {
           <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> Retry sync</button>
         </div>
         {syncMessage ? <p className="simple-message">{syncMessage}</p> : null}
+      </article>
+      <article className="admin-detail-card">
+        <h2>Admin PIN</h2>
+        <p>PIN นี้ป้องกันหลังบ้านเฉพาะในเครื่องนี้เท่านั้น</p>
+        <div className="admin-form">
+          <input type="password" inputMode="numeric" value={currentPin} onChange={(event) => setCurrentPin(event.target.value)} placeholder="PIN ปัจจุบัน" />
+          <input type="password" inputMode="numeric" value={nextPin} onChange={(event) => setNextPin(event.target.value)} placeholder="PIN ใหม่" />
+          <button className="secondary-action" onClick={saveNewPin} type="button">เปลี่ยน PIN แอดมิน</button>
+          <button className="secondary-action" onClick={onLock} type="button"><Lock size={18} /> ล็อกหลังบ้าน</button>
+        </div>
+        {pinMessage ? <p className="simple-message">{pinMessage}</p> : null}
+      </article>
+      <article className="admin-detail-card">
+        <h2>Local Test Data</h2>
+        <p>ใช้สำหรับล้างข้อมูลทดสอบในเครื่องนี้เท่านั้น ไม่ลบข้อมูลใน Google Sheets หรือ Google Drive</p>
+        <button className="danger-action" onClick={resetData} type="button">Reset local test data</button>
       </article>
       <button className="primary-action" onClick={save} type="button">บันทึก Settings</button>
     </section>

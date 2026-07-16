@@ -1,5 +1,48 @@
 # APK Build Result
 
+## RESET-005 Result
+
+RESET-005 adds Admin PIN protection, Web/PWA icon assets, Android launcher icon assets, responsive hardening, and Android location permissions for GPS metadata.
+
+Expected APK after build:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Icon assets updated:
+
+```text
+android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+```
+
+Fresh RESET-005 verification on 2026-07-16:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 8s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+PWA result:
+
+```text
+dist/ generated with manifest.webmanifest and icons/
+```
+
 ## RESET-004 Result
 
 RESET-004 adds optional Google Sheets sync and keeps the same debug APK path:

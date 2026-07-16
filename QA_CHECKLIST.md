@@ -1,5 +1,24 @@
 # QA Checklist
 
+## RESET-005 Required Checks
+
+- [x] One codebase supports Android APK and Web/PWA
+- [x] App opens Employee Frontline by default
+- [x] Backoffice requires local Admin PIN
+- [x] First Backoffice entry shows first-time PIN setup when no PIN exists
+- [x] Backoffice can be locked again
+- [x] Admin PIN can be changed in Backoffice Settings
+- [x] Google Apps Script URL/token settings are hidden from Frontline
+- [x] Frontline bottom nav remains Today / Scan / Photos / My Work
+- [x] Responsive CSS hardening prevents fixed desktop layout on phones
+- [x] PWA manifest and icons exist
+- [x] iPhone/iPad Safari PWA docs exist
+- [x] Android launcher icon assets are generated
+- [x] Android CAMERA, coarse location, and fine location permissions are declared
+- [x] Visible RESET app files have no mojibake byte patterns
+- [x] Google Sheets sync remains optional and local-first
+- [ ] Physical Android/iPhone/iPad responsive QA is still pending
+
 ## RESET-004 Required Checks
 
 - [x] No Firebase, Supabase, R2, or paid storage added for RESET-004

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Hub Vehicle Proof Capture</string>
-    <string name="title_activity_main">Hub Vehicle Proof Capture</string>
+    <string name="app_name">Hub Photo Proof</string>
+    <string name="title_activity_main">Hub Photo Proof</string>
     <string name="package_name">com.flashops.hubchecklist</string>
     <string name="custom_url_scheme">com.flashops.hubchecklist</string>
 </resources>

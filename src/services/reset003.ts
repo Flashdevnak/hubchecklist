@@ -7,6 +7,7 @@ export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
 export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2' | 'DROP_REAR_EXTRA';
 export type GoogleSyncMode = 'local_only' | 'google_sheets';
 export type GoogleSyncAction = 'createRecord' | 'uploadPhotoMetadata' | 'syncRecord' | 'appendAudit';
+export type RecordSyncStatus = 'LOCAL_ONLY' | 'PENDING_SYNC' | 'SYNCED' | 'SYNC_FAILED';
 
 export interface Hub {
   hubCode: string;
@@ -63,6 +64,7 @@ export interface ProofRecord {
   submittedAt?: string;
   createdAt: string;
   updatedAt: string;
+  syncStatus?: RecordSyncStatus;
   voidReason?: string;
   notes?: string;
 }
@@ -115,6 +117,7 @@ const RECORDS_KEY = 'reset003.records';
 const AUDIT_KEY = 'reset003.audit';
 const SETTINGS_KEY = 'reset003.settings';
 const SYNC_QUEUE_KEY = 'reset003.googleSyncQueue';
+const ADMIN_PIN_KEY = 'reset003.adminPin';
 
 const DEFAULT_SETTINGS: AppSettings = {
   gpsMandatory: false,
@@ -162,6 +165,7 @@ export const EXPORT_HEADERS = [
   'รายการรูปที่ขาด',
   'ยืนยันส่งทั้งที่รูปไม่ครบหรือไม่',
   'เวลาส่งข้อมูล',
+  'สถานะซิงก์',
   'หมายเหตุ',
 ];
 
@@ -202,6 +206,34 @@ export function getSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings): void {
   writeJson(SETTINGS_KEY, settings);
+}
+
+export function hasAdminPin(): boolean {
+  return Boolean(window.localStorage.getItem(ADMIN_PIN_KEY));
+}
+
+export function setAdminPin(pin: string): boolean {
+  const cleaned = pin.trim();
+  if (cleaned.length < 4) return false;
+  window.localStorage.setItem(ADMIN_PIN_KEY, cleaned);
+  addAudit({ action: 'admin_pin_set', detail: 'Local admin PIN was set on this device', actor: 'admin' });
+  return true;
+}
+
+export function verifyAdminPin(pin: string): boolean {
+  const saved = window.localStorage.getItem(ADMIN_PIN_KEY);
+  return Boolean(saved && pin === saved);
+}
+
+export function changeAdminPin(currentPin: string, nextPin: string): boolean {
+  if (!verifyAdminPin(currentPin)) return false;
+  return setAdminPin(nextPin);
+}
+
+export function resetLocalTestData(): void {
+  window.localStorage.removeItem(RECORDS_KEY);
+  window.localStorage.removeItem(AUDIT_KEY);
+  window.localStorage.removeItem(SYNC_QUEUE_KEY);
 }
 
 export function listRecords(): ProofRecord[] {
@@ -323,6 +355,7 @@ export function submitRecord(record: ProofRecord, confirmMissing: boolean): Proo
     missingPhotoConfirmedAt: missing.length > 0 && confirmMissing ? now : undefined,
     submittedAt: now,
     updatedAt: now,
+    syncStatus: isGoogleSyncConfigured() ? 'PENDING_SYNC' : 'LOCAL_ONLY',
   };
   upsertRecord(submitted);
   addAudit({
@@ -400,9 +433,11 @@ export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResul
 
   try {
     const response = await callAppsScript('syncRecord', payload);
+    upsertRecord({ ...record, syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
     return { ok: true, queued: false, message: 'บันทึกและซิงก์แล้ว', response };
   } catch (error) {
     queueSync('syncRecord', payload, error instanceof Error ? error.message : 'Sync failed');
+    upsertRecord({ ...record, syncStatus: 'PENDING_SYNC', updatedAt: new Date().toISOString() });
     return {
       ok: false,
       queued: true,
@@ -559,6 +594,7 @@ function buildExportRow(record: ProofRecord): string[] {
     record.missingPhotoWarnings.join(', '),
     record.missingPhotoConfirmed ? 'ยืนยันแล้ว' : '',
     record.submittedAt ? formatDateTime(record.submittedAt) : '',
+    record.syncStatus ?? 'LOCAL_ONLY',
     record.notes ?? '',
   ];
 }

@@ -1,5 +1,46 @@
 # Test Plan
 
+## RESET-005
+
+Goal: verify the final one-system app with Employee Frontline default, PIN-protected Backoffice, Android APK, Web/PWA support, responsive layout, and app icons.
+
+Admin lock:
+
+- Fresh open loads Employee Frontline.
+- Tap the small Backoffice gear.
+- If no PIN exists, set a first-time Admin PIN.
+- Lock Backoffice.
+- Reopen Backoffice and confirm the PIN is required.
+- Confirm wrong PIN is rejected.
+- In Settings, change the Admin PIN and confirm the old PIN no longer unlocks.
+
+Frontline:
+
+- Confirm no Google URL/token, export, backup, settings, audit, or admin records are visible.
+- Select hub, select responsible staff, scan/manual barcode, choose drop condition, capture photos, submit.
+- Deny camera and confirm manual input fallback still completes work.
+- Deny GPS and confirm warning only, no fake GPS.
+
+Responsive:
+
+- Test 360x740, 390x844, 412x915, 430x932, 800x1340, and 1024x768.
+- Confirm no horizontal scroll.
+- Confirm Backoffice navigation collapses into mobile-safe tabs/cards.
+- Confirm bottom nav does not cover submit buttons.
+
+PWA/iPhone:
+
+- Run web build and verify `dist/manifest.webmanifest` and `dist/icons/` exist.
+- Open the HTTPS web URL on iPhone Safari.
+- Add to Home Screen.
+- Confirm camera/GPS permission prompts appear where supported.
+- Confirm manual barcode and photo input fallback works.
+
+Icons:
+
+- Confirm browser favicon/PWA icons are present.
+- Confirm Android launcher PNGs exist in all mipmap density folders.
+
 ## RESET-004
 
 Goal: verify optional free central storage through Google Sheets + Apps Script + Drive while preserving local-first Frontline work.

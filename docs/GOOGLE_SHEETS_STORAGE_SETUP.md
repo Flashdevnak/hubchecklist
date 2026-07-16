@@ -27,7 +27,7 @@ APP_SHARED_SECRET=<long random shared secret>
 
 ## Configure The App
 
-In Admin Backoffice -> Settings:
+Google sync settings are protected. Open Backoffice with the local Admin PIN, then go to Settings:
 
 1. Set Sync mode to `Google Sheets sync`.
 2. Paste the Google Apps Script Web App URL.
@@ -56,6 +56,8 @@ HubChecklist Photos/<date>/<vehicleBarcode>/
 
 - No Firebase, Supabase, R2, or paid storage is required.
 - The shared secret is stored only in localStorage on the device.
+- Employees do not see the Apps Script URL or token in Frontline.
+- Backoffice uses local device PIN protection only; it is not enterprise identity management.
 - Never commit a real shared secret.
 - Apps Script rejects missing or incorrect tokens.
 
