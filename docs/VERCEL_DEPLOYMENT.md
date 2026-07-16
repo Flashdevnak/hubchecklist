@@ -1,5 +1,14 @@
 # Vercel Deployment
 
+## RESET-009 Web/PWA Notes
+
+The Vercel build remains a normal Vite build from `dist`. RESET-009 does not deploy Vercel from this repo task.
+
+- Vercel URL is the employee Web/PWA app.
+- Google Apps Script `/exec` is the backend API only.
+- Frontline scanner/photo capture require HTTPS and browser permission support.
+- The full-screen scanner and clean watermark behavior are included in the web build.
+
 Vercel is the Web/PWA app URL for iPhone, iPad, and desktop users.
 
 Google Apps Script `/exec` is the backend API only. Do not give the Apps Script `/exec` URL to employees as the app website.

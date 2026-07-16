@@ -9,6 +9,7 @@ const SHEETS = {
   EXPORT_LOGS: 'ExportLogs',
 };
 
+const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
 const MISSING_PHOTO_TEXT = 'ยังไม่ได้ถ่าย';
 
 const SIMPLE_RECORD_HEADERS = [
@@ -471,14 +472,14 @@ function buildSimpleRecordRow_(record, photoResults) {
     record.vehicleBarcode || '',
     record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
     record.dropCount || 0,
-    record.status || '',
+    statusText_(record.status || ''),
     photoCell_(photoMap.REAR_MAIN),
     photoCell_(photoMap.FRONT_DROP),
     photoCell_(photoMap.DROP_REAR_1),
     photoCell_(photoMap.DROP_REAR_2),
     extras.map(photoCell_).filter(Boolean).join('\n') || MISSING_PHOTO_TEXT,
     (record.missingPhotoWarnings || []).join(', '),
-    record.submittedAt || '',
+    formatBangkokDateTime_(record.submittedAt),
     record.notes || '',
   ];
 }
@@ -556,7 +557,7 @@ function photoValues_(photo, uploaded, existing) {
     labelThai: photo.labelThai || '',
     captured: photo.captured === true,
     fileName: photo.fileName || '',
-    capturedAt: photo.capturedAt || '',
+    capturedAt: formatBangkokDateTime_(photo.capturedAt),
     gpsLat: photo.gpsLat || '',
     gpsLng: photo.gpsLng || '',
     gpsAccuracy: photo.gpsAccuracy || '',
@@ -567,8 +568,27 @@ function photoValues_(photo, uploaded, existing) {
     driveFileId: uploaded.fileId || '',
     driveUrl: uploaded.url || '',
     localOnly: uploaded.localOnly === true,
-    createdAt: existing && existing.createdAt ? existing.createdAt : new Date().toISOString(),
+    createdAt: existing && existing.createdAt ? existing.createdAt : formatBangkokDateTime_(new Date()),
   };
+}
+
+function formatBangkokDateTime_(value) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, BANGKOK_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+  }
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return text;
+  const date = new Date(text);
+  if (!isNaN(date.getTime())) return Utilities.formatDate(date, BANGKOK_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+  return text;
+}
+
+function statusText_(status) {
+  if (status === 'COMPLETE') return 'เสร็จแล้ว';
+  if (status === 'NEED_REVIEW') return 'รอตรวจสอบ';
+  if (status === 'VOIDED') return 'ยกเลิก';
+  return status || '';
 }
 
 function photoCell_(photo) {

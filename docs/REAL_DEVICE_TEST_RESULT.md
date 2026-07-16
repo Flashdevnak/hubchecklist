@@ -1,5 +1,19 @@
 # Real Device Test Result
 
+## RESET-009 Pending Physical QA
+
+The RESET-009 code/build pass is not a physical-device pass. Test these on Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop browser:
+
+- [ ] Full-screen scanner fills the screen and closes cleanly.
+- [ ] Manual barcode fallback works after camera deny/unsupported.
+- [ ] Watermark has no dark panel or black strip.
+- [ ] Watermark Thai labels are readable on bright and dark photos.
+- [ ] GPS denied path shows `พิกัด: ไม่พบตำแหน่ง`.
+- [ ] Photo page controls are not cut off by Android/iOS system navigation.
+- [ ] My Work shows active responsible-person open records.
+- [ ] Google Sheets times are Bangkok `yyyy-MM-dd HH:mm:ss`.
+- [ ] Flash live Android WebView flow is still tested separately before claiming production readiness.
+
 ## RESET-006-007-FINAL-PLUS Pending Real Device Checks
 
 - [ ] Samsung S23 FE: full-screen scan fills the viewport and reads barcode/QR

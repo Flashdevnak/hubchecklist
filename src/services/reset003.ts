@@ -357,7 +357,7 @@ export function getLocalDateString(date = new Date()): string {
 
 export function formatDateTime(iso?: string): string {
   if (!iso) return '-';
-  return new Date(iso).toLocaleString('th-TH', { timeZone: BANGKOK_TIME_ZONE, hour12: false });
+  return `${formatDatePart(iso)} ${formatTimePart(iso)}`;
 }
 
 export function formatDatePart(iso?: string): string {
@@ -379,17 +379,17 @@ export function normalizeVehicleBarcode(input: string): string {
 export function createPhotoSlots(hasDropTransfer: boolean, dropCount: number): ProofPhotoSlot[] {
   if (!hasDropTransfer) {
     return [
-      createSlot('REAR_MAIN', 'รูปหลังรถ พร้อม time stamp + GPS watermark'),
-      createSlot('FRONT_DROP', 'รูปหน้าดรอป พร้อม time stamp + GPS watermark'),
+      createSlot('REAR_MAIN', 'รูปหลังรถ'),
+      createSlot('FRONT_DROP', 'รูปหน้าดรอป'),
     ];
   }
 
   const trailerSlots = Array.from({ length: Math.max(2, dropCount) }, (_, index) => createSlot(
     index < 2 ? (`DROP_REAR_${index + 1}` as SlotType) : 'DROP_REAR_EXTRA',
-    `รูปหลังรถพ่วงที่ ${index + 1} พร้อม time stamp + GPS watermark`,
+    `รูปหลังรถพ่วงที่ ${index + 1}`,
   ));
   return [
-    createSlot('REAR_MAIN', 'รูปหลังรถหลัก พร้อม time stamp + GPS watermark'),
+    createSlot('REAR_MAIN', 'รูปหลังรถหลัก'),
     ...trailerSlots,
   ];
 }
@@ -465,8 +465,11 @@ export function submitRecord(record: ProofRecord, confirmMissing: boolean): Proo
 
 export async function submitRecordWithGoogleSync(record: ProofRecord, confirmMissing: boolean): Promise<{ record: ProofRecord; sync: SyncResult }> {
   const submitted = submitRecord(record, confirmMissing);
-  const sync = await syncRecordToGoogle(submitted);
-  return { record: submitted, sync };
+  if (!isGoogleSyncConfigured()) {
+    return { record: submitted, sync: { ok: true, queued: false, message: 'บันทึกข้อมูลแล้ว' } };
+  }
+  void syncRecordToGoogle(submitted);
+  return { record: submitted, sync: { ok: true, queued: true, message: 'บันทึกข้อมูลแล้ว' } };
 }
 
 export function getPendingSyncCount(): number {
@@ -550,7 +553,7 @@ export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
 }
 
 export async function requestAdminAccess(deviceName: string, ownerName: string): Promise<{ ok: boolean; message: string; device?: AdminDevice }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
   try {
     const data = await callAppsScript('requestAdminAccess', {
       deviceId: getDeviceId(),
@@ -564,7 +567,7 @@ export async function requestAdminAccess(deviceName: string, ownerName: string):
 }
 
 export async function verifyCentralAdminAccess(pin: string): Promise<{ ok: boolean; message: string; role?: AdminDeviceRole; device?: AdminDevice }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
   try {
     const data = await callAppsScript('verifyAdminAccess', {
       deviceId: getDeviceId(),
@@ -585,7 +588,7 @@ export async function verifyCentralAdminAccess(pin: string): Promise<{ ok: boole
 }
 
 export async function setCentralAdminPin(values: { currentPin?: string; setupToken?: string; newPin: string }): Promise<{ ok: boolean; message: string }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
   try {
     const data = await callAppsScript('setAdminPin', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
     return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึก PIN หลังบ้านแล้ว' : 'บันทึก PIN ไม่สำเร็จ') };
@@ -595,7 +598,7 @@ export async function setCentralAdminPin(values: { currentPin?: string; setupTok
 }
 
 export async function setCentralAdminDeviceApprovalRequired(values: { adminPin: string; enabled: boolean }): Promise<{ ok: boolean; message: string }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
   try {
     const data = await callAppsScript('setAdminDeviceApprovalRequired', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
     return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึกการจำกัดเครื่องแอดมินแล้ว' : 'บันทึกไม่สำเร็จ') };
@@ -923,15 +926,15 @@ async function requestLocation(): Promise<{ status: GpsStatus; lat?: number; lng
 function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: string, location: { status: GpsStatus; lat?: number; lng?: number; accuracy?: number }): string {
   const gps = typeof location.lat === 'number' && typeof location.lng === 'number'
     ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
-    : 'GPS unavailable';
+    : 'ไม่พบตำแหน่ง';
   return [
     `วันที่: ${formatDatePart(capturedAt)}`,
     `เวลา: ${formatTimePart(capturedAt)}`,
-    `GPS: ${gps}`,
-    `Barcode: ${record.vehicleBarcode}`,
+    `พิกัด: ${gps}`,
+    `บาร์โค้ดรถ: ${record.vehicleBarcode}`,
     `ฮับ: ${record.hubCode}-${record.hubName}`,
-    `Responsible: ${responsibleText(record)}`,
-    `Photo: ${labelThai}`,
+    `ผู้รับผิดชอบ: ${responsibleText(record)}`,
+    `ประเภทรูป: ${labelThai}`,
   ].join('\n');
 }
 
@@ -951,23 +954,29 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       if (watermarkText) {
-        const fontSize = Math.max(24, Math.round(canvas.width / 38));
-        const lineHeight = Math.round(fontSize * 1.32);
-        const padding = Math.max(18, Math.round(canvas.width / 60));
-        const boxWidth = Math.min(canvas.width - padding * 2, Math.max(canvas.width * 0.62, 620));
+        const fontSize = Math.max(20, Math.round(canvas.width / 46));
+        const lineHeight = Math.round(fontSize * 1.28);
+        const padding = Math.max(18, Math.round(canvas.width / 58));
+        const boxWidth = Math.min(canvas.width - padding * 2, Math.max(canvas.width * 0.52, 560));
         context.font = `700 ${fontSize}px "Segoe UI", sans-serif`;
-        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, boxWidth - padding * 2));
-        const maxLines = Math.max(5, Math.floor((canvas.height * 0.42 - padding * 2) / lineHeight));
+        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, boxWidth));
+        const maxLines = Math.max(5, Math.floor((canvas.height * 0.38 - padding * 2) / lineHeight));
         const lines = wrappedLines.length > maxLines ? [...wrappedLines.slice(0, maxLines - 1), `${wrappedLines[maxLines - 1].slice(0, 80)}...`] : wrappedLines;
-        const boxHeight = Math.min(canvas.height * 0.42, Math.max(132, lines.length * lineHeight + padding * 2));
         const x = padding;
-        const y = canvas.height - boxHeight - padding;
-        drawRoundedRect(context, x, y, boxWidth, boxHeight, Math.max(18, padding * 0.8));
-        context.fillStyle = 'rgba(11, 31, 51, 0.78)';
-        context.fill();
+        const y = canvas.height - padding - (lines.length * lineHeight);
+        context.textBaseline = 'top';
+        context.lineJoin = 'round';
+        context.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        context.shadowBlur = Math.max(3, Math.round(fontSize / 5));
+        context.shadowOffsetX = 1;
+        context.shadowOffsetY = 2;
         lines.forEach((line, index) => {
-          context.fillStyle = index === 0 ? '#ffe044' : '#ffffff';
-          context.fillText(line, x + padding, y + padding + lineHeight * (index + 0.75));
+          const lineY = y + lineHeight * index;
+          context.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+          context.lineWidth = Math.max(3, Math.round(fontSize / 8));
+          context.strokeText(line, x, lineY);
+          context.fillStyle = index < 2 ? '#ffe044' : '#ffffff';
+          context.fillText(line, x, lineY);
         });
       }
       resolve(canvas.toDataURL('image/jpeg', 0.78));
@@ -976,17 +985,6 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
     image.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
     image.src = URL.createObjectURL(file);
   });
-}
-
-function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
-  const safeRadius = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + safeRadius, y);
-  context.arcTo(x + width, y, x + width, y + height, safeRadius);
-  context.arcTo(x + width, y + height, x, y + height, safeRadius);
-  context.arcTo(x, y + height, x, y, safeRadius);
-  context.arcTo(x, y, x + width, y, safeRadius);
-  context.closePath();
 }
 
 function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

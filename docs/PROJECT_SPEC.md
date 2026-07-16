@@ -1,4 +1,18 @@
-# Project Specification
+﻿# Project Specification
+
+## RESET-009 Final Production Polish
+
+RESET-009 is complete as an implementation/build polish pass. It does not claim physical device QA, Vercel deployment, or live Apps Script production verification.
+
+- Frontline remains the default and uses short Thai operational labels.
+- Backoffice remains protected by central Admin PIN.
+- The scan view opens full-screen, hides bottom navigation, starts the camera automatically where supported, and keeps manual barcode entry.
+- Same date/hub/responsible/barcode scans detect existing work and default to continuing photo capture.
+- My Work lists today’s active responsible-person work so missing trailer/drop photos can be continued.
+- Photo slot labels are clean Thai labels without `old mixed watermark wording`.
+- Watermarked photos draw text directly on the photo with subtle shadow/stroke only. No black strip or large dark background panel is used.
+- Google Sheets record rows stay on the simplified 15-column layout. Apps Script writes submitted/captured timestamps as Bangkok `yyyy-MM-dd HH:mm:ss` strings.
+- Export ZIP continues to use watermarked photos and the simplified workbook.
 
 ## RESET-008A Simple Admin PIN Login
 
@@ -98,7 +112,7 @@ Responsible is shown as one value, such as `25845 TUI`.
 Photo evidence:
 
 - Timestamp and GPS are rendered directly on each watermarked photo.
-- GPS unavailable/denied is shown as a warning, never fake coordinates.
+- GPS denied/unavailable is shown as a warning, never fake coordinates.
 - `manifest.json` still stores full metadata for each photo.
 
 Google Sheets:
@@ -113,7 +127,7 @@ RESET-005 keeps one codebase, one Android APK, and one Web/PWA. Android users in
 
 Protected modes:
 
-- Employee Frontline is the default launch mode.
+- หน้างาน is the default launch mode.
 - Backoffice requires a local device Admin PIN.
 - First Backoffice entry creates the PIN when none exists.
 - Admin can lock Backoffice and change the PIN in Settings.
@@ -147,7 +161,7 @@ RESET-004 adds optional free central storage using Google Sheets, Google Apps Sc
 Behavior:
 
 - Default mode remains `Local only`.
-- Admin Backoffice Settings stores the Google Apps Script Web App URL and `APP_SHARED_SECRET` locally.
+- หลังบ้าน Settings stores the Google Apps Script Web App URL and `APP_SHARED_SECRET` locally.
 - Test connection calls Apps Script `healthCheck`.
 - Frontline submits local records first, then attempts Google sync.
 - Failed sync does not block staff. The app queues the payload locally and shows `บันทึกในเครื่องแล้ว รอซิงก์`.
@@ -180,7 +194,7 @@ Frontline:
 - Warn before submitting with missing photos.
 - Submit as `COMPLETE` or `NEED_REVIEW`.
 
-Admin Backoffice:
+หลังบ้าน:
 
 - Manage hubs and responsible staff.
 - Review records/photos/timestamp/GPS/missing-photo warnings.

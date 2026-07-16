@@ -69,7 +69,7 @@ export default function App() {
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'central-unlock' | 'backend-missing' | 'notice' | 'setup-token' | null>(null);
   const [employeeMode, setEmployeeMode] = useState(isEmployeeDeviceMode());
-  const [bootstrapMessage, setBootstrapMessage] = useState('กำลังเชื่อมต่อ Backend กลาง');
+  const [bootstrapMessage, setBootstrapMessage] = useState('รอซิงก์');
   const [frontlineStep, setFrontlineStep] = useState<FrontlineStep>('home');
   const [adminStep, setAdminStep] = useState<AdminStep>('dashboard');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -80,15 +80,15 @@ export default function App() {
     ensureSeedData();
     bootstrapCentralConfig().then((result) => {
       if (getCentralBackendStatus() === 'missing') {
-        setBootstrapMessage('ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ');
+        setBootstrapMessage('ออฟไลน์');
       } else if (result.source === 'online') {
-        setBootstrapMessage('เชื่อมต่อ Backend กลางแล้ว');
+        setBootstrapMessage('ออนไลน์');
       } else {
-        setBootstrapMessage('ออฟไลน์: ใช้ข้อมูลล่าสุดในเครื่อง');
+        setBootstrapMessage('ออฟไลน์');
       }
       setRefreshKey((value) => value + 1);
     }).catch(() => {
-      setBootstrapMessage('ออฟไลน์: ใช้ข้อมูลล่าสุดในเครื่อง');
+      setBootstrapMessage('ออฟไลน์');
       setRefreshKey((value) => value + 1);
     });
   }, []);
@@ -161,7 +161,7 @@ export default function App() {
           >
             Hub Photo Proof
           </strong>
-          <span>{mode === 'admin' && adminUnlocked ? 'Admin Backoffice' : 'Employee Frontline'}</span>
+          <span>{mode === 'admin' && adminUnlocked ? 'หลังบ้าน' : 'หน้างาน'}</span>
         </div>
         <div className="header-actions">
           {mode === 'admin' && adminUnlocked ? (
@@ -202,10 +202,10 @@ export default function App() {
 
       {adminPinPanel ? <AdminPinPanel mode={adminPinPanel} onCancel={() => setAdminPinPanel(null)} onSuccess={unlockBackoffice} /> : null}
 
-      {mode === 'frontline' || !adminUnlocked ? (
+      {(mode === 'frontline' || !adminUnlocked) && frontlineStep !== 'scan' ? (
         <nav className="reset-bottom-nav">
           <NavButton active={frontlineStep === 'home'} icon={<Home size={20} />} label="วันนี้" onClick={() => setFrontlineStep('home')} />
-          <NavButton active={frontlineStep === 'scan'} icon={<QrCode size={20} />} label="สแกน" onClick={() => setFrontlineStep('scan')} />
+          <NavButton active={false} icon={<QrCode size={20} />} label="สแกน" onClick={() => setFrontlineStep('scan')} />
           <NavButton active={frontlineStep === 'photos'} icon={<Camera size={20} />} label="รูป" onClick={() => setFrontlineStep('photos')} />
           <NavButton active={frontlineStep === 'my-work'} icon={<ClipboardList size={20} />} label="งานของฉัน" onClick={() => setFrontlineStep('my-work')} />
         </nav>
@@ -269,7 +269,7 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'centra
         <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice || isBackendMissing ? 'หลังบ้านถูกล็อก' : isCentral ? 'เข้าสู่หลังบ้าน' : 'ใส่ PIN แอดมิน'}</h2>
         <p>
           {isBackendMissing
-            ? 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ'
+            ? 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล'
             : isNotice
               ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแลระบบ'
               : isCentral
@@ -326,7 +326,7 @@ function FrontlineApp({ activeRecord, bootstrapMessage, onOpenRecord, onReload, 
   const activeStaff = listResponsibleStaff().find((staff) => staff.employeeCode === activeContext?.employeeCode && staff.active) ?? null;
 
   if (step === 'scan') {
-    return <ScanScreen activeHub={activeHub} activeStaff={activeStaff} onCreated={(record) => { onReload(); onOpenRecord(record.id); }} />;
+    return <ScanScreen activeHub={activeHub} activeStaff={activeStaff} onClose={() => onStepChange('home')} onCreated={(record) => { onReload(); onOpenRecord(record.id); }} />;
   }
   if (step === 'photos') {
     return <PhotoCaptureScreen record={activeRecord} onDone={() => { onReload(); onStepChange('done'); }} onReload={onReload} />;
@@ -371,9 +371,13 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
   return (
     <section className="frontline-stack">
       <article className="hero-card">
-        <h1>งานวันนี้</h1>
-        <p>เลือกฮับและผู้รับผิดชอบครั้งเดียว จากนั้นสแกนรถและถ่ายรูปหลักฐาน</p>
-        <p className={getCentralBackendStatus() === 'missing' ? 'simple-message' : 'backend-status'}>{bootstrapMessage}</p>
+        <div className="hero-title-row">
+          <div>
+            <h1>Hub Photo Proof</h1>
+            <p>หน้างาน</p>
+          </div>
+          <StatusPill tone={bootstrapMessage === 'ออนไลน์' ? 'success' : 'warning'} text={bootstrapMessage} />
+        </div>
         <div className="context-card">
           <label>
             <span>ฮับ</span>
@@ -401,6 +405,7 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
         <StatCard label="งานวันนี้" value={todayRecords.length} />
         <StatCard label="รอถ่ายรูป" value={pending.length} />
         <StatCard label="เสร็จแล้ว" value={todayRecords.filter((record) => record.status === 'COMPLETE').length} />
+        <StatCard label="รอซิงก์" value={todayRecords.filter((record) => record.syncStatus === 'PENDING_SYNC').length} />
       </div>
 
       <div className="frontline-actions">
@@ -411,9 +416,10 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
   );
 }
 
-function ScanScreen({ activeHub, activeStaff, onCreated }: {
+function ScanScreen({ activeHub, activeStaff, onClose, onCreated }: {
   activeHub: Hub | null;
   activeStaff: ResponsibleStaff | null;
+  onClose: () => void;
   onCreated: (record: ProofRecord) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -424,8 +430,6 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
   const [message, setMessage] = useState('');
   const [cameraOn, setCameraOn] = useState(false);
   const [hasDropTransfer, setHasDropTransfer] = useState(false);
-
-  useEffect(() => () => stopCamera(), []);
 
   const startCamera = async () => {
     if (!activeHub || !activeStaff) {
@@ -453,7 +457,7 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
         scanFrame();
       }
       setCameraOn(true);
-      setMessage('สแกนให้เต็มกรอบ');
+      setMessage('เล็งบาร์โค้ดหรือ QR');
     } catch {
       setMessage('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตกล้อง หรือกรอกบาร์โค้ดรถเอง');
     }
@@ -492,16 +496,39 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
 
   const createRecord = () => {
     if (!activeHub || !activeStaff || !barcode.trim()) return;
+    const existing = listRecords().find((record) => (
+      record.status !== 'VOIDED'
+      && record.date === getLocalDateString()
+      && record.hubCode === activeHub.hubCode
+      && record.responsibleEmployeeCode === activeStaff.employeeCode
+      && record.vehicleBarcode === normalizeVehicleBarcode(barcode)
+    ));
+    if (existing) {
+      const continueExisting = window.confirm('พบงานเดิม ต้องการถ่ายรูปต่อหรือเริ่มใหม่?\n\nกด OK เพื่อถ่ายรูปต่อ');
+      if (continueExisting) {
+        onCreated(existing);
+        return;
+      }
+    }
     const record = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: barcode, hasDropTransfer });
     upsertRecord(record);
     addAudit({ recordId: record.id, action: 'record_created', detail: `created from barcode ${record.vehicleBarcode}`, actor: activeStaff.employeeCode });
     onCreated(record);
   };
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void startCamera(); }, 120);
+    return () => {
+      window.clearTimeout(timer);
+      stopCamera();
+    };
+  }, [activeHub?.hubCode, activeStaff?.employeeCode]);
+
   return (
-    <section className="scan-screen">
+    <section className="scan-screen fullscreen-scan">
       <article className="scan-camera">
         <div className="scan-topline">
+          <button className="scan-close-button" onClick={() => { stopCamera(); onClose(); }} type="button" aria-label="ปิด">×</button>
           <strong>สแกนบาร์รถ</strong>
           <span>{activeHub ? `${activeHub.hubCode}` : 'เลือกฮับก่อน'}</span>
         </div>
@@ -510,15 +537,15 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
           <div className="scan-empty">
             <QrCode size={72} />
             <strong>สแกนบาร์รถ</strong>
-            <span>กดเปิดกล้อง แล้วสแกนให้เต็มกรอบ</span>
+            <span>เล็งบาร์โค้ดหรือ QR</span>
           </div>
         ) : null}
         <div className="scan-frame-box" />
       </article>
       <div className="scan-control-panel">
-        <button className="primary-action" onClick={startCamera} type="button"><Camera size={20} /> เปิดกล้องสแกน</button>
+        <button className="primary-action" onClick={startCamera} type="button"><Camera size={20} /> สแกนใหม่</button>
         <label>
-          <span>กรอกเอง</span>
+          <span>กรอกบาร์รถ</span>
           <input value={barcode} onChange={(event) => setBarcode(normalizeVehicleBarcode(event.target.value))} placeholder="NAK..." />
         </label>
         <p className="locked-date">วันที่: {getLocalDateString()}</p>
@@ -527,7 +554,7 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
           <button className={hasDropTransfer ? 'active' : ''} onClick={() => setHasDropTransfer(true)} type="button">พ่วงดรอป</button>
         </div>
         {message ? <p className="simple-message">{message}</p> : null}
-        <button className="primary-action jumbo" disabled={!activeHub || !activeStaff || !barcode} onClick={createRecord} type="button">ไปถ่ายรูป</button>
+        <button className="primary-action jumbo" disabled={!activeHub || !activeStaff || !barcode} onClick={createRecord} type="button">ใช้บาร์โค้ดนี้</button>
       </div>
     </section>
   );
@@ -558,15 +585,14 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
 
   const submit = async () => {
     if (missing.length > 0) {
-      const text = `คุณยังถ่ายรูปไม่ครบ หากส่งงานโดยไม่มีรูปที่จำเป็น อาจมีผลต่อการตรวจสอบงาน กรุณาตรวจสอบก่อนส่ง\n\nรูปที่ขาด: ${missing.map((slot) => slot.labelThai).join(', ')}\n\nกด OK เพื่อส่งเป็น NEED_REVIEW หรือ Cancel เพื่อกลับไปถ่ายรูป`;
+      const text = `รูปยังไม่ครบ อาจมีผลต่อการตรวจสอบงาน ต้องการส่งข้อมูลต่อหรือไม่?\n\nรูปที่ขาด: ${missing.map((slot) => slot.labelThai).join(', ')}`;
       if (!window.confirm(text)) return;
     }
     setMessage('กำลังบันทึกข้อมูล');
     const result = await submitRecordWithGoogleSync(workingRecord, missing.length > 0);
     setWorkingRecord(result.record);
-    setMessage(result.sync.message);
+    setMessage(result.sync.message || 'บันทึกข้อมูลแล้ว');
     onReload();
-    if (result.sync.queued) window.alert('บันทึกแล้ว ระบบจะซิงก์ให้อัตโนมัติ');
     onDone();
   };
 
@@ -586,7 +612,7 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
         <p>ฮับ: {workingRecord.hubCode}-{workingRecord.hubName}</p>
         <p>ผู้รับผิดชอบ: {workingRecord.responsibleEmployeeCode} {workingRecord.responsibleName}</p>
         <p>วันที่: {workingRecord.date}</p>
-        <p>เงื่อนไข: {workingRecord.hasDropTransfer ? `พ่วงดรอป ${workingRecord.dropCount} จุด` : 'ไม่พ่วงดรอป'}</p>
+        <p>{workingRecord.hasDropTransfer ? `พ่วงดรอป ${workingRecord.dropCount} จุด` : 'ไม่พ่วงดรอป'} · รูปครบ {workingRecord.photoSlots.length - missing.length}/{workingRecord.photoSlots.length}</p>
       </article>
       {workingRecord.hasDropTransfer ? <button className="secondary-action" onClick={addDrop} type="button"><Plus size={18} /> เพิ่มดรอปอีก 1</button> : null}
       <div className="photo-grid">
@@ -601,7 +627,6 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
             <div className="photo-meta">
               <span>เวลา: {slot.displayTimestamp ?? '-'}</span>
               <span>GPS: {slot.gpsLat && slot.gpsLng ? `${slot.gpsLat.toFixed(6)}, ${slot.gpsLng.toFixed(6)}` : 'ไม่พบ GPS / ไม่ได้รับอนุญาตตำแหน่ง'}</span>
-              {slot.captured ? <span>ลายน้ำวันที่/เวลา/GPS อยู่บนรูปแล้ว</span> : null}
               {slot.gpsStatus !== 'granted' && slot.captured ? <b>GPS ไม่พบ</b> : null}
             </div>
             <label className="capture-button">
@@ -625,18 +650,32 @@ function DoneScreen({ onMyWork, onScanNext }: { onMyWork: () => void; onScanNext
   return (
     <article className="done-card">
       <CheckCircle2 size={70} />
-      <h1>ส่งข้อมูลสำเร็จ</h1>
+      <h1>บันทึกข้อมูลแล้ว</h1>
       <button className="primary-action jumbo" onClick={onScanNext} type="button">สแกนคันถัดไป</button>
-      <button className="secondary-action jumbo" onClick={onMyWork} type="button">ไปงานของฉัน</button>
+      <button className="secondary-action jumbo" onClick={onMyWork} type="button">ดูงานของฉัน</button>
     </article>
   );
 }
 
 function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: string) => void; records: ProofRecord[] }) {
+  const activeContext = getActiveContext();
+  const today = getLocalDateString();
+  const mine = records
+    .filter((record) => (
+      record.status !== 'VOIDED'
+      && record.date === today
+      && (!activeContext?.employeeCode || record.responsibleEmployeeCode === activeContext.employeeCode)
+      && (!activeContext?.hubCode || record.hubCode === activeContext.hubCode)
+    ))
+    .sort((a, b) => a.vehicleBarcode.localeCompare(b.vehicleBarcode));
+  const openItems = mine.filter((record) => record.status !== 'COMPLETE' || record.syncStatus === 'PENDING_SYNC' || getMissingPhotoSlots(record).length > 0);
   return (
     <section className="frontline-stack">
-      <h1>งานของฉัน</h1>
-      <RecordList records={records} onOpenRecord={onOpenRecord} />
+      <article className="hero-card compact">
+        <h1>งานค้างถ่ายรูปของฉัน</h1>
+        <p>{activeContext ? `${activeContext.hubCode} · ${activeContext.employeeCode}` : 'เลือกผู้รับผิดชอบก่อนเริ่มงาน'}</p>
+      </article>
+      <RecordList records={openItems} onOpenRecord={onOpenRecord} actionLabel="ถ่ายรูปต่อ" />
     </section>
   );
 }
@@ -686,12 +725,12 @@ function AdminDashboard({ records }: { records: ProofRecord[] }) {
   const todayRecords = records.filter((record) => record.date === today);
   return (
     <section className="admin-stack">
-      <h1>Dashboard</h1>
+      <h1>ภาพรวม</h1>
       <div className="summary-grid">
         <StatCard label="วันนี้" value={todayRecords.length} />
-        <StatCard label="Complete" value={records.filter((record) => record.status === 'COMPLETE').length} />
-        <StatCard label="Need review" value={records.filter((record) => record.status === 'NEED_REVIEW').length} />
-        <StatCard label="Missing photos" value={records.filter((record) => record.missingPhotoWarnings.length > 0).length} />
+        <StatCard label="เสร็จแล้ว" value={records.filter((record) => record.status === 'COMPLETE').length} />
+        <StatCard label="รอตรวจสอบ" value={records.filter((record) => record.status === 'NEED_REVIEW').length} />
+        <StatCard label="รูปไม่ครบ" value={records.filter((record) => record.missingPhotoWarnings.length > 0).length} />
       </div>
       <RecordList records={records.slice(0, 8)} />
     </section>
@@ -716,7 +755,7 @@ function HubManager({ onReload }: { onReload: () => void }) {
   };
   return (
     <section className="admin-stack">
-      <h1>Hubs</h1>
+      <h1>ฮับ</h1>
       <div className="admin-form">
         <input value={hubCode} onChange={(event) => setHubCode(event.target.value)} placeholder="26NAK_BHUB" />
         <input value={hubName} onChange={(event) => setHubName(event.target.value)} placeholder="นครราชสีมา" />
@@ -747,7 +786,7 @@ function StaffManager({ onReload }: { onReload: () => void }) {
   };
   return (
     <section className="admin-stack">
-      <h1>Responsible Staff</h1>
+      <h1>ผู้รับผิดชอบ</h1>
       <div className="admin-form">
         <input value={employeeCode} onChange={(event) => setEmployeeCode(event.target.value)} placeholder="25845" />
         <input value={displayName} onChange={(event) => setDisplayName(event.target.value.toUpperCase())} placeholder="TUI" />
@@ -781,7 +820,7 @@ function AdminRecords({ activeRecord, onOpenRecord, onReload, records }: { activ
   };
   return (
     <section className="admin-stack">
-      <h1>Records</h1>
+      <h1>รายการ</h1>
       <RecordList records={records} onOpenRecord={onOpenRecord} />
       {activeRecord ? (
         <article className="admin-detail-card">
@@ -801,7 +840,7 @@ function AdminRecords({ activeRecord, onOpenRecord, onReload, records }: { activ
 function AdminPhotos({ records }: { records: ProofRecord[] }) {
   return (
     <section className="admin-stack">
-      <h1>Photos</h1>
+      <h1>รูปภาพ</h1>
       {records.map((record) => (
         <article className="admin-detail-card" key={record.id}>
           <h2>{record.vehicleBarcode}</h2>
@@ -811,7 +850,7 @@ function AdminPhotos({ records }: { records: ProofRecord[] }) {
                 {slot.imageLocalData ? <img src={slot.imageLocalData} alt={slot.labelThai} /> : <div className="photo-placeholder small">ยังไม่ได้ถ่าย</div>}
                 <span>{slot.labelThai}</span>
                 <small>{slot.displayTimestamp ?? '-'} / {slot.gpsStatus === 'granted' ? 'GPS พร้อม' : 'GPS ไม่พบ'}</small>
-                <small>{slot.watermarkText ?? 'ยังไม่มี metadata ลายน้ำ'}</small>
+                <small>{slot.watermarkText ?? 'ยังไม่มีข้อมูลรูป'}</small>
               </div>
             ))}
           </div>
@@ -832,10 +871,10 @@ function ExportPanel({ records }: { records: ProofRecord[] }) {
   };
   return (
     <section className="admin-stack">
-      <h1>Export</h1>
-      <p>Export เฉพาะหลังบ้าน: workbook.xlsx, photos/, manifest.json</p>
+      <h1>ส่งออก</h1>
+      <p>ไฟล์หลังบ้าน: workbook.xlsx, photos/, manifest.json</p>
       <p>วันที่ เวลา และ GPS อยู่บนลายน้ำในรูปภาพแล้ว Excel จึงใช้คอลัมน์แบบสั้น</p>
-      <button className="primary-action" onClick={exportZip} type="button"><Download size={18} /> Export ZIP</button>
+      <button className="primary-action" onClick={exportZip} type="button"><Download size={18} /> ส่งออก ZIP</button>
       {message ? <p className="simple-message">{message}</p> : null}
     </section>
   );
@@ -844,7 +883,7 @@ function ExportPanel({ records }: { records: ProofRecord[] }) {
 function BackupPanel() {
   return (
     <section className="admin-stack">
-      <h1>Backup / Cleanup</h1>
+      <h1>สำรองข้อมูล</h1>
       <p className="simple-message">ยังเป็น local-first guard: ต้อง export/backup ก่อน cleanup และไม่ลบ records โดยไม่มีการยืนยัน</p>
     </section>
   );
@@ -944,17 +983,17 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   };
   return (
     <section className="admin-stack">
-      <h1>Settings</h1>
+      <h1>ตั้งค่า</h1>
       <label className="checkbox-row">
         <input checked={settings.gpsMandatory} onChange={(event) => setSettings({ ...settings, gpsMandatory: event.target.checked })} type="checkbox" />
         GPS บังคับ (ตอนนี้ยังเป็นโหมดเตือน ไม่ปลอม GPS)
       </label>
       <label className="checkbox-row">
         <input checked={settings.watermarkEnabled} onChange={(event) => setSettings({ ...settings, watermarkEnabled: event.target.checked })} type="checkbox" />
-        เปิด watermark บนรูป
+        เปิดลายน้ำบนรูป
       </label>
       <article className="admin-detail-card">
-        <h2>Employee Device Mode</h2>
+        <h2>โหมดเครื่องพนักงาน</h2>
         <p>เปิดก่อนส่งเครื่องให้พนักงาน เพื่อซ่อนปุ่มหลังบ้านและปิดการตั้งค่า PIN ครั้งแรกบนเครื่องพนักงาน</p>
         <label className="checkbox-row">
           <input checked={employeeDeviceMode} onChange={(event) => toggleEmployeeDeviceMode(event.target.checked)} type="checkbox" />
@@ -962,16 +1001,16 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
         </label>
       </article>
       <article className="admin-detail-card">
-        <h2>Google Sheets Sync</h2>
+        <h2>ซิงก์ Google Sheets</h2>
         {getCentralBackendUrl() ? (
-          <p>Backend กลางถูกตั้งค่าจาก environment แล้ว พนักงานและเครื่องทั่วไปไม่ต้องกรอก URL/token</p>
+          <p>ระบบกลางถูกตั้งค่าจาก environment แล้ว พนักงานและเครื่องทั่วไปไม่ต้องกรอก URL/token</p>
         ) : (
           <div className="admin-form">
             <label>
-              <span>Sync mode</span>
+              <span>โหมดซิงก์</span>
               <select value={settings.googleSyncMode} onChange={(event) => setSettings({ ...settings, googleSyncMode: event.target.value === 'google_sheets' ? 'google_sheets' : 'local_only' })}>
-                <option value="local_only">Local only</option>
-                <option value="google_sheets">Google Sheets sync</option>
+                <option value="local_only">บันทึกในเครื่อง</option>
+                <option value="google_sheets">ซิงก์ Google Sheets</option>
               </select>
             </label>
             <label>
@@ -985,13 +1024,13 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
           </div>
         )}
         <div className="sync-status-row">
-          <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'success' : 'warning'} text={getCentralBackendUrl() ? 'Central backend' : settings.googleSyncMode === 'google_sheets' ? 'Google Sheets sync' : 'Local only'} />
-          <span>Pending sync queue: {pendingSyncCount}</span>
+          <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'success' : 'warning'} text={getCentralBackendUrl() ? 'ระบบกลาง' : settings.googleSyncMode === 'google_sheets' ? 'ซิงก์ Google Sheets' : 'บันทึกในเครื่อง'} />
+          <span>รอซิงก์: {pendingSyncCount}</span>
         </div>
         <p>ระบบจะบันทึกลง Records_All และแยกชีทตามฮับให้อัตโนมัติ</p>
         <div className="admin-form">
-          <button className="secondary-action" onClick={testConnection} type="button"><RefreshCcw size={18} /> Test connection</button>
-          <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> Retry sync</button>
+          <button className="secondary-action" onClick={testConnection} type="button"><RefreshCcw size={18} /> ทดสอบการเชื่อมต่อ</button>
+          <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> ซิงก์อีกครั้ง</button>
         </div>
         {syncMessage ? <p className="simple-message">{syncMessage}</p> : null}
       </article>
@@ -1023,11 +1062,11 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
         </article>
       ) : null}
       <article className="admin-detail-card">
-        <h2>Local Test Data</h2>
+        <h2>ข้อมูลทดสอบในเครื่อง</h2>
         <p>ใช้สำหรับล้างข้อมูลทดสอบในเครื่องนี้เท่านั้น ไม่ลบข้อมูลใน Google Sheets หรือ Google Drive</p>
-        <button className="danger-action" onClick={resetData} type="button">Reset local test data</button>
+        <button className="danger-action" onClick={resetData} type="button">ล้างข้อมูลทดสอบในเครื่อง</button>
       </article>
-      <button className="primary-action" onClick={save} type="button">บันทึก Settings</button>
+      <button className="primary-action" onClick={save} type="button">บันทึกตั้งค่า</button>
     </section>
   );
 }
@@ -1113,14 +1152,15 @@ function AdminDevicesPanel() {
   );
 }
 
-function RecordList({ onOpenRecord, records }: { onOpenRecord?: (recordId: string) => void; records: ProofRecord[] }) {
+function RecordList({ actionLabel, onOpenRecord, records }: { actionLabel?: string; onOpenRecord?: (recordId: string) => void; records: ProofRecord[] }) {
   return (
     <div className="record-list">
       {records.map((record) => (
         <button className="record-row" key={record.id} onClick={() => onOpenRecord?.(record.id)} type="button">
           <strong>{record.vehicleBarcode}</strong>
           <span>{record.date} / {record.hubCode} / {record.responsibleEmployeeCode} {record.responsibleName}</span>
-          <StatusPill tone={record.status === 'COMPLETE' ? 'success' : record.status === 'NEED_REVIEW' ? 'danger' : 'warning'} text={record.status} />
+          <span>{getMissingPhotoSlots(record).length ? `รูปไม่ครบ ${getMissingPhotoSlots(record).length} รูป` : actionLabel ?? ''}</span>
+          <StatusPill tone={record.status === 'COMPLETE' ? 'success' : record.status === 'NEED_REVIEW' ? 'danger' : 'warning'} text={statusText(record.status)} />
         </button>
       ))}
       {records.length === 0 ? <p className="simple-message">ยังไม่มีข้อมูล</p> : null}
@@ -1148,6 +1188,13 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 function StatusPill({ text, tone }: { text: string; tone: 'success' | 'warning' | 'danger' }) {
   return <span className={`status-pill ${tone}`}>{text}</span>;
+}
+
+function statusText(status: ProofRecord['status']): string {
+  if (status === 'COMPLETE') return 'เสร็จแล้ว';
+  if (status === 'NEED_REVIEW') return 'รอตรวจสอบ';
+  if (status === 'VOIDED') return 'ยกเลิก';
+  return 'รอถ่ายรูป';
 }
 
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {

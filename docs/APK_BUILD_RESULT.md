@@ -1,5 +1,35 @@
 # APK Build Result
 
+## RESET-009 Build Result
+
+RESET-009 must rebuild the same Android debug APK after UI/scan/photo/watermark/time polish:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Result: PASSED.
+
+Commands run:
+
+```text
+npm.cmd install
+npx.cmd tsc -b
+npm.cmd run build
+npx.cmd cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Additional checks:
+
+```text
+Get-Content -Raw google-apps-script\Code.gs | node --check --input-type=commonjs -
+rg mojibake scan
+```
+
+Physical device QA remains pending unless separately tested on real devices.
+
 ## RESET-008A Result
 
 Fresh verification on 2026-07-17:

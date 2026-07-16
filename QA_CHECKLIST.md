@@ -1,4 +1,4 @@
-# QA Checklist
+﻿# QA Checklist
 
 ## RESET-008A Simple Admin PIN Login
 
@@ -19,6 +19,12 @@
 - [x] Frontline staff do not configure backend URL/token
 - [x] Android/Web builds use `VITE_APPS_SCRIPT_WEB_APP_URL`
 - [x] Mojibake scan passes across src/docs/Apps Script
+- [x] RESET-009 watermark has no large dark background box or black strip
+- [x] RESET-009 watermark uses clean Thai labels and removes `old mixed watermark wording`
+- [x] RESET-009 scan opens as a full-screen camera view with manual barcode fallback
+- [x] RESET-009 My Work filters today’s records by active hub/responsible person
+- [x] RESET-009 submit saves locally first and leaves sync as background/queued work
+- [x] RESET-009 Apps Script formats submitted/captured time in `Asia/Bangkok` as `yyyy-MM-dd HH:mm:ss`
 - [ ] Vercel deployment itself remains manual and is not claimed complete
 - [ ] Physical Android/iPhone/iPad QA remains manual and is not claimed complete
 
@@ -57,7 +63,7 @@
 - [x] Responsible is exported as one value, for example `25845 TUI`
 - [x] Separate Excel photo timestamp/GPS columns are removed
 - [x] Photo watermark includes date/time, GPS/permission state, barcode, hub, responsible, and slot label
-- [x] GPS unavailable watermark shows a warning and does not fake coordinates
+- [x] กรณีไม่พบ GPS shows a warning and does not fake coordinates
 - [x] ZIP photos use the watermarked image data
 - [x] `manifest.json` includes full photo metadata
 - [x] Apps Script writes to `Records_All`
@@ -69,7 +75,7 @@
 ## RESET-005 Required Checks
 
 - [x] One codebase supports Android APK and Web/PWA
-- [x] App opens Employee Frontline by default
+- [x] App opens หน้างาน by default
 - [x] Backoffice requires local Admin PIN
 - [x] First Backoffice entry shows contact-admin lockout when no PIN exists
 - [x] First PIN setup is hidden behind admin-only setup token flow
@@ -118,8 +124,8 @@
 - [x] GPS denied/unavailable is stored as warning; GPS is not faked
 - [x] Missing photo warning appears before submit
 - [x] Submit saves COMPLETE or NEED_REVIEW record locally
-- [x] Admin Backoffice manages hubs and responsible staff
-- [x] Admin Backoffice has records/photos/export/settings/audit areas
+- [x] หลังบ้าน manages hubs and responsible staff
+- [x] หลังบ้าน has records/photos/export/settings/audit areas
 - [x] Excel/ZIP export creates `workbook.xlsx`, `photos/`, and `manifest.json`
 - [x] Rendered RESET-003 UI files have no mojibake patterns
 - [ ] Physical Android device QA is still pending

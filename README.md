@@ -1,4 +1,4 @@
-# Hub Vehicle Proof Capture
+﻿# Hub Vehicle Proof Capture
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
@@ -17,6 +17,7 @@ RESET-008A simplifies admin login:
 - Correct central PIN opens Backoffice.
 - No deviceName, ownerName, Device ID, or approval request appears in the default login modal.
 - Backoffice Settings can change the central PIN through Apps Script.
+- RESET-009 final polish removes the photo watermark background box, uses clean Thai watermark labels, opens the scanner full-screen, groups My Work by active responsible person, and writes Google Sheets time values as Bangkok `yyyy-MM-dd HH:mm:ss` strings.
 
 RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
 
@@ -27,12 +28,12 @@ RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
 - Unapproved devices show Device ID and can request approval, but cannot self-approve.
 - Full-screen scan uses a larger mobile camera viewport with Thai operational labels.
 - Trailer-drop photo rules require rear main vehicle photo plus trailer photos.
-- Watermarks use a larger rounded overlay with accurate Bangkok date/time, GPS status, barcode, hub, responsible staff, and photo slot.
+- Watermarks draw clean Thai text directly on the photo with shadow/stroke only; no large background panel or black strip.
 
 RESET-003 rebuilds the visible app again into a very simple **one APK** vehicle photo proof system:
 
 - **Frontline**: select hub, select responsible person, scan Barcode/QR, locked current date, choose drop condition, capture required photos with real timestamp/GPS metadata, submit.
-- **Admin Backoffice**: manage hubs, responsible staff, records, photos, export ZIP/Excel, settings, backup guard, and audit.
+- **หลังบ้าน**: manage hubs, responsible staff, records, photos, export ZIP/Excel, settings, backup guard, and audit.
 
 RESET-004 adds optional **free central storage** with Google Sheets + Google Apps Script + Google Drive:
 
@@ -43,7 +44,7 @@ RESET-004 adds optional **free central storage** with Google Sheets + Google App
 
 RESET-005 finalizes one deployable system:
 
-- The app opens Employee Frontline by default.
+- The app opens หน้างาน by default.
 - Backoffice is protected by a local device Admin PIN.
 - Google Sheets URL/token/settings are visible only after Backoffice unlock.
 - Android APK, Web/PWA, iPhone/iPad Safari, tablet, and desktop browser paths share the same codebase.
@@ -121,6 +122,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | RESET-003 Simple hub barcode photo proof app | Complete | Frontline hub/responsible/barcode/photo submit; Admin backoffice/export; device QA pending |
 | RESET-004 Free Google Sheets storage sync | Complete | Optional Apps Script sync, Drive photo upload, pending queue; live Sheet setup/test still manual |
 | RESET-005 Final PWA/admin lock/responsive/icon pass | Complete | Admin PIN, PWA docs/icons, Android icon, responsive hardening; real device QA still pending |
+| RESET-009 final production UI scan photo watermark time polish | Complete | UI/watermark/scan/photo/time polish implemented; physical device QA and live Apps Script verification still pending |
 
 ## Key Docs
 
@@ -138,7 +140,18 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 
 ## Google Sheets Sync
 
-Default mode is `Local only`; no URL or token is required to open/build the app. To enable central free storage, deploy `google-apps-script/Code.gs` as a Google Apps Script web app, set `APP_SHARED_SECRET` in Script Properties, then enter the Web App URL and shared secret in Admin Backoffice -> Settings.
+Default mode is `Local only`; no URL or token is required to open/build the app. To enable central free storage, deploy `google-apps-script/Code.gs` as a Google Apps Script web app, set `APP_SHARED_SECRET` in Script Properties, then enter the Web App URL and shared secret in หลังบ้าน -> Settings.
+
+RESET-009 keeps the simplified 15-column record row. Apps Script formats submitted/captured timestamps with `Asia/Bangkok` as `yyyy-MM-dd HH:mm:ss` and preserves already formatted local values.
+
+## RESET-009 Polish
+
+- Watermarked photos draw Thai text directly on the image with shadow/stroke only. There is no black strip or large background panel.
+- Watermark labels are `วันที่`, `เวลา`, `พิกัด`, `บาร์โค้ดรถ`, `ฮับ`, `ผู้รับผิดชอบ`, and `ประเภทรูป`.
+- Frontline opens with short operational Thai labels and an online/offline status pill.
+- Scan opens as a full-screen camera view with close action and manual barcode fallback.
+- Photo page keeps large capture/retake controls, safe bottom padding, and a sticky submit button above navigation.
+- My Work lists today’s open work for the active hub/responsible person so staff can continue missing trailer/drop photos.
 
 The app sends submitted records and photo metadata to Apps Script. If the request fails, it queues the payload locally and staff can continue work.
 

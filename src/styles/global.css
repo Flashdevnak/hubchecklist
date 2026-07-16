@@ -54,6 +54,7 @@ strong, span, p, h1, h2, h3, button, input, select, textarea { overflow-wrap: an
 .hero-card.compact { gap: 6px; }
 .hero-card h1, .done-card h1, .admin-stack h1, .frontline-stack h1 { margin: 0; font-size: clamp(26px, 5vw, 40px); letter-spacing: 0; }
 .hero-card p, .admin-stack p { margin: 0; color: var(--muted); line-height: 1.55; }
+.hero-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .context-card { padding: 14px; display: grid; gap: 12px; box-shadow: none; }
 label { display: grid; gap: 7px; color: var(--muted); font-weight: 900; }
 input, select, textarea {
@@ -79,6 +80,11 @@ input, select, textarea {
 .frontline-actions { display: grid; gap: 10px; }
 
 .scan-screen { display: grid; gap: 12px; min-height: calc(100vh - 180px); }
+.fullscreen-scan {
+  position: fixed; inset: 0; z-index: 55; min-height: 100dvh; gap: 0;
+  grid-template-rows: minmax(0, 1fr) auto; background: #05070d; color: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
 .scan-camera {
   min-height: min(76vh, 760px); border-radius: 24px; overflow: hidden; background: #111827; color: #fff;
   position: relative; display: grid; place-items: center; box-shadow: 0 18px 44px rgba(17,24,39,.18);
@@ -86,11 +92,15 @@ input, select, textarea {
 .scan-camera video { width: 100%; height: 100%; min-height: inherit; object-fit: cover; }
 .scan-topline {
   position: absolute; z-index: 3; left: 14px; right: 14px; top: 14px;
-  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center;
   padding: 10px 12px; border-radius: 16px; background: rgba(17,24,39,.72); backdrop-filter: blur(8px);
 }
 .scan-topline strong { font-size: 18px; color: var(--yellow); }
 .scan-topline span { color: rgba(255,255,255,.82); font-weight: 900; }
+.scan-close-button {
+  width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(255,255,255,.14);
+  color: #fff; font-size: 26px; line-height: 1; display: grid; place-items: center;
+}
 .scan-empty { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 10px; text-align: center; padding: 24px; }
 .scan-empty strong { font-size: 24px; }
 .scan-empty span { color: rgba(255,255,255,.75); }
@@ -98,8 +108,14 @@ input, select, textarea {
   position: absolute; inset: 14% 7%; border: 4px solid rgba(255,224,68,.92); border-radius: 24px; pointer-events: none;
   box-shadow: 0 0 0 999px rgba(0,0,0,.12);
 }
-.scan-frame-box::after { content: "สแกนให้เต็มกรอบ"; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); min-width: max-content; padding: 7px 12px; border-radius: 999px; background: rgba(17,24,39,.75); color: #fff; font-weight: 950; }
+.scan-frame-box::after { content: "เล็งบาร์โค้ดหรือ QR"; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); min-width: max-content; padding: 7px 12px; border-radius: 999px; background: rgba(17,24,39,.75); color: #fff; font-weight: 950; }
 .scan-control-panel { display: grid; gap: 12px; }
+.fullscreen-scan .scan-camera { min-height: 0; height: 100%; border-radius: 0; box-shadow: none; }
+.fullscreen-scan .scan-control-panel {
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,.96); color: var(--text);
+  border-radius: 20px 20px 0 0;
+}
 .locked-date, .simple-message { border-radius: 14px; padding: 12px 14px; background: #fff7ed; color: #9a3412; font-weight: 900; margin: 0; }
 .drop-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .drop-choice button {
@@ -128,6 +144,7 @@ input, select, textarea {
   display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
   padding: 10px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px);
 }
+.frontline-stack:has(.sticky-submit) { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 .sticky-submit span { font-weight: 950; }
 .done-card { min-height: 55vh; display: grid; place-items: center; align-content: center; gap: 14px; padding: 24px; text-align: center; }
 .done-card svg { color: var(--success); }
@@ -189,8 +206,8 @@ input, select, textarea {
 @media (max-width: 780px) {
   .reset-main { padding: 14px 12px 20px; }
   .reset-topbar { align-items: stretch; display: grid; }
-  .scan-screen { margin: -14px -12px 0; min-height: calc(100vh - 92px - env(safe-area-inset-bottom)); }
-  .scan-camera { min-height: calc(100vh - 310px - env(safe-area-inset-bottom)); border-radius: 0 0 22px 22px; }
+  .scan-screen:not(.fullscreen-scan) { margin: -14px -12px 0; min-height: calc(100vh - 92px - env(safe-area-inset-bottom)); }
+  .scan-screen:not(.fullscreen-scan) .scan-camera { min-height: calc(100vh - 310px - env(safe-area-inset-bottom)); border-radius: 0 0 22px 22px; }
   .scan-control-panel { padding: 0 12px 12px; }
   .admin-layout { grid-template-columns: 1fr; }
   .admin-sidebar {

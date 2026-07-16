@@ -2,6 +2,16 @@
 
 RESET-004 adds free central storage using Google Sheets, Google Apps Script, and Google Drive.
 
+## RESET-009 Time Format
+
+Apps Script keeps the simplified 15-column `Records_All` / hub sheet layout. User-facing submitted/captured time values are written as Bangkok strings:
+
+```text
+yyyy-MM-dd HH:mm:ss
+```
+
+If the app sends an already formatted Bangkok value, Apps Script preserves it. If the app sends ISO, Apps Script formats it with `Utilities.formatDate(date, 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss')`.
+
 ## RESET-006-007-FINAL-PLUS Central Backend
 
 Deploy `google-apps-script/Code.gs` as a Web App and set the resulting `/exec` URL in:

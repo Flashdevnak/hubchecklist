@@ -1,4 +1,17 @@
-# Test Plan
+﻿# Test Plan
+
+## RESET-009 Final Polish Checks
+
+- Open Frontline and confirm the header uses `Hub Photo Proof`, `หน้างาน`, and a short `ออนไลน์` / `ออฟไลน์` / `รอซิงก์` status.
+- Tap `สแกนบาร์รถ` and confirm the scanner fills the viewport, hides the bottom nav, shows a close button, and keeps manual `กรอกบาร์รถ` fallback.
+- Scan or manually enter the same barcode twice for the same date/hub/responsible person and confirm the app offers to continue existing work instead of creating an accidental duplicate.
+- Capture each required photo and confirm the preview has no black strip or dark background panel.
+- Confirm watermark labels are Thai only: `วันที่`, `เวลา`, `พิกัด`, `บาร์โค้ดรถ`, `ฮับ`, `ผู้รับผิดชอบ`, `ประเภทรูป`.
+- Deny GPS and confirm the watermark says `พิกัด: ไม่พบตำแหน่ง` without fake coordinates.
+- Submit with missing photos and confirm the warning is short Thai text and the record becomes `รอตรวจสอบ`.
+- Open `งานของฉัน` and confirm it lists today’s open records for the active hub/responsible person, grouped by vehicle barcode in the list.
+- Sync to Google Sheets and confirm submitted/captured values are Bangkok strings like `2026-07-17 00:34:12`, not English browser date strings.
+- Export ZIP and confirm the 15-column workbook, watermarked photos, and manifest still generate.
 
 ## RESET-008A Simple Admin PIN Login
 
@@ -95,7 +108,7 @@ Watermark checks:
 
 - Confirm preview image shows date/time, GPS, barcode, hub, responsible, and photo slot.
 - Deny GPS and retake a photo.
-- Confirm the watermark shows GPS unavailable text and no fake coordinates.
+- Confirm the watermark shows `พิกัด: ไม่พบตำแหน่ง` and no fake coordinates.
 
 Google Sheets checks:
 
@@ -107,11 +120,11 @@ Google Sheets checks:
 
 ## RESET-005
 
-Goal: verify the final one-system app with Employee Frontline default, PIN-protected Backoffice, Android APK, Web/PWA support, responsive layout, and app icons.
+Goal: verify the final one-system app with หน้างาน default, PIN-protected Backoffice, Android APK, Web/PWA support, responsive layout, and app icons.
 
 Admin lock:
 
-- Fresh open loads Employee Frontline.
+- Fresh open loads หน้างาน.
 - Tap the small Backoffice gear.
 - If no PIN exists, confirm normal entry shows the contact-admin message instead of first-time PIN setup.
 - Use the hidden admin setup token flow only on an admin-controlled device when first PIN setup is required.
@@ -153,7 +166,7 @@ Goal: verify optional free central storage through Google Sheets + Apps Script +
 
 Local-only checks:
 
-- Open Admin Backoffice -> Settings.
+- Open หลังบ้าน -> Settings.
 - Confirm Sync mode defaults to `Local only`.
 - Leave Google Apps Script URL and shared secret blank.
 - Submit a Frontline record and confirm the app does not crash.
@@ -187,7 +200,7 @@ Safety checks:
 
 ## RESET-003
 
-Goal: verify the simplified Frontline + Admin Backoffice photo proof app in one APK.
+Goal: verify the simplified Frontline + หลังบ้าน photo proof app in one APK.
 
 Frontline:
 
@@ -204,7 +217,7 @@ Frontline:
 - Submit with all photos and confirm status becomes `COMPLETE`.
 - Submit with missing photos only after warning confirmation and confirm status becomes `NEED_REVIEW`.
 
-Admin Backoffice:
+หลังบ้าน:
 
 - Add/edit/delete hubs.
 - Add/edit/delete responsible staff and assign each to one hub.

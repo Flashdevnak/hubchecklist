@@ -1,4 +1,15 @@
-# Flow QA Checklist
+﻿# Flow QA Checklist
+
+## RESET-009 Final Polish
+
+1. Frontline shows short Thai labels and no backend/debug wording.
+2. Scan opens full-screen, hides bottom nav, and keeps manual barcode fallback.
+3. Duplicate same-day barcode for the same hub/responsible opens the continue-existing-work prompt.
+4. Photo watermark has no black strip or dark panel.
+5. Watermark text uses Thai labels only and shows `พิกัด: ไม่พบตำแหน่ง` when GPS is unavailable.
+6. Photo page fits phone width and the submit button is not hidden by bottom/system navigation.
+7. My Work shows today’s open work for the active responsible person.
+8. Google Sheets submitted/captured times use Bangkok `yyyy-MM-dd HH:mm:ss`.
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
@@ -45,7 +56,7 @@ Use this checklist during web, PWA, and Android device testing. Record pass/fail
 
 ## RESET-005 Admin Lock And Device Flow
 
-1. Open app and confirm Employee Frontline is shown first.
+1. Open app and confirm หน้างาน is shown first.
 2. Confirm no export, backup, settings, audit, Google URL, or token appears in Frontline.
 3. Tap Backoffice gear and set Admin PIN on first use.
 4. Lock Backoffice and verify PIN is required to enter again.
