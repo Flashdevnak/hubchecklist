@@ -149,6 +149,7 @@ input, select, textarea {
 .mini-photo-row span, .mini-photo-row small { color: var(--muted); font-weight: 800; }
 .checkbox-row { display: flex; align-items: center; gap: 10px; color: var(--text); }
 .checkbox-row input { width: 20px; min-height: 20px; }
+.sync-status-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--muted); font-weight: 900; }
 
 .status-pill { border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 950; white-space: nowrap; }
 .status-pill.success { background: #d1fadf; color: var(--success); }

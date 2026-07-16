@@ -1,5 +1,20 @@
 # Real Device Test Result
 
+## RESET-004 Status
+
+Free Google Sheets storage code and Apps Script files are added. Physical device sync validation is still pending because the user's Google Apps Script Web App URL must be deployed and configured first.
+
+Do not mark these passed until tested with the deployed script:
+
+- [ ] Samsung S23 FE submits record to Google Sheets
+- [ ] Galaxy Tab A7 Lite submits record to Google Sheets
+- [ ] Photo metadata appears in `Photos`
+- [ ] Photo files upload to Google Drive when request size allows
+- [ ] Wrong token/offline state queues pending sync
+- [ ] Retry sync drains pending queue after configuration is fixed
+- [ ] iPad browser fallback remains local-first or syncs only when Apps Script is configured
+- [ ] Desktop browser confirms Test connection and retry behavior
+
 ## RESET-003 Status
 
 The debug APK can be built locally. Physical device validation is still pending.

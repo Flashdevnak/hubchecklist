@@ -21,17 +21,20 @@ import {
   getMissingPhotoSlots,
   getRecordById,
   getSettings,
+  getPendingSyncCount,
   listAudit,
   listHubs,
   listRecords,
   listResponsibleStaff,
   normalizeVehicleBarcode,
+  retryPendingSync,
   saveActiveContext,
   saveHubs,
   saveRecords,
   saveResponsibleStaff,
   saveSettings,
-  submitRecord,
+  submitRecordWithGoogleSync,
+  testGoogleConnection,
   updatePhotoSlotsForDropCount,
   upsertRecord,
 } from './services/reset003';
@@ -351,16 +354,19 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
     onReload();
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (missing.length > 0) {
       const text = workingRecord.hasDropTransfer
         ? `คุณยังไม่ได้ถ่าย ${missing.map((slot) => slot.labelThai).join(', ')} หากไม่มีรูปนี้ อาจไม่สามารถร้องเรียนหรือยืนยันงานได้ และพนักงานอาจถูกตรวจสอบ/ถูกลงโทษตามระเบียบ ต้องการส่งต่อหรือไม่?`
         : 'ยังถ่ายรูปไม่ครบ หากส่งข้อมูลไม่ครบ อาจไม่สามารถใช้เป็นหลักฐานร้องเรียนได้ และอาจมีผลต่อการตรวจสอบงานของพนักงาน ยืนยันจะส่งต่อหรือไม่?';
       if (!window.confirm(text)) return;
     }
-    const submitted = submitRecord(workingRecord, missing.length > 0);
-    setWorkingRecord(submitted);
+    setMessage('กำลังบันทึกข้อมูล');
+    const result = await submitRecordWithGoogleSync(workingRecord, missing.length > 0);
+    setWorkingRecord(result.record);
+    setMessage(result.sync.message);
     onReload();
+    if (result.sync.queued) window.alert('บันทึกในเครื่องแล้ว รอซิงก์');
     onDone();
   };
 
@@ -638,8 +644,27 @@ function BackupPanel() {
 
 function SettingsPanel({ onReload }: { onReload: () => void }) {
   const [settings, setSettings] = useState(getSettings());
+  const [pendingSyncCount, setPendingSyncCount] = useState(getPendingSyncCount());
+  const [syncMessage, setSyncMessage] = useState('');
   const save = () => {
     saveSettings(settings);
+    setPendingSyncCount(getPendingSyncCount());
+    onReload();
+  };
+  const testConnection = async () => {
+    saveSettings(settings);
+    setSyncMessage('กำลังทดสอบการเชื่อมต่อ');
+    const result = await testGoogleConnection();
+    setSyncMessage(result.message);
+    setPendingSyncCount(getPendingSyncCount());
+    onReload();
+  };
+  const retrySync = async () => {
+    saveSettings(settings);
+    setSyncMessage('กำลังซิงก์รายการที่ค้าง');
+    const result = await retryPendingSync();
+    setSyncMessage(result.message);
+    setPendingSyncCount(getPendingSyncCount());
     onReload();
   };
   return (
@@ -653,6 +678,35 @@ function SettingsPanel({ onReload }: { onReload: () => void }) {
         <input checked={settings.watermarkEnabled} onChange={(event) => setSettings({ ...settings, watermarkEnabled: event.target.checked })} type="checkbox" />
         เปิด watermark บนรูป
       </label>
+      <article className="admin-detail-card">
+        <h2>Google Sheets Sync</h2>
+        <div className="admin-form">
+          <label>
+            <span>Sync mode</span>
+            <select value={settings.googleSyncMode} onChange={(event) => setSettings({ ...settings, googleSyncMode: event.target.value === 'google_sheets' ? 'google_sheets' : 'local_only' })}>
+              <option value="local_only">Local only</option>
+              <option value="google_sheets">Google Sheets sync</option>
+            </select>
+          </label>
+          <label>
+            <span>Google Apps Script Web App URL</span>
+            <input value={settings.googleAppsScriptUrl} onChange={(event) => setSettings({ ...settings, googleAppsScriptUrl: event.target.value })} placeholder="https://script.google.com/macros/s/..." />
+          </label>
+          <label>
+            <span>APP_SHARED_SECRET</span>
+            <input type="password" value={settings.googleSharedSecret} onChange={(event) => setSettings({ ...settings, googleSharedSecret: event.target.value })} placeholder="stored locally only" />
+          </label>
+        </div>
+        <div className="sync-status-row">
+          <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'warning' : 'success'} text={settings.googleSyncMode === 'google_sheets' ? 'Google Sheets sync' : 'Local only'} />
+          <span>Pending sync queue: {pendingSyncCount}</span>
+        </div>
+        <div className="admin-form">
+          <button className="secondary-action" onClick={testConnection} type="button"><RefreshCcw size={18} /> Test connection</button>
+          <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> Retry sync</button>
+        </div>
+        {syncMessage ? <p className="simple-message">{syncMessage}</p> : null}
+      </article>
       <button className="primary-action" onClick={save} type="button">บันทึก Settings</button>
     </section>
   );

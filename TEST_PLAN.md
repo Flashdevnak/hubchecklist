@@ -1,5 +1,43 @@
 # Test Plan
 
+## RESET-004
+
+Goal: verify optional free central storage through Google Sheets + Apps Script + Drive while preserving local-first Frontline work.
+
+Local-only checks:
+
+- Open Admin Backoffice -> Settings.
+- Confirm Sync mode defaults to `Local only`.
+- Leave Google Apps Script URL and shared secret blank.
+- Submit a Frontline record and confirm the app does not crash.
+- Confirm record appears in local Admin Records.
+- Confirm Export ZIP still works from local data.
+
+Configured sync checks:
+
+- Deploy `google-apps-script/Code.gs` from a Google Sheet.
+- Set Script Property `APP_SHARED_SECRET`.
+- Enter the Web App URL and shared secret in Settings.
+- Tap Test connection and confirm success.
+- Submit a Frontline record with photos.
+- Confirm `Records` and `Photos` rows appear in Google Sheets.
+- Confirm Drive folder `HubChecklist Photos/<date>/<vehicleBarcode>/` contains uploaded image files when payload size permits.
+
+Failure/retry checks:
+
+- Configure a wrong shared secret.
+- Submit a record.
+- Confirm staff sees `บันทึกในเครื่องแล้ว รอซิงก์`.
+- Confirm pending sync queue count increases.
+- Fix the shared secret.
+- Tap Retry sync.
+- Confirm queue count decreases after successful sync.
+
+Safety checks:
+
+- Do not add Firebase, Supabase, R2, or paid cloud services.
+- Do not claim live Google sync success until the user's Web App URL is deployed and tested.
+
 ## RESET-003
 
 Goal: verify the simplified Frontline + Admin Backoffice photo proof app in one APK.

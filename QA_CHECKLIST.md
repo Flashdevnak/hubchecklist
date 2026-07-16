@@ -1,5 +1,19 @@
 # QA Checklist
 
+## RESET-004 Required Checks
+
+- [x] No Firebase, Supabase, R2, or paid storage added for RESET-004
+- [x] Google Apps Script files exist in `google-apps-script/`
+- [x] Apps Script supports `createRecord`, `uploadPhotoMetadata`, `syncRecord`, `getHubs`, `getResponsibleStaff`, `getRecords`, `appendAudit`, and `healthCheck`
+- [x] Apps Script validates `APP_SHARED_SECRET`
+- [x] App defaults to local-only mode and builds without Google settings
+- [x] Backoffice Settings includes Web App URL, shared secret, sync mode, Test connection, queue status, and Retry sync
+- [x] Frontline submit saves locally first
+- [x] Failed Google sync queues pending payload and shows `บันทึกในเครื่องแล้ว รอซิงก์`
+- [x] Base64 photo upload to Google Drive is implemented as best-effort
+- [ ] Live Google Sheet deployment and real device sync test are pending manual setup
+- [ ] Google Drive photo upload quota/runtime behavior must be validated with real photos
+
 ## RESET-003 Required Checks
 
 - [x] One Android app / one APK only

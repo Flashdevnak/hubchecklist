@@ -1,5 +1,29 @@
 # Project Specification
 
+## RESET-004 Free Central Storage
+
+RESET-004 adds optional free central storage using Google Sheets, Google Apps Script, and Google Drive. It does not add Firebase, Supabase, R2, or paid storage.
+
+Behavior:
+
+- Default mode remains `Local only`.
+- Admin Backoffice Settings stores the Google Apps Script Web App URL and `APP_SHARED_SECRET` locally.
+- Test connection calls Apps Script `healthCheck`.
+- Frontline submits local records first, then attempts Google sync.
+- Failed sync does not block staff. The app queues the payload locally and shows `บันทึกในเครื่องแล้ว รอซิงก์`.
+- Retry sync is available from Backoffice Settings.
+- Apps Script validates the shared secret before any action.
+- Google Sheets stores records, photo metadata, hubs, responsible staff, and audit.
+- Google Drive receives base64 photo uploads when Apps Script request/runtime limits allow it.
+
+Apps Script files:
+
+- `google-apps-script/Code.gs`
+- `google-apps-script/README.md`
+- `google-apps-script/SHEET_SCHEMA.md`
+
+Live Google deployment and real device sync testing remain manual QA steps.
+
 ## RESET-003 Simple Hub Barcode Photo Proof App
 
 RESET-003 replaces the visible app workflow with a simple local-first photo proof system in one APK.

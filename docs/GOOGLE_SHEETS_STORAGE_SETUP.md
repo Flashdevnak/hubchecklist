@@ -1,0 +1,67 @@
+# RESET-004 Google Sheets Storage Setup
+
+RESET-004 adds free central storage using Google Sheets, Google Apps Script, and Google Drive.
+
+The app still works without this setup. When Sync mode is `Local only`, records/photos/audit remain on the device and export still works locally. When Google sync is configured, submitted records are sent to Apps Script. If sync fails, the app saves locally and shows:
+
+```text
+บันทึกในเครื่องแล้ว รอซิงก์
+```
+
+## Create Storage
+
+1. Create a Google Sheet named `HubChecklist Central Storage`.
+2. Open Extensions -> Apps Script.
+3. Copy `google-apps-script/Code.gs` into the script editor.
+4. Open Project Settings -> Script Properties.
+5. Add:
+
+```text
+APP_SHARED_SECRET=<long random shared secret>
+```
+
+6. Deploy -> New deployment -> Web app.
+7. Execute as: Me.
+8. Access: Anyone with link, or restricted Workspace users if all devices can access it.
+9. Copy the Web App URL.
+
+## Configure The App
+
+In Admin Backoffice -> Settings:
+
+1. Set Sync mode to `Google Sheets sync`.
+2. Paste the Google Apps Script Web App URL.
+3. Enter the same `APP_SHARED_SECRET`.
+4. Tap Test connection.
+5. Submit a record from Frontline.
+6. If the pending queue increases, return to Settings and tap Retry sync.
+
+## Data Created
+
+Apps Script creates these sheets automatically:
+
+- `Records`
+- `Photos`
+- `Hubs`
+- `ResponsibleStaff`
+- `Audit`
+
+Photo files are uploaded to Google Drive under:
+
+```text
+HubChecklist Photos/<date>/<vehicleBarcode>/
+```
+
+## Security
+
+- No Firebase, Supabase, R2, or paid storage is required.
+- The shared secret is stored only in localStorage on the device.
+- Never commit a real shared secret.
+- Apps Script rejects missing or incorrect tokens.
+
+## Limitations
+
+- This is a free storage bridge, not full user authentication.
+- Apps Script can hit request size and runtime limits with many large photos.
+- Google Drive quota depends on the Google account.
+- Sync success must be verified in the target Google Sheet and Drive folder.

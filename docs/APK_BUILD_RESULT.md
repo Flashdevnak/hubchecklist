@@ -1,5 +1,49 @@
 # APK Build Result
 
+## RESET-004 Result
+
+RESET-004 adds optional Google Sheets sync and keeps the same debug APK path:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Required verification commands:
+
+```powershell
+npm.cmd install
+npx.cmd tsc -b
+npm.cmd run build
+npx.cmd cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Google Apps Script live sync is not part of APK build success. It must be deployed and tested separately with `APP_SHARED_SECRET`.
+
+Fresh RESET-004 verification on 2026-07-16:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 7s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+APK generated:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
 ## RESET-003 Result
 
 Date: 2026-07-03

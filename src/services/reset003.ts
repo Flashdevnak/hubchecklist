@@ -5,6 +5,8 @@ export type AppMode = 'frontline' | 'admin';
 export type ProofStatus = 'DRAFT' | 'COMPLETE' | 'NEED_REVIEW' | 'VOIDED';
 export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
 export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2' | 'DROP_REAR_EXTRA';
+export type GoogleSyncMode = 'local_only' | 'google_sheets';
+export type GoogleSyncAction = 'createRecord' | 'uploadPhotoMetadata' | 'syncRecord' | 'appendAudit';
 
 export interface Hub {
   hubCode: string;
@@ -77,6 +79,33 @@ export interface AuditEntry {
 export interface AppSettings {
   gpsMandatory: boolean;
   watermarkEnabled: boolean;
+  googleSyncMode: GoogleSyncMode;
+  googleAppsScriptUrl: string;
+  googleSharedSecret: string;
+}
+
+export interface SyncQueueItem {
+  id: string;
+  action: GoogleSyncAction;
+  payload: unknown;
+  createdAt: string;
+  attempts: number;
+  lastAttemptAt?: string;
+  error?: string;
+}
+
+export interface SyncResult {
+  ok: boolean;
+  queued: boolean;
+  message: string;
+  response?: unknown;
+}
+
+export interface RetrySyncResult {
+  attempted: number;
+  synced: number;
+  failed: number;
+  message: string;
 }
 
 const HUBS_KEY = 'reset003.hubs';
@@ -85,6 +114,15 @@ const ACTIVE_CONTEXT_KEY = 'reset003.activeContext';
 const RECORDS_KEY = 'reset003.records';
 const AUDIT_KEY = 'reset003.audit';
 const SETTINGS_KEY = 'reset003.settings';
+const SYNC_QUEUE_KEY = 'reset003.googleSyncQueue';
+
+const DEFAULT_SETTINGS: AppSettings = {
+  gpsMandatory: false,
+  watermarkEnabled: true,
+  googleSyncMode: 'local_only',
+  googleAppsScriptUrl: '',
+  googleSharedSecret: '',
+};
 
 export const DEFAULT_HUB: Hub = {
   hubCode: '26NAK_BHUB',
@@ -159,7 +197,7 @@ export function saveActiveContext(context: ActiveWorkContext): void {
 }
 
 export function getSettings(): AppSettings {
-  return readJson<AppSettings>(SETTINGS_KEY, { gpsMandatory: false, watermarkEnabled: true });
+  return { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(SETTINGS_KEY, {}) };
 }
 
 export function saveSettings(settings: AppSettings): void {
@@ -294,6 +332,116 @@ export function submitRecord(record: ProofRecord, confirmMissing: boolean): Proo
     actor: submitted.responsibleEmployeeCode,
   });
   return submitted;
+}
+
+export async function submitRecordWithGoogleSync(record: ProofRecord, confirmMissing: boolean): Promise<{ record: ProofRecord; sync: SyncResult }> {
+  const submitted = submitRecord(record, confirmMissing);
+  const sync = await syncRecordToGoogle(submitted);
+  return { record: submitted, sync };
+}
+
+export function getPendingSyncCount(): number {
+  return getSyncQueue().length;
+}
+
+export function getSyncQueue(): SyncQueueItem[] {
+  return readJson<SyncQueueItem[]>(SYNC_QUEUE_KEY, []);
+}
+
+export async function testGoogleConnection(): Promise<SyncResult> {
+  const settings = getSettings();
+  if (!isGoogleSyncConfigured(settings)) {
+    return {
+      ok: false,
+      queued: false,
+      message: 'ยังไม่ได้ตั้งค่า Google Apps Script URL หรือ shared secret',
+    };
+  }
+  try {
+    const response = await callAppsScript('healthCheck', { checkedAt: new Date().toISOString() });
+    return { ok: true, queued: false, message: 'เชื่อมต่อ Google Sheets ได้', response };
+  } catch (error) {
+    return {
+      ok: false,
+      queued: false,
+      message: error instanceof Error ? error.message : 'เชื่อมต่อ Google Sheets ไม่สำเร็จ',
+    };
+  }
+}
+
+export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResult> {
+  const settings = getSettings();
+  if (!isGoogleSyncConfigured(settings)) {
+    return {
+      ok: true,
+      queued: false,
+      message: 'บันทึกในเครื่องแล้ว',
+    };
+  }
+
+  const payload = {
+    record,
+    photoMetadata: record.photoSlots.map((slot) => ({
+      recordId: record.id,
+      vehicleBarcode: record.vehicleBarcode,
+      slotId: slot.slotId,
+      slotType: slot.slotType,
+      labelThai: slot.labelThai,
+      captured: slot.captured,
+      fileName: slot.fileName,
+      capturedAt: slot.capturedAt,
+      gpsLat: slot.gpsLat,
+      gpsLng: slot.gpsLng,
+      gpsAccuracy: slot.gpsAccuracy,
+      gpsStatus: slot.gpsStatus,
+      imageLocalData: slot.imageLocalData,
+    })),
+  };
+
+  try {
+    const response = await callAppsScript('syncRecord', payload);
+    return { ok: true, queued: false, message: 'บันทึกและซิงก์แล้ว', response };
+  } catch (error) {
+    queueSync('syncRecord', payload, error instanceof Error ? error.message : 'Sync failed');
+    return {
+      ok: false,
+      queued: true,
+      message: 'บันทึกในเครื่องแล้ว รอซิงก์',
+    };
+  }
+}
+
+export async function retryPendingSync(): Promise<RetrySyncResult> {
+  const queue = getSyncQueue();
+  if (queue.length === 0) {
+    return { attempted: 0, synced: 0, failed: 0, message: 'ไม่มีรายการรอซิงก์' };
+  }
+
+  let synced = 0;
+  const failedItems: SyncQueueItem[] = [];
+
+  for (const item of queue) {
+    try {
+      await callAppsScript(item.action, item.payload);
+      synced += 1;
+    } catch (error) {
+      failedItems.push({
+        ...item,
+        attempts: item.attempts + 1,
+        lastAttemptAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Sync failed',
+      });
+    }
+  }
+
+  saveSyncQueue(failedItems);
+  const failed = failedItems.length;
+  return {
+    attempted: queue.length,
+    synced,
+    failed,
+    message: failed === 0 ? `ซิงก์สำเร็จ ${synced} รายการ` : `ซิงก์สำเร็จ ${synced} รายการ, ยังไม่สำเร็จ ${failed} รายการ`,
+  };
 }
 
 export async function capturePhotoForSlot(record: ProofRecord, slotId: string, file: File): Promise<ProofRecord> {
@@ -509,6 +657,61 @@ function readJson<T>(key: string, fallback: T): T {
 
 function writeJson<T>(key: string, value: T): void {
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function isGoogleSyncConfigured(settings = getSettings()): boolean {
+  return settings.googleSyncMode === 'google_sheets'
+    && settings.googleAppsScriptUrl.trim().length > 0
+    && settings.googleSharedSecret.trim().length > 0;
+}
+
+function queueSync(action: GoogleSyncAction, payload: unknown, error?: string): void {
+  const item: SyncQueueItem = {
+    id: createId(),
+    action,
+    payload,
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+    error,
+  };
+  saveSyncQueue([...getSyncQueue(), item]);
+}
+
+function saveSyncQueue(queue: SyncQueueItem[]): void {
+  writeJson(SYNC_QUEUE_KEY, queue);
+}
+
+async function callAppsScript(action: 'healthCheck' | GoogleSyncAction | 'getHubs' | 'getResponsibleStaff' | 'getRecords', payload: unknown): Promise<unknown> {
+  const settings = getSettings();
+  if (!isGoogleSyncConfigured(settings)) {
+    throw new Error('ยังไม่ได้ตั้งค่า Google Apps Script URL หรือ shared secret');
+  }
+
+  const response = await fetch(settings.googleAppsScriptUrl.trim(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action,
+      token: settings.googleSharedSecret,
+      payload,
+      client: 'hubchecklist-reset004',
+      sentAt: new Date().toISOString(),
+    }),
+  });
+
+  const text = await response.text();
+  let data: { ok?: boolean; error?: string } | null = null;
+  try {
+    data = text ? JSON.parse(text) as { ok?: boolean; error?: string } : null;
+  } catch {
+    throw new Error('Apps Script response is not JSON');
+  }
+
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `Apps Script HTTP ${response.status}`);
+  }
+
+  return data;
 }
 
 function createId(): string {

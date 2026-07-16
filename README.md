@@ -7,6 +7,13 @@ RESET-003 rebuilds the visible app again into a very simple **one APK** vehicle 
 - **Frontline**: select hub, select responsible person, scan Barcode/QR, locked current date, choose drop condition, capture required photos with real timestamp/GPS metadata, submit.
 - **Admin Backoffice**: manage hubs, responsible staff, records, photos, export ZIP/Excel, settings, backup guard, and audit.
 
+RESET-004 adds optional **free central storage** with Google Sheets + Google Apps Script + Google Drive:
+
+- Backoffice Settings now has Google Apps Script Web App URL, local shared secret, sync mode, Test connection, pending queue count, and Retry sync.
+- Frontline still saves locally first. If Google sync is configured and fails, the record remains local and is queued with `บันทึกในเครื่องแล้ว รอซิงก์`.
+- Apps Script files live in `google-apps-script/` and create `Records`, `Photos`, `Hubs`, `ResponsibleStaff`, and `Audit` sheets.
+- Base64 photo upload to Google Drive is implemented as best-effort and can be limited by Apps Script/Drive quotas.
+
 Frontline no longer exposes OCR proof-paper parsing, Flash WebView technical flow, Supabase/R2 warnings, placeholder cards, or debug data. OCR/Flash code may remain in the repository for previous compatibility, but it is not part of the RESET-003 Frontline workflow.
 
 RESET-001 rebuilds the product as **one Android app / one APK** with two modes inside the same app:
@@ -62,6 +69,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | MVP-017 Simple staff scan/review/create flow | Complete | QR/barcode/manual/OCR parser foundation; real device QA still pending |
 | RESET-001 Frontline/Backoffice unified table rebuild | Complete | One APK, mode separation, unified table export, real device QA still pending |
 | RESET-003 Simple hub barcode photo proof app | Complete | Frontline hub/responsible/barcode/photo submit; Admin backoffice/export; device QA pending |
+| RESET-004 Free Google Sheets storage sync | Complete | Optional Apps Script sync, Drive photo upload, pending queue; live Sheet setup/test still manual |
 
 ## Key Docs
 
@@ -71,6 +79,13 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 - [APK build result](docs/APK_BUILD_RESULT.md)
 - [Real device test result](docs/REAL_DEVICE_TEST_RESULT.md)
 - [Project spec](docs/PROJECT_SPEC.md)
+- [Google Sheets storage setup](docs/GOOGLE_SHEETS_STORAGE_SETUP.md)
+
+## Google Sheets Sync
+
+Default mode is `Local only`; no URL or token is required to open/build the app. To enable central free storage, deploy `google-apps-script/Code.gs` as a Google Apps Script web app, set `APP_SHARED_SECRET` in Script Properties, then enter the Web App URL and shared secret in Admin Backoffice -> Settings.
+
+The app sends submitted records and photo metadata to Apps Script. If the request fails, it queues the payload locally and staff can continue work.
 
 ## Commands
 

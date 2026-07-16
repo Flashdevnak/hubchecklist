@@ -2,6 +2,22 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-004 Google Sheets Sync Flow
+
+1. Open Backoffice -> Settings.
+2. Confirm Sync mode can be switched between `Local only` and `Google Sheets sync`.
+3. Enter Google Apps Script Web App URL and `APP_SHARED_SECRET`.
+4. Tap Test connection.
+5. Submit a Frontline record while sync is configured.
+6. Confirm `Records` row appears in Google Sheets.
+7. Capture photos and confirm `Photos` metadata appears.
+8. Confirm Google Drive file URLs appear when base64 upload succeeds.
+9. Force a wrong token or offline state.
+10. Submit another record and confirm staff sees `บันทึกในเครื่องแล้ว รอซิงก์`.
+11. Confirm pending sync queue count increases.
+12. Fix configuration and tap Retry sync.
+13. Confirm pending sync queue decreases after success.
+
 ## RESET-003 Frontline Flow
 
 1. Select hub `26NAK_BHUB-นครราชสีมา`.
