@@ -1,5 +1,41 @@
 # Project Specification
 
+## RESET-005A Export And Watermark Simplification
+
+RESET-005A simplifies user-facing exports while keeping complete metadata internally.
+
+Excel export uses 15 columns:
+
+1. วันที่
+2. ฮับ
+3. ผู้รับผิดชอบ
+4. บาร์โค้ดรถ
+5. พ่วงดรอปหรือไม่
+6. จำนวนดรอป
+7. สถานะ
+8. รูปหลังรถ
+9. รูปหน้าดรอป
+10. รูปหลังรถพ่วงที่ 1
+11. รูปหลังรถพ่วงที่ 2
+12. รูปหลังรถพ่วงเพิ่มเติม
+13. รายการรูปที่ขาด
+14. เวลาส่งข้อมูล
+15. หมายเหตุ
+
+Responsible is shown as one value, such as `25845 TUI`.
+
+Photo evidence:
+
+- Timestamp and GPS are rendered directly on each watermarked photo.
+- GPS unavailable/denied is shown as a warning, never fake coordinates.
+- `manifest.json` still stores full metadata for each photo.
+
+Google Sheets:
+
+- `Records_All` is the master sheet and source of truth.
+- Hub-specific sheets are created/updated automatically as views/copies.
+- Retry sync updates existing rows by record id.
+
 ## RESET-005 Final One-System Pass
 
 RESET-005 keeps one codebase, one Android APK, and one Web/PWA. Android users install the APK; iPhone/iPad users use the HTTPS Web/PWA link; desktop/admin users use a web browser.

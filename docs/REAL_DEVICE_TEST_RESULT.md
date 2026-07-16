@@ -1,5 +1,17 @@
 # Real Device Test Result
 
+## RESET-005A Status
+
+RESET-005A code/build readiness is implemented, but physical and live Google Sheet validation remain pending.
+
+- [ ] Confirm watermarked photo readability on Samsung S23 FE
+- [ ] Confirm watermarked photo readability on Galaxy Tab A7 Lite
+- [ ] Confirm iPhone Safari photo capture stores watermarked image
+- [ ] Confirm GPS denied watermark shows warning only
+- [ ] Confirm exported ZIP opens and photos are watermarked
+- [ ] Confirm deployed Apps Script writes to `Records_All`
+- [ ] Confirm deployed Apps Script creates/updates hub-specific sheet
+
 ## RESET-005 Status
 
 RESET-005 code/build readiness is implemented, but physical device QA is still pending.

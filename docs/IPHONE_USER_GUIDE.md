@@ -33,3 +33,4 @@ iPhone and iPad users use the Web/PWA version. They do not install the Android A
 - iPhone browser support varies by iOS/Safari version.
 - Use HTTPS. Camera/GPS may not work on plain HTTP.
 - Google sync runs only if an admin configured it in Backoffice on that browser/device.
+- Captured photos are saved with a visible date/time/GPS watermark when the browser can process the image.

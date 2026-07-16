@@ -38,13 +38,19 @@ Google sync settings are protected. Open Backoffice with the local Admin PIN, th
 
 ## Data Created
 
-Apps Script creates these sheets automatically:
+Apps Script creates these master sheets automatically:
 
-- `Records`
+- `Records_All`
 - `Photos`
 - `Hubs`
 - `ResponsibleStaff`
 - `Audit`
+- `Settings`
+- `ExportLogs`
+
+It also creates one readable hub-specific sheet per hub. `Records_All` remains the source of truth; hub sheets are views/copies for easier daily viewing.
+
+Record rows use the same simplified 15 columns as Excel export. Responsible appears as one value such as `25845 TUI`. Photo date/time/GPS are on the watermarked image and full metadata remains in `Photos`.
 
 Photo files are uploaded to Google Drive under:
 

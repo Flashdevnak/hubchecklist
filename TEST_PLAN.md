@@ -1,5 +1,34 @@
 # Test Plan
 
+## RESET-005A
+
+Goal: verify simplified export, watermarked photo evidence, merged responsible value, and hub-based Google Sheets views.
+
+Export checks:
+
+- Create a record for responsible `25845 TUI`.
+- Capture at least one photo with GPS allowed.
+- Export ZIP.
+- Open `workbook.xlsx` and confirm the Records sheet has exactly 15 headers.
+- Confirm responsible appears in one column as `25845 TUI`.
+- Confirm there are no separate photo timestamp/GPS columns.
+- Confirm photo cells point to watermarked photo filenames.
+- Open `manifest.json` and confirm full photo metadata still exists.
+
+Watermark checks:
+
+- Confirm preview image shows date/time, GPS, barcode, hub, responsible, and photo slot.
+- Deny GPS and retake a photo.
+- Confirm the watermark shows GPS unavailable text and no fake coordinates.
+
+Google Sheets checks:
+
+- Deploy the updated Apps Script.
+- Submit/sync a record.
+- Confirm `Records_All` receives the simplified row.
+- Confirm a hub-specific sheet is created or updated.
+- Retry pending sync and confirm the same record is updated, not duplicated.
+
 ## RESET-005
 
 Goal: verify the final one-system app with Employee Frontline default, PIN-protected Backoffice, Android APK, Web/PWA support, responsive layout, and app icons.
@@ -61,7 +90,7 @@ Configured sync checks:
 - Enter the Web App URL and shared secret in Settings.
 - Tap Test connection and confirm success.
 - Submit a Frontline record with photos.
-- Confirm `Records` and `Photos` rows appear in Google Sheets.
+- Confirm `Records_All`, the hub-specific sheet, and `Photos` rows appear in Google Sheets.
 - Confirm Drive folder `HubChecklist Photos/<date>/<vehicleBarcode>/` contains uploaded image files when payload size permits.
 
 Failure/retry checks:

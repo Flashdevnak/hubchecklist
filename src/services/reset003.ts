@@ -143,8 +143,7 @@ export const DEFAULT_STAFF: ResponsibleStaff = {
 export const EXPORT_HEADERS = [
   'วันที่',
   'ฮับ',
-  'รหัสผู้รับผิดชอบ',
-  'ชื่อผู้รับผิดชอบ',
+  'ผู้รับผิดชอบ',
   'บาร์โค้ดรถ',
   'พ่วงดรอปหรือไม่',
   'จำนวนดรอป',
@@ -154,18 +153,8 @@ export const EXPORT_HEADERS = [
   'รูปหลังรถพ่วงที่ 1',
   'รูปหลังรถพ่วงที่ 2',
   'รูปหลังรถพ่วงเพิ่มเติม',
-  'เวลาถ่ายรูปหลังรถ',
-  'GPS รูปหลังรถ',
-  'เวลาถ่ายรูปหน้าดรอป',
-  'GPS รูปหน้าดรอป',
-  'เวลาถ่ายรูปพ่วงที่ 1',
-  'GPS รูปพ่วงที่ 1',
-  'เวลาถ่ายรูปพ่วงที่ 2',
-  'GPS รูปพ่วงที่ 2',
   'รายการรูปที่ขาด',
-  'ยืนยันส่งทั้งที่รูปไม่ครบหรือไม่',
   'เวลาส่งข้อมูล',
-  'สถานะซิงก์',
   'หมายเหตุ',
 ];
 
@@ -427,6 +416,9 @@ export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResul
       gpsLng: slot.gpsLng,
       gpsAccuracy: slot.gpsAccuracy,
       gpsStatus: slot.gpsStatus,
+      watermarkText: slot.watermarkText,
+      hub: `${record.hubCode}-${record.hubName}`,
+      responsible: responsibleText(record),
       imageLocalData: slot.imageLocalData,
     })),
   };
@@ -490,7 +482,7 @@ export async function capturePhotoForSlot(record: ProofRecord, slotId: string, f
     ...item,
     captured: true,
     imageLocalData,
-    fileName: safeFileName(`${record.date}_${record.vehicleBarcode}_${item.slotId}.jpg`),
+    fileName: buildPhotoFileName(record, item),
     capturedAt,
     displayTimestamp: formatDateTime(capturedAt),
     gpsLat: location.lat,
@@ -516,7 +508,10 @@ export async function generateExportZip(records = listRecords()): Promise<Blob> 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Records');
   sheet.addRow(EXPORT_HEADERS);
-  records.forEach((record) => sheet.addRow(buildExportRow(record)));
+  records.forEach((record) => {
+    const row = sheet.addRow(buildExportRow(record));
+    applyPhotoHyperlinks(row, record);
+  });
   sheet.getRow(1).font = { bold: true };
   sheet.columns.forEach((column) => {
     column.width = 22;
@@ -528,13 +523,45 @@ export async function generateExportZip(records = listRecords()): Promise<Blob> 
   records.forEach((record) => {
     record.photoSlots.forEach((slot) => {
       if (!slot.imageLocalData) return;
-      zip.file(`photos/${safeFileName(record.date)}/${safeFileName(record.vehicleBarcode)}/${safeFileName(slot.fileName ?? `${slot.slotId}.jpg`)}`, dataUrlToUint8Array(slot.imageLocalData));
+      zip.file(photoZipPath(record, slot), dataUrlToUint8Array(slot.imageLocalData));
     });
   });
   zip.file('manifest.json', JSON.stringify({
     exportedAt: new Date().toISOString(),
     recordCount: records.length,
     photoCount: records.flatMap((record) => record.photoSlots).filter((slot) => slot.imageLocalData).length,
+    records: records.map((record) => ({
+      id: record.id,
+      date: record.date,
+      hubCode: record.hubCode,
+      hubName: record.hubName,
+      responsible: responsibleText(record),
+      vehicleBarcode: record.vehicleBarcode,
+      hasDropTransfer: record.hasDropTransfer,
+      dropCount: record.dropCount,
+      status: record.status,
+      submittedAt: record.submittedAt,
+      syncStatus: record.syncStatus ?? 'LOCAL_ONLY',
+      missingPhotoWarnings: record.missingPhotoWarnings,
+      photos: record.photoSlots.map((slot) => ({
+        slotId: slot.slotId,
+        slotType: slot.slotType,
+        slotLabel: slot.labelThai,
+        required: slot.required,
+        captured: slot.captured,
+        fileName: slot.fileName,
+        capturedAt: slot.capturedAt,
+        gpsLat: slot.gpsLat,
+        gpsLng: slot.gpsLng,
+        gpsAccuracy: slot.gpsAccuracy,
+        gpsStatus: slot.gpsStatus,
+        locationPermissionStatus: slot.locationPermissionStatus,
+        watermarkText: slot.watermarkText,
+        vehicleBarcode: record.vehicleBarcode,
+        hub: `${record.hubCode}-${record.hubName}`,
+        responsible: responsibleText(record),
+      })),
+    })),
   }, null, 2));
   return zip.generateAsync({ type: 'blob' });
 }
@@ -572,8 +599,7 @@ function buildExportRow(record: ProofRecord): string[] {
   return [
     record.date,
     `${record.hubCode}-${record.hubName}`,
-    record.responsibleEmployeeCode,
-    record.responsibleName,
+    responsibleText(record),
     record.vehicleBarcode,
     record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
     String(record.dropCount),
@@ -583,18 +609,8 @@ function buildExportRow(record: ProofRecord): string[] {
     photoExportValue(drop1),
     photoExportValue(drop2),
     extras.map(photoExportValue).join('\n') || 'ยังไม่ได้ถ่าย',
-    rearMain?.displayTimestamp ?? '',
-    gpsText(rearMain),
-    frontDrop?.displayTimestamp ?? '',
-    gpsText(frontDrop),
-    drop1?.displayTimestamp ?? '',
-    gpsText(drop1),
-    drop2?.displayTimestamp ?? '',
-    gpsText(drop2),
     record.missingPhotoWarnings.join(', '),
-    record.missingPhotoConfirmed ? 'ยืนยันแล้ว' : '',
     record.submittedAt ? formatDateTime(record.submittedAt) : '',
-    record.syncStatus ?? 'LOCAL_ONLY',
     record.notes ?? '',
   ];
 }
@@ -608,12 +624,58 @@ function photoExportValue(slot?: ProofPhotoSlot): string {
   return slot.fileName ?? slot.labelThai;
 }
 
+function applyPhotoHyperlinks(row: ExcelJS.Row, record: ProofRecord): void {
+  const rearMain = findSlot(record, 'REAR_MAIN');
+  const frontDrop = findSlot(record, 'FRONT_DROP');
+  const drop1 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_1');
+  const drop2 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_2');
+  const extras = record.photoSlots.filter((slot) => slot.slotType === 'DROP_REAR_EXTRA' && slot.captured);
+  setPhotoHyperlink(row, 8, record, rearMain);
+  setPhotoHyperlink(row, 9, record, frontDrop);
+  setPhotoHyperlink(row, 10, record, drop1);
+  setPhotoHyperlink(row, 11, record, drop2);
+  setPhotoHyperlink(row, 12, record, extras[0]);
+}
+
+function setPhotoHyperlink(row: ExcelJS.Row, columnNumber: number, record: ProofRecord, slot?: ProofPhotoSlot): void {
+  if (!slot?.captured || !slot.imageLocalData) return;
+  const currentValue = row.getCell(columnNumber).value;
+  const text = typeof currentValue === 'string' && currentValue ? currentValue : (slot.fileName ?? slot.labelThai);
+  row.getCell(columnNumber).value = {
+    text,
+    hyperlink: photoZipPath(record, slot),
+  };
+}
+
+function photoZipPath(record: ProofRecord, slot: ProofPhotoSlot): string {
+  return `photos/${safeFileName(record.date)}/${safeFileName(record.vehicleBarcode)}/${safeFileName(slot.fileName ?? `${slot.slotId}.jpg`)}`;
+}
+
 function gpsText(slot?: ProofPhotoSlot): string {
   if (!slot) return '';
   if (typeof slot.gpsLat === 'number' && typeof slot.gpsLng === 'number') {
     return `${slot.gpsLat.toFixed(6)}, ${slot.gpsLng.toFixed(6)} (${Math.round(slot.gpsAccuracy ?? 0)}m)`;
   }
   return slot.gpsStatus === 'granted' ? '' : 'ไม่พบ GPS / ไม่ได้รับอนุญาตตำแหน่ง';
+}
+
+function responsibleText(record: ProofRecord): string {
+  return `${record.responsibleEmployeeCode} ${record.responsibleName}`.trim();
+}
+
+function buildPhotoFileName(record: ProofRecord, slot: ProofPhotoSlot): string {
+  return safeFileName(`${record.date}_${record.vehicleBarcode}_${photoFileKey(record, slot)}.jpg`);
+}
+
+function photoFileKey(record: ProofRecord, slot: ProofPhotoSlot): string {
+  if (slot.slotType === 'REAR_MAIN') return 'rear_main';
+  if (slot.slotType === 'FRONT_DROP') return 'front_drop';
+  if (slot.slotType === 'DROP_REAR_1') return 'drop_rear_1';
+  if (slot.slotType === 'DROP_REAR_2') return 'drop_rear_2';
+  const sameTypeIndex = record.photoSlots
+    .filter((item) => item.slotType === 'DROP_REAR_EXTRA')
+    .findIndex((item) => item.slotId === slot.slotId);
+  return `drop_rear_${Math.max(3, sameTypeIndex + 3)}`;
 }
 
 async function requestLocation(): Promise<{ status: GpsStatus; lat?: number; lng?: number; accuracy?: number }> {
@@ -632,11 +694,18 @@ async function requestLocation(): Promise<{ status: GpsStatus; lat?: number; lng
   });
 }
 
-function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: string, location: { status: GpsStatus; lat?: number; lng?: number }): string {
+function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: string, location: { status: GpsStatus; lat?: number; lng?: number; accuracy?: number }): string {
   const gps = typeof location.lat === 'number' && typeof location.lng === 'number'
-    ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`
-    : 'ไม่พบ GPS / ไม่ได้รับอนุญาตตำแหน่ง';
-  return `${formatDateTime(capturedAt)} | ${gps} | ${record.vehicleBarcode} | ${labelThai}`;
+    ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
+    : 'ไม่พบตำแหน่ง / ไม่ได้รับอนุญาต';
+  return [
+    `วันที่: ${formatDateTime(capturedAt)}`,
+    `GPS: ${gps}`,
+    `บาร์รถ: ${record.vehicleBarcode}`,
+    `ฮับ: ${record.hubCode}-${record.hubName}`,
+    `ผู้รับผิดชอบ: ${responsibleText(record)}`,
+    `รูป: ${labelThai}`,
+  ].join('\n');
 }
 
 function renderWatermarkedImage(file: File, watermarkText: string): Promise<string> {
@@ -655,11 +724,20 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       if (watermarkText) {
+        const fontSize = Math.max(18, Math.round(canvas.width / 48));
+        const lineHeight = Math.round(fontSize * 1.35);
+        const padding = Math.max(14, Math.round(canvas.width / 80));
+        context.font = `${fontSize}px sans-serif`;
+        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, canvas.width - padding * 2));
+        const maxLines = Math.max(4, Math.floor((canvas.height * 0.45 - padding * 2) / lineHeight));
+        const lines = wrappedLines.length > maxLines ? [...wrappedLines.slice(0, maxLines - 1), `${wrappedLines[maxLines - 1].slice(0, 80)}...`] : wrappedLines;
+        const stripHeight = Math.min(canvas.height * 0.45, Math.max(96, lines.length * lineHeight + padding * 2));
         context.fillStyle = 'rgba(0, 0, 0, 0.62)';
-        context.fillRect(0, canvas.height - 72, canvas.width, 72);
-        context.fillStyle = '#ffffff';
-        context.font = `${Math.max(18, Math.round(canvas.width / 48))}px sans-serif`;
-        context.fillText(watermarkText.slice(0, 120), 18, canvas.height - 28);
+        context.fillRect(0, canvas.height - stripHeight, canvas.width, stripHeight);
+        lines.forEach((line, index) => {
+          context.fillStyle = index === 0 ? '#ffe044' : '#ffffff';
+          context.fillText(line, padding, canvas.height - stripHeight + padding + lineHeight * (index + 0.75));
+        });
       }
       resolve(canvas.toDataURL('image/jpeg', 0.78));
       URL.revokeObjectURL(image.src);
@@ -667,6 +745,23 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
     image.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
     image.src = URL.createObjectURL(file);
   });
+}
+
+function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  words.forEach((word) => {
+    const testLine = line ? `${line} ${word}` : word;
+    if (context.measureText(testLine).width <= maxWidth) {
+      line = testLine;
+      return;
+    }
+    if (line) lines.push(line);
+    line = word;
+  });
+  if (line) lines.push(line);
+  return lines.length ? lines : [text];
 }
 
 function dataUrlToUint8Array(dataUrl: string): Uint8Array {

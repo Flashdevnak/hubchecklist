@@ -2,6 +2,16 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-005A Export / Watermark Flow
+
+1. Capture a photo with GPS allowed and confirm the preview has a readable watermark.
+2. Retake with GPS denied and confirm the watermark says GPS is unavailable.
+3. Export ZIP and confirm `workbook.xlsx` has the simplified 15 columns.
+4. Confirm responsible appears as one value such as `25845 TUI`.
+5. Confirm photo timestamp/GPS are not separate Excel columns.
+6. Confirm `manifest.json` still has full photo metadata.
+7. Sync to Google Sheets and confirm `Records_All` plus the hub-specific sheet update.
+
 ## RESET-005 Admin Lock And Device Flow
 
 1. Open app and confirm Employee Frontline is shown first.
@@ -21,7 +31,7 @@ Use this checklist during web, PWA, and Android device testing. Record pass/fail
 3. Enter Google Apps Script Web App URL and `APP_SHARED_SECRET`.
 4. Tap Test connection.
 5. Submit a Frontline record while sync is configured.
-6. Confirm `Records` row appears in Google Sheets.
+6. Confirm `Records_All` and the hub-specific sheet update in Google Sheets.
 7. Capture photos and confirm `Photos` metadata appears.
 8. Confirm Google Drive file URLs appear when base64 upload succeeds.
 9. Force a wrong token or offline state.

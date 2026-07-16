@@ -4,7 +4,9 @@ This folder contains the free central storage bridge for RESET-004.
 
 Storage stack:
 
-- Google Sheets stores records, photo metadata, hubs, responsible staff, and audit rows.
+- Google Sheets stores simplified records, photo metadata, hubs, responsible staff, and audit rows.
+- `Records_All` is the source of truth.
+- A hub-specific sheet is created/updated automatically for each hub as a user-friendly view.
 - Google Drive stores base64 photo files when the app sends `imageLocalData`.
 - The app remains local-first. If this web app is not configured or sync fails, records stay in localStorage and move to the pending sync queue.
 
@@ -52,6 +54,18 @@ Supported actions:
 - `getRecords`
 - `appendAudit`
 - `healthCheck`
+
+## RESET-005A Layout
+
+Records use the simplified 15-column layout documented in `SHEET_SCHEMA.md`.
+
+Responsible staff is shown as one value, for example:
+
+```text
+25845 TUI
+```
+
+Photo columns contain the Drive URL or file name when available. Date/time/GPS are visible on the photo watermark and remain stored in `Photos` metadata.
 
 ## Security Notes
 

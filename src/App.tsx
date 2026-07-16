@@ -476,10 +476,12 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
               <strong>{slot.labelThai}</strong>
               <StatusPill tone={slot.captured ? 'success' : 'warning'} text={slot.captured ? 'ถ่ายแล้ว' : 'ยังไม่ได้ถ่าย'} />
             </div>
+            {slot.captured ? <StatusPill tone={slot.gpsStatus === 'granted' ? 'success' : 'warning'} text={slot.gpsStatus === 'granted' ? 'GPS พร้อม' : 'GPS ไม่พบ'} /> : null}
             {slot.imageLocalData ? <img src={slot.imageLocalData} alt={slot.labelThai} /> : <div className="photo-placeholder">ยังไม่ได้ถ่าย</div>}
             <div className="photo-meta">
               <span>เวลา: {slot.displayTimestamp ?? '-'}</span>
               <span>GPS: {slot.gpsLat && slot.gpsLng ? `${slot.gpsLat.toFixed(6)}, ${slot.gpsLng.toFixed(6)}` : 'ไม่พบ GPS / ไม่ได้รับอนุญาตตำแหน่ง'}</span>
+              {slot.captured ? <span>ลายน้ำวันที่/เวลา/GPS อยู่บนรูปแล้ว</span> : null}
               {slot.gpsStatus !== 'granted' && slot.captured ? <b>GPS ไม่พบ</b> : null}
             </div>
             <label className="capture-button">
@@ -685,7 +687,8 @@ function AdminPhotos({ records }: { records: ProofRecord[] }) {
               <div key={slot.slotId}>
                 {slot.imageLocalData ? <img src={slot.imageLocalData} alt={slot.labelThai} /> : <div className="photo-placeholder small">ยังไม่ได้ถ่าย</div>}
                 <span>{slot.labelThai}</span>
-                <small>{slot.displayTimestamp ?? '-'} / {slot.gpsStatus}</small>
+                <small>{slot.displayTimestamp ?? '-'} / {slot.gpsStatus === 'granted' ? 'GPS พร้อม' : 'GPS ไม่พบ'}</small>
+                <small>{slot.watermarkText ?? 'ยังไม่มี metadata ลายน้ำ'}</small>
               </div>
             ))}
           </div>
@@ -708,6 +711,7 @@ function ExportPanel({ records }: { records: ProofRecord[] }) {
     <section className="admin-stack">
       <h1>Export</h1>
       <p>Export เฉพาะหลังบ้าน: workbook.xlsx, photos/, manifest.json</p>
+      <p>วันที่ เวลา และ GPS อยู่บนลายน้ำในรูปภาพแล้ว Excel จึงใช้คอลัมน์แบบสั้น</p>
       <button className="primary-action" onClick={exportZip} type="button"><Download size={18} /> Export ZIP</button>
       {message ? <p className="simple-message">{message}</p> : null}
     </section>
@@ -804,6 +808,7 @@ function SettingsPanel({ onLock, onReload }: { onLock: () => void; onReload: () 
           <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'warning' : 'success'} text={settings.googleSyncMode === 'google_sheets' ? 'Google Sheets sync' : 'Local only'} />
           <span>Pending sync queue: {pendingSyncCount}</span>
         </div>
+        <p>ระบบจะบันทึกลง Records_All และแยกชีทตามฮับให้อัตโนมัติ</p>
         <div className="admin-form">
           <button className="secondary-action" onClick={testConnection} type="button"><RefreshCcw size={18} /> Test connection</button>
           <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> Retry sync</button>

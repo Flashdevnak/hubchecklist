@@ -51,3 +51,4 @@ dist/
 - Manual barcode input is always available.
 - Photo capture uses `accept="image/*"` and `capture="environment"` where the browser supports it.
 - Google Sheets sync remains optional and local-first.
+- Export remains browser-based: ZIP contains simplified `workbook.xlsx`, watermarked photos, and full metadata in `manifest.json`.

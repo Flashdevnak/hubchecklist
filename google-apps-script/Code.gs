@@ -1,30 +1,35 @@
 const SHEETS = {
-  RECORDS: 'Records',
+  RECORDS_ALL: 'Records_All',
   PHOTOS: 'Photos',
   HUBS: 'Hubs',
   RESPONSIBLE_STAFF: 'ResponsibleStaff',
   AUDIT: 'Audit',
+  SETTINGS: 'Settings',
+  EXPORT_LOGS: 'ExportLogs',
 };
 
+const MISSING_PHOTO_TEXT = 'ยังไม่ได้ถ่าย';
+
+const SIMPLE_RECORD_HEADERS = [
+  'วันที่',
+  'ฮับ',
+  'ผู้รับผิดชอบ',
+  'บาร์โค้ดรถ',
+  'พ่วงดรอปหรือไม่',
+  'จำนวนดรอป',
+  'สถานะ',
+  'รูปหลังรถ',
+  'รูปหน้าดรอป',
+  'รูปหลังรถพ่วงที่ 1',
+  'รูปหลังรถพ่วงที่ 2',
+  'รูปหลังรถพ่วงเพิ่มเติม',
+  'รายการรูปที่ขาด',
+  'เวลาส่งข้อมูล',
+  'หมายเหตุ',
+];
+
 const HEADERS = {
-  Records: [
-    'id',
-    'date',
-    'hubCode',
-    'hubName',
-    'responsibleEmployeeCode',
-    'responsibleName',
-    'vehicleBarcode',
-    'hasDropTransfer',
-    'dropCount',
-    'status',
-    'missingPhotoWarnings',
-    'missingPhotoConfirmed',
-    'submittedAt',
-    'createdAt',
-    'updatedAt',
-    'notes',
-  ],
+  Records_All: SIMPLE_RECORD_HEADERS.concat(['recordId', 'syncStatus', 'updatedAt']),
   Photos: [
     'id',
     'recordId',
@@ -39,6 +44,9 @@ const HEADERS = {
     'gpsLng',
     'gpsAccuracy',
     'gpsStatus',
+    'watermarkText',
+    'hub',
+    'responsible',
     'driveFileId',
     'driveUrl',
     'localOnly',
@@ -47,6 +55,8 @@ const HEADERS = {
   Hubs: ['hubCode', 'hubName', 'active', 'updatedAt'],
   ResponsibleStaff: ['employeeCode', 'displayName', 'hubCode', 'active', 'updatedAt'],
   Audit: ['id', 'recordId', 'action', 'detail', 'actor', 'createdAt'],
+  Settings: ['key', 'value', 'updatedAt'],
+  ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
 };
 
 function doPost(e) {
@@ -57,18 +67,18 @@ function doPost(e) {
 
     switch (request.action) {
       case 'healthCheck':
-        return json_({ ok: true, app: 'hubchecklist', checkedAt: new Date().toISOString() });
+        return json_({ ok: true, app: 'hubchecklist', storage: 'Records_All + hub sheets', checkedAt: new Date().toISOString() });
       case 'createRecord':
       case 'syncRecord':
         return json_({ ok: true, result: syncRecord_(request.payload.record, request.payload.photoMetadata || []) });
       case 'uploadPhotoMetadata':
-        return json_({ ok: true, result: appendPhoto_(request.payload) });
+        return json_({ ok: true, result: upsertPhoto_(request.payload) });
       case 'getHubs':
         return json_({ ok: true, hubs: readRows_(SHEETS.HUBS) });
       case 'getResponsibleStaff':
         return json_({ ok: true, responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF) });
       case 'getRecords':
-        return json_({ ok: true, records: readRows_(SHEETS.RECORDS) });
+        return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
       case 'appendAudit':
         return json_({ ok: true, result: appendAudit_(request.payload) });
       default:
@@ -92,79 +102,119 @@ function validateToken_(token) {
 
 function ensureSheets_() {
   Object.keys(HEADERS).forEach(function (sheetName) {
-    const sheet = getOrCreateSheet_(sheetName);
-    const headers = HEADERS[sheetName];
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers);
-      return;
-    }
-    const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-    if (firstRow.join('|') !== headers.join('|')) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    }
+    ensureHeaders_(getOrCreateSheet_(sheetName), HEADERS[sheetName]);
   });
+}
+
+function ensureHeaders_(sheet, headers) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    return;
+  }
+  const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  if (firstRow.join('|') !== headers.join('|')) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
 }
 
 function syncRecord_(record, photoMetadata) {
   if (!record || !record.id) throw new Error('Missing record.id');
-  const recordResult = upsertRecord_(record);
   const photoResults = (photoMetadata || []).map(function (photo) {
-    return appendPhoto_(photo);
+    return upsertPhoto_(photo);
   });
+  const row = buildSimpleRecordRow_(record, photoResults);
+  const masterResult = upsertRecordAll_(record, row);
+  const hubResult = upsertHubSheet_(record, row);
   appendAudit_({
     id: Utilities.getUuid(),
     recordId: record.id,
     action: 'google_sync_record',
-    detail: 'Record synced from HubChecklist app',
+    detail: 'Record synced to Records_All and hub sheet',
     actor: record.responsibleEmployeeCode || 'app',
     createdAt: new Date().toISOString(),
   });
-  return { record: recordResult, photos: photoResults };
+  return { record: masterResult, hubSheet: hubResult, photos: photoResults };
 }
 
-function upsertRecord_(record) {
-  const sheet = getOrCreateSheet_(SHEETS.RECORDS);
-  const headers = HEADERS.Records;
-  const row = headers.map(function (key) {
-    return valueForRecord_(record, key);
+function buildSimpleRecordRow_(record, photoResults) {
+  const photoMap = {};
+  (photoResults || []).forEach(function (photo) {
+    photoMap[photo.slotType] = photo;
   });
-  const rowIndex = findRowByValue_(sheet, 1, record.id);
+  const extras = (photoResults || []).filter(function (photo) {
+    return photo.slotType === 'DROP_REAR_EXTRA';
+  });
+  return [
+    record.date || '',
+    hubText_(record),
+    responsibleText_(record),
+    record.vehicleBarcode || '',
+    record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
+    record.dropCount || 0,
+    record.status || '',
+    photoCell_(photoMap.REAR_MAIN),
+    photoCell_(photoMap.FRONT_DROP),
+    photoCell_(photoMap.DROP_REAR_1),
+    photoCell_(photoMap.DROP_REAR_2),
+    extras.map(photoCell_).filter(Boolean).join('\n') || MISSING_PHOTO_TEXT,
+    (record.missingPhotoWarnings || []).join(', '),
+    record.submittedAt || '',
+    record.notes || '',
+  ];
+}
+
+function upsertRecordAll_(record, simpleRow) {
+  const sheet = getOrCreateSheet_(SHEETS.RECORDS_ALL);
+  ensureHeaders_(sheet, HEADERS.Records_All);
+  const row = simpleRow.concat([record.id, record.syncStatus || '', record.updatedAt || '']);
+  const rowIndex = findRowByValue_(sheet, SIMPLE_RECORD_HEADERS.length + 1, record.id);
   if (rowIndex > 0) {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-    return { id: record.id, action: 'updated' };
+    return { id: record.id, action: 'updated', sheet: SHEETS.RECORDS_ALL };
   }
   sheet.appendRow(row);
-  return { id: record.id, action: 'created' };
+  return { id: record.id, action: 'created', sheet: SHEETS.RECORDS_ALL };
 }
 
-function appendPhoto_(photo) {
+function upsertHubSheet_(record, simpleRow) {
+  const sheetName = hubSheetName_(record);
+  const sheet = getOrCreateSheet_(sheetName);
+  ensureHeaders_(sheet, SIMPLE_RECORD_HEADERS);
+  const rowIndex = findRowByRecordNote_(sheet, record.id);
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, simpleRow.length).setValues([simpleRow]);
+    sheet.getRange(rowIndex, 1).setNote(record.id);
+    return { id: record.id, action: 'updated', sheet: sheetName };
+  }
+  sheet.appendRow(simpleRow);
+  const newRow = sheet.getLastRow();
+  sheet.getRange(newRow, 1).setNote(record.id);
+  return { id: record.id, action: 'created', sheet: sheetName };
+}
+
+function upsertPhoto_(photo) {
   if (!photo || !photo.recordId || !photo.slotId) throw new Error('Missing photo recordId or slotId');
-  const uploaded = uploadPhotoIfPresent_(photo);
   const sheet = getOrCreateSheet_(SHEETS.PHOTOS);
-  const row = HEADERS.Photos.map(function (key) {
-    return valueForPhoto_(photo, uploaded, key);
-  });
-  sheet.appendRow(row);
-  return { id: row[0], driveFileId: uploaded.fileId, driveUrl: uploaded.url, localOnly: uploaded.localOnly };
+  ensureHeaders_(sheet, HEADERS.Photos);
+  const rowIndex = findPhotoRow_(sheet, photo.recordId, photo.slotId);
+  const existing = rowIndex > 0 ? readRowObject_(sheet, rowIndex) : null;
+  const uploaded = uploadPhotoIfPresent_(photo, existing);
+  const values = photoValues_(photo, uploaded, existing);
+  const row = HEADERS.Photos.map(function (key) { return values[key] || ''; });
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  return values;
 }
 
-function appendAudit_(entry) {
-  const sheet = getOrCreateSheet_(SHEETS.AUDIT);
-  const next = {
-    id: entry.id || Utilities.getUuid(),
-    recordId: entry.recordId || '',
-    action: entry.action || '',
-    detail: entry.detail || '',
-    actor: entry.actor || '',
-    createdAt: entry.createdAt || new Date().toISOString(),
-  };
-  sheet.appendRow(HEADERS.Audit.map(function (key) { return next[key]; }));
-  return next;
-}
-
-function uploadPhotoIfPresent_(photo) {
+function uploadPhotoIfPresent_(photo, existing) {
+  if (existing && existing.capturedAt === photo.capturedAt && existing.driveUrl) {
+    return { fileId: existing.driveFileId || '', url: existing.driveUrl || '', localOnly: existing.localOnly === true };
+  }
   if (!photo.imageLocalData || photo.captured !== true) {
-    return { fileId: '', url: '', localOnly: true };
+    return { fileId: existing ? existing.driveFileId || '' : '', url: existing ? existing.driveUrl || '' : '', localOnly: true };
   }
   const match = String(photo.imageLocalData).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!match) return { fileId: '', url: '', localOnly: true };
@@ -174,6 +224,36 @@ function uploadPhotoIfPresent_(photo) {
   const folder = getPhotoFolder_(photo);
   const file = folder.createFile(blob);
   return { fileId: file.getId(), url: file.getUrl(), localOnly: false };
+}
+
+function photoValues_(photo, uploaded, existing) {
+  return {
+    id: existing && existing.id ? existing.id : Utilities.getUuid(),
+    recordId: photo.recordId || '',
+    vehicleBarcode: photo.vehicleBarcode || '',
+    slotId: photo.slotId || '',
+    slotType: photo.slotType || '',
+    labelThai: photo.labelThai || '',
+    captured: photo.captured === true,
+    fileName: photo.fileName || '',
+    capturedAt: photo.capturedAt || '',
+    gpsLat: photo.gpsLat || '',
+    gpsLng: photo.gpsLng || '',
+    gpsAccuracy: photo.gpsAccuracy || '',
+    gpsStatus: photo.gpsStatus || '',
+    watermarkText: photo.watermarkText || '',
+    hub: photo.hub || '',
+    responsible: photo.responsible || '',
+    driveFileId: uploaded.fileId || '',
+    driveUrl: uploaded.url || '',
+    localOnly: uploaded.localOnly === true,
+    createdAt: existing && existing.createdAt ? existing.createdAt : new Date().toISOString(),
+  };
+}
+
+function photoCell_(photo) {
+  if (!photo || photo.captured !== true) return MISSING_PHOTO_TEXT;
+  return photo.driveUrl || photo.fileName || MISSING_PHOTO_TEXT;
 }
 
 function getPhotoFolder_(photo) {
@@ -187,6 +267,21 @@ function getOrCreateFolder_(parent, name) {
   const folders = parent.getFoldersByName(name);
   if (folders.hasNext()) return folders.next();
   return parent.createFolder(name);
+}
+
+function appendAudit_(entry) {
+  const sheet = getOrCreateSheet_(SHEETS.AUDIT);
+  ensureHeaders_(sheet, HEADERS.Audit);
+  const next = {
+    id: entry.id || Utilities.getUuid(),
+    recordId: entry.recordId || '',
+    action: entry.action || '',
+    detail: entry.detail || '',
+    actor: entry.actor || '',
+    createdAt: entry.createdAt || new Date().toISOString(),
+  };
+  sheet.appendRow(HEADERS.Audit.map(function (key) { return next[key]; }));
+  return next;
 }
 
 function readRows_(sheetName) {
@@ -205,33 +300,14 @@ function readRows_(sheetName) {
   });
 }
 
-function valueForRecord_(record, key) {
-  if (key === 'missingPhotoWarnings') return (record.missingPhotoWarnings || []).join(', ');
-  if (key === 'hasDropTransfer' || key === 'missingPhotoConfirmed') return record[key] === true;
-  return record[key] || '';
-}
-
-function valueForPhoto_(photo, uploaded, key) {
-  const values = {
-    id: Utilities.getUuid(),
-    recordId: photo.recordId || '',
-    vehicleBarcode: photo.vehicleBarcode || '',
-    slotId: photo.slotId || '',
-    slotType: photo.slotType || '',
-    labelThai: photo.labelThai || '',
-    captured: photo.captured === true,
-    fileName: photo.fileName || '',
-    capturedAt: photo.capturedAt || '',
-    gpsLat: photo.gpsLat || '',
-    gpsLng: photo.gpsLng || '',
-    gpsAccuracy: photo.gpsAccuracy || '',
-    gpsStatus: photo.gpsStatus || '',
-    driveFileId: uploaded.fileId || '',
-    driveUrl: uploaded.url || '',
-    localOnly: uploaded.localOnly === true,
-    createdAt: new Date().toISOString(),
-  };
-  return values[key] || '';
+function readRowObject_(sheet, rowIndex) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  const item = {};
+  headers.forEach(function (header, index) {
+    item[header] = values[index];
+  });
+  return item;
 }
 
 function findRowByValue_(sheet, columnIndex, value) {
@@ -242,6 +318,40 @@ function findRowByValue_(sheet, columnIndex, value) {
     if (String(values[index][0]) === String(value)) return index + 2;
   }
   return -1;
+}
+
+function findPhotoRow_(sheet, recordId, slotId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const values = sheet.getRange(2, 2, lastRow - 1, 3).getValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (String(values[index][0]) === String(recordId) && String(values[index][2]) === String(slotId)) return index + 2;
+  }
+  return -1;
+}
+
+function findRowByRecordNote_(sheet, recordId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const notes = sheet.getRange(2, 1, lastRow - 1, 1).getNotes();
+  for (let index = 0; index < notes.length; index += 1) {
+    if (String(notes[index][0]) === String(recordId)) return index + 2;
+  }
+  return -1;
+}
+
+function hubText_(record) {
+  return `${record.hubCode || ''}-${record.hubName || ''}`.replace(/-$/, '');
+}
+
+function responsibleText_(record) {
+  return `${record.responsibleEmployeeCode || ''} ${record.responsibleName || ''}`.trim();
+}
+
+function hubSheetName_(record) {
+  const base = hubText_(record) || 'Unknown Hub';
+  const sanitized = base.replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim();
+  return sanitized.slice(0, 90) || 'Unknown Hub';
 }
 
 function getOrCreateSheet_(name) {

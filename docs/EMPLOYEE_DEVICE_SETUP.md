@@ -33,6 +33,7 @@ android/app/build/outputs/apk/debug/app-debug.apk
 - If scan is unavailable, use manual input.
 - If GPS is unavailable, the app shows a warning and never creates fake coordinates.
 - Submitted records save locally first and sync later when configured.
+- Photo preview/export uses the watermarked image so date/time/GPS evidence is visible on the photo itself.
 
 ## Supported Screen Targets
 

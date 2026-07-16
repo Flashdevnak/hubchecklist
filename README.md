@@ -11,7 +11,7 @@ RESET-004 adds optional **free central storage** with Google Sheets + Google App
 
 - Backoffice Settings now has Google Apps Script Web App URL, local shared secret, sync mode, Test connection, pending queue count, and Retry sync.
 - Frontline still saves locally first. If Google sync is configured and fails, the record remains local and is queued with `บันทึกในเครื่องแล้ว รอซิงก์`.
-- Apps Script files live in `google-apps-script/` and create `Records`, `Photos`, `Hubs`, `ResponsibleStaff`, and `Audit` sheets.
+- Apps Script files live in `google-apps-script/` and create `Records_All`, hub-specific sheets, `Photos`, `Hubs`, `ResponsibleStaff`, and `Audit` sheets.
 - Base64 photo upload to Google Drive is implemented as best-effort and can be limited by Apps Script/Drive quotas.
 
 RESET-005 finalizes one deployable system:
@@ -21,6 +21,14 @@ RESET-005 finalizes one deployable system:
 - Google Sheets URL/token/settings are visible only after Backoffice unlock.
 - Android APK, Web/PWA, iPhone/iPad Safari, tablet, and desktop browser paths share the same codebase.
 - PWA and Android launcher icons use the new original Hub Photo Proof icon.
+
+RESET-005A simplifies reporting:
+
+- Excel export now uses 15 simple columns.
+- Responsible code/name are merged into one column such as `25845 TUI`.
+- Photo timestamp/GPS are visible on the photo watermark instead of split across many Excel columns.
+- `manifest.json` still keeps full photo metadata.
+- Google Sheets writes to `Records_All` and also updates a hub-specific sheet for easier viewing.
 
 Frontline no longer exposes OCR proof-paper parsing, Flash WebView technical flow, Supabase/R2 warnings, placeholder cards, or debug data. OCR/Flash code may remain in the repository for previous compatibility, but it is not part of the RESET-003 Frontline workflow.
 

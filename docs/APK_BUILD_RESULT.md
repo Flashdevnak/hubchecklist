@@ -1,5 +1,47 @@
 # APK Build Result
 
+## RESET-005A Result
+
+RESET-005A simplifies export columns and updates photo watermark/export/Google Sheets behavior. The APK path remains:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Required verification remains:
+
+```powershell
+npm.cmd install
+npx.cmd tsc -b
+npm.cmd run build
+npx.cmd cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Fresh RESET-005A verification on 2026-07-16:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 4s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+PWA result:
+
+```text
+dist/ generated for Web/PWA
+```
+
 ## RESET-005 Result
 
 RESET-005 adds Admin PIN protection, Web/PWA icon assets, Android launcher icon assets, responsive hardening, and Android location permissions for GPS metadata.

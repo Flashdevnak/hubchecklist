@@ -1,5 +1,20 @@
 # QA Checklist
 
+## RESET-005A Required Checks
+
+- [x] Excel export uses simplified 15 columns
+- [x] Responsible is exported as one value, for example `25845 TUI`
+- [x] Separate Excel photo timestamp/GPS columns are removed
+- [x] Photo watermark includes date/time, GPS/permission state, barcode, hub, responsible, and slot label
+- [x] GPS unavailable watermark shows a warning and does not fake coordinates
+- [x] ZIP photos use the watermarked image data
+- [x] `manifest.json` includes full photo metadata
+- [x] Apps Script writes to `Records_All`
+- [x] Apps Script creates/updates hub-specific sheets
+- [x] Apps Script sync retry updates existing rows by record id
+- [x] Frontline still hides Google sync settings
+- [ ] Live Google Sheets deployment with real Drive upload remains pending
+
 ## RESET-005 Required Checks
 
 - [x] One codebase supports Android APK and Web/PWA
