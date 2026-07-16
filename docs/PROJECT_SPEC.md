@@ -1,5 +1,32 @@
 # Project Specification
 
+## RESET-006-007-FINAL-PLUS Central Backend and Flow Hardening
+
+Status: implemented in code and ready for build verification.
+
+The app remains one APK and one Web/PWA. Google Sheets + Apps Script is the central free backend. Firebase, Supabase, R2, and paid storage are not used for this reset.
+
+Central configuration:
+
+- `VITE_APPS_SCRIPT_WEB_APP_URL` is the build-time central backend URL.
+- `VITE_APP_CLIENT_MODE=central` documents central mode.
+- Frontline never shows backend URL/token fields.
+- Bootstrap fetches central settings, hubs, responsible staff, admin auth status, and minimum version, then caches for offline use.
+
+Central Backoffice authorization:
+
+- Backoffice requires an approved AdminDevices row and a valid central Admin PIN.
+- Unapproved devices can request approval and copy Device ID.
+- Employees cannot approve themselves.
+
+Flow/UI hardening:
+
+- Frontline opens by default and uses only Today, Scan, Photo, and My Work.
+- Scan view is full-screen oriented with a large live camera area.
+- Trailer-drop requires rear main vehicle photo plus trailer rear photos.
+- Missing required photos can only submit as NEED_REVIEW after a clear warning.
+- Watermark uses accurate Bangkok capture date/time and a larger rounded overlay.
+
 ## RESET-005B Employee Device Admin PIN Protection
 
 RESET-005B changes first PIN setup so employees cannot create their own Backoffice PIN on a fresh install.

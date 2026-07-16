@@ -2,6 +2,15 @@
 
 iPhone and iPad users use the Web/PWA version. They do not install the Android APK.
 
+## RESET-006-007-FINAL-PLUS PWA Behavior
+
+- iPhone users open the same Web/PWA app.
+- Frontline uses central bootstrap data when `VITE_APPS_SCRIPT_WEB_APP_URL` is configured.
+- Staff do not enter backend URL/token values.
+- Browser/PWA mode keeps local-first save and pending sync fallback.
+- Full-screen scan depends on Safari camera/barcode support; manual barcode entry remains available.
+- Photo capture uses the iOS file/camera picker and writes the same timestamp/GPS watermark when permission is available.
+
 ## Add To Home Screen
 
 1. Open the provided HTTPS app URL in Safari.

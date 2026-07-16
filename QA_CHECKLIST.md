@@ -1,5 +1,23 @@
 # QA Checklist
 
+## RESET-006-007-FINAL-PLUS Required Checks
+
+- [x] `doGet` exists so Apps Script `/exec` opens with a health response
+- [x] App reads central backend URL from `VITE_APPS_SCRIPT_WEB_APP_URL`
+- [x] Missing backend URL shows Thai contact-admin message
+- [x] Frontline does not expose backend URL/token fields
+- [x] Bootstrap fetches/caches hubs, responsible staff, settings, and admin auth status
+- [x] Backoffice requires central approved device and central Admin PIN
+- [x] Unapproved devices cannot enter Backoffice and can show/copy Device ID
+- [x] AdminDevices sheet/action draft supports request, list, approve, revoke
+- [x] Full-screen scan uses large mobile camera viewport
+- [x] Trailer-drop requires rear main vehicle photo plus trailer photos
+- [x] Missing required photos trigger NEED_REVIEW confirmation
+- [x] Watermark uses larger rounded overlay with no black strip
+- [x] Bangkok date/time formatting is used for locked date, capture metadata, and watermark
+- [x] Mobile scan/photo/admin layouts avoid horizontal overflow
+- [ ] Live Apps Script deployment and physical-device Flash flow remain pending
+
 ## RESET-005B Required Checks
 
 - [x] Fresh install does not expose normal first-time Admin PIN setup

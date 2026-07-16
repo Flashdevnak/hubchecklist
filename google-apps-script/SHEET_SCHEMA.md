@@ -2,6 +2,35 @@
 
 RESET-005A creates a simplified user-facing spreadsheet layout.
 
+## RESET-006-007-FINAL-PLUS Additions
+
+`doGet` returns a JSON health response for browser `/exec` checks.
+
+New central bootstrap/admin actions:
+
+- `bootstrap`
+- `getAppSettings`
+- `requestAdminAccess`
+- `verifyAdminAccess`
+- `listAdminDevices`
+- `approveAdminDevice`
+- `revokeAdminDevice`
+- `getAdminAuthStatus`
+
+New sheet: `AdminDevices`
+
+| Column | Purpose |
+| --- | --- |
+| deviceId | App-generated local device id |
+| deviceName | Human-readable device name |
+| ownerName | Admin/user requesting access |
+| role | OWNER, ADMIN, VIEWER |
+| status | PENDING, APPROVED, REVOKED |
+| approvedAt | Approval timestamp |
+| revokedAt | Revocation timestamp |
+| lastLoginAt | Last successful central admin login |
+| note | Admin notes |
+
 ## Source Of Truth
 
 `Records_All` is the master record sheet. Hub-specific sheets are views/copies for easier daily viewing.

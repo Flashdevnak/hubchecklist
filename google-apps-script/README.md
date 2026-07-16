@@ -2,6 +2,13 @@
 
 This folder contains the free central storage bridge for RESET-004.
 
+## RESET-006-007-FINAL-PLUS
+
+- `doGet` returns a small JSON health response for `/exec` browser checks.
+- `bootstrap` returns server time, settings, hubs, responsible staff, admin auth enabled, and minimum app version.
+- `AdminDevices` supports central Backoffice authorization with request/list/approve/revoke actions.
+- `ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` are Settings keys for central Admin PIN verification.
+
 Storage stack:
 
 - Google Sheets stores simplified records, photo metadata, hubs, responsible staff, and audit rows.

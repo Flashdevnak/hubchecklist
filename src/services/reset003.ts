@@ -8,6 +8,8 @@ export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2
 export type GoogleSyncMode = 'local_only' | 'google_sheets';
 export type GoogleSyncAction = 'createRecord' | 'uploadPhotoMetadata' | 'syncRecord' | 'appendAudit';
 export type RecordSyncStatus = 'LOCAL_ONLY' | 'PENDING_SYNC' | 'SYNCED' | 'SYNC_FAILED';
+export type AdminDeviceStatus = 'PENDING' | 'APPROVED' | 'REVOKED';
+export type AdminDeviceRole = 'OWNER' | 'ADMIN' | 'VIEWER';
 
 export interface Hub {
   hubCode: string;
@@ -86,6 +88,30 @@ export interface AppSettings {
   googleSharedSecret: string;
 }
 
+export interface AdminDevice {
+  deviceId: string;
+  deviceName: string;
+  ownerName: string;
+  role: AdminDeviceRole;
+  status: AdminDeviceStatus;
+  approvedAt?: string;
+  revokedAt?: string;
+  lastLoginAt?: string;
+  note?: string;
+}
+
+export interface BootstrapCache {
+  ok: boolean;
+  serverTime?: string;
+  appSettings?: Partial<AppSettings> & Record<string, unknown>;
+  hubs: Hub[];
+  responsibleStaff: ResponsibleStaff[];
+  adminAuthEnabled: boolean;
+  minimumAppVersion?: string;
+  cachedAt: string;
+  source: 'online' | 'cache' | 'local';
+}
+
 export interface SyncQueueItem {
   id: string;
   action: GoogleSyncAction;
@@ -119,6 +145,12 @@ const SETTINGS_KEY = 'reset003.settings';
 const SYNC_QUEUE_KEY = 'reset003.googleSyncQueue';
 const ADMIN_PIN_KEY = 'reset003.adminPin';
 const EMPLOYEE_DEVICE_MODE_KEY = 'reset003.employeeDeviceMode';
+const DEVICE_ID_KEY = 'reset003.deviceId';
+const BOOTSTRAP_CACHE_KEY = 'reset003.bootstrapCache';
+const ADMIN_SESSION_KEY = 'reset003.adminSession';
+const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
+const CENTRAL_BACKEND_URL = (import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL as string | undefined)?.trim() ?? '';
+const CENTRAL_CLIENT_MODE = (import.meta.env.VITE_APP_CLIENT_MODE as string | undefined)?.trim() ?? '';
 
 const DEFAULT_SETTINGS: AppSettings = {
   gpsMandatory: false,
@@ -191,11 +223,53 @@ export function saveActiveContext(context: ActiveWorkContext): void {
 }
 
 export function getSettings(): AppSettings {
-  return { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(SETTINGS_KEY, {}) };
+  const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {});
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    googleSyncMode: CENTRAL_BACKEND_URL ? 'google_sheets' : (saved.googleSyncMode ?? DEFAULT_SETTINGS.googleSyncMode),
+    googleAppsScriptUrl: CENTRAL_BACKEND_URL || saved.googleAppsScriptUrl || '',
+  };
 }
 
 export function saveSettings(settings: AppSettings): void {
-  writeJson(SETTINGS_KEY, settings);
+  writeJson(SETTINGS_KEY, {
+    ...settings,
+    googleAppsScriptUrl: CENTRAL_BACKEND_URL || settings.googleAppsScriptUrl,
+  });
+}
+
+export function getCentralBackendUrl(): string {
+  return CENTRAL_BACKEND_URL;
+}
+
+export function isCentralClientMode(): boolean {
+  return CENTRAL_CLIENT_MODE === 'central' || Boolean(CENTRAL_BACKEND_URL);
+}
+
+export function getCentralBackendStatus(): 'configured' | 'missing' {
+  return CENTRAL_BACKEND_URL ? 'configured' : 'missing';
+}
+
+export function getDeviceId(): string {
+  const current = window.localStorage.getItem(DEVICE_ID_KEY);
+  if (current) return current;
+  const next = createId();
+  window.localStorage.setItem(DEVICE_ID_KEY, next);
+  return next;
+}
+
+export function getCachedBootstrap(): BootstrapCache | null {
+  return readJson<BootstrapCache | null>(BOOTSTRAP_CACHE_KEY, null);
+}
+
+export function hasAuthorizedAdminSession(): boolean {
+  const session = readJson<{ deviceId: string; role: AdminDeviceRole; expiresAt: string } | null>(ADMIN_SESSION_KEY, null);
+  return Boolean(session && session.deviceId === getDeviceId() && new Date(session.expiresAt).getTime() > Date.now());
+}
+
+export function clearAdminSession(): void {
+  window.localStorage.removeItem(ADMIN_SESSION_KEY);
 }
 
 export function hasAdminPin(): boolean {
@@ -271,15 +345,29 @@ export function addAudit(entry: Omit<AuditEntry, 'id' | 'createdAt'>): void {
 }
 
 export function getLocalDateString(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BANGKOK_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${pick('year')}-${pick('month')}-${pick('day')}`;
 }
 
 export function formatDateTime(iso?: string): string {
   if (!iso) return '-';
-  return new Date(iso).toLocaleString('th-TH', { hour12: false });
+  return new Date(iso).toLocaleString('th-TH', { timeZone: BANGKOK_TIME_ZONE, hour12: false });
+}
+
+export function formatDatePart(iso?: string): string {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: BANGKOK_TIME_ZONE });
+}
+
+export function formatTimePart(iso?: string): string {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleTimeString('th-TH', { timeZone: BANGKOK_TIME_ZONE, hour12: false });
 }
 
 export function normalizeVehicleBarcode(input: string): string {
@@ -291,20 +379,25 @@ export function normalizeVehicleBarcode(input: string): string {
 export function createPhotoSlots(hasDropTransfer: boolean, dropCount: number): ProofPhotoSlot[] {
   if (!hasDropTransfer) {
     return [
-      createSlot('REAR_MAIN', 'รูปหลังรถ'),
-      createSlot('FRONT_DROP', 'รูปหน้าดรอป'),
+      createSlot('REAR_MAIN', 'รูปหลังรถ พร้อม time stamp + GPS watermark'),
+      createSlot('FRONT_DROP', 'รูปหน้าดรอป พร้อม time stamp + GPS watermark'),
     ];
   }
 
-  return Array.from({ length: Math.max(2, dropCount) }, (_, index) => createSlot(
+  const trailerSlots = Array.from({ length: Math.max(2, dropCount) }, (_, index) => createSlot(
     index < 2 ? (`DROP_REAR_${index + 1}` as SlotType) : 'DROP_REAR_EXTRA',
-    `รูปหลังรถพ่วงที่ ${index + 1}`,
+    `รูปหลังรถพ่วงที่ ${index + 1} พร้อม time stamp + GPS watermark`,
   ));
+  return [
+    createSlot('REAR_MAIN', 'รูปหลังรถหลัก พร้อม time stamp + GPS watermark'),
+    ...trailerSlots,
+  ];
 }
 
 export function updatePhotoSlotsForDropCount(record: ProofRecord, dropCount: number): ProofRecord {
   const nextSlots = createPhotoSlots(true, dropCount).map((slot) => {
-    const existing = record.photoSlots.find((item) => item.labelThai === slot.labelThai || item.slotId === slot.slotId);
+    const existing = record.photoSlots.find((item) => item.slotType === slot.slotType && item.labelThai === slot.labelThai)
+      ?? record.photoSlots.find((item) => item.slotType === slot.slotType && item.slotType !== 'DROP_REAR_EXTRA');
     return existing ?? slot;
   });
   return {
@@ -405,6 +498,105 @@ export async function testGoogleConnection(): Promise<SyncResult> {
   }
 }
 
+export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
+  ensureSeedData();
+  if (!CENTRAL_BACKEND_URL) {
+    const local: BootstrapCache = {
+      ok: false,
+      hubs: listHubs(),
+      responsibleStaff: listResponsibleStaff(),
+      adminAuthEnabled: false,
+      cachedAt: new Date().toISOString(),
+      source: 'local',
+    };
+    writeJson(BOOTSTRAP_CACHE_KEY, local);
+    return local;
+  }
+
+  try {
+    const data = await callAppsScript('bootstrap', {
+      deviceId: getDeviceId(),
+      appVersion: '0.1.0',
+    }, { allowWithoutSecret: true }) as Partial<BootstrapCache>;
+    const hubs = normalizeHubs(data.hubs);
+    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
+    if (hubs.length > 0) saveHubs(hubs);
+    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
+    const cache: BootstrapCache = {
+      ok: data.ok !== false,
+      serverTime: data.serverTime,
+      appSettings: data.appSettings,
+      hubs: hubs.length > 0 ? hubs : listHubs(),
+      responsibleStaff: responsibleStaff.length > 0 ? responsibleStaff : listResponsibleStaff(),
+      adminAuthEnabled: data.adminAuthEnabled !== false,
+      minimumAppVersion: data.minimumAppVersion,
+      cachedAt: new Date().toISOString(),
+      source: 'online',
+    };
+    writeJson(BOOTSTRAP_CACHE_KEY, cache);
+    return cache;
+  } catch {
+    const cached = getCachedBootstrap();
+    if (cached) return { ...cached, source: 'cache' };
+    return {
+      ok: false,
+      hubs: listHubs(),
+      responsibleStaff: listResponsibleStaff(),
+      adminAuthEnabled: true,
+      cachedAt: new Date().toISOString(),
+      source: 'local',
+    };
+  }
+}
+
+export async function requestAdminAccess(deviceName: string, ownerName: string): Promise<{ ok: boolean; message: string; device?: AdminDevice }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  try {
+    const data = await callAppsScript('requestAdminAccess', {
+      deviceId: getDeviceId(),
+      deviceName,
+      ownerName,
+    }, { allowWithoutSecret: true }) as { ok?: boolean; device?: AdminDevice; message?: string };
+    return { ok: data.ok !== false, message: data.message || 'ส่งคำขออนุมัติแล้ว', device: data.device };
+  } catch {
+    return { ok: false, message: 'ส่งคำขอไม่สำเร็จ กรุณาติดต่อผู้ดูแล' };
+  }
+}
+
+export async function verifyCentralAdminAccess(pin: string): Promise<{ ok: boolean; message: string; role?: AdminDeviceRole; device?: AdminDevice }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  try {
+    const data = await callAppsScript('verifyAdminAccess', {
+      deviceId: getDeviceId(),
+      pin,
+    }, { allowWithoutSecret: true }) as { ok?: boolean; message?: string; role?: AdminDeviceRole; device?: AdminDevice };
+    if (data.ok && (data.role === 'OWNER' || data.role === 'ADMIN')) {
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+      writeJson(ADMIN_SESSION_KEY, { deviceId: getDeviceId(), role: data.role, expiresAt });
+      return { ok: true, message: data.message || 'อนุมัติหลังบ้านแล้ว', role: data.role, device: data.device };
+    }
+    return { ok: false, message: data.message || 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล', role: data.role, device: data.device };
+  } catch {
+    if (hasAuthorizedAdminSession() && verifyAdminPin(pin)) {
+      return { ok: true, message: 'ออฟไลน์: ใช้ session ผู้ดูแลเดิมบนเครื่องนี้', role: 'ADMIN' };
+    }
+    return { ok: false, message: 'ตรวจสอบสิทธิ์หลังบ้านไม่สำเร็จ กรุณาติดต่อผู้ดูแล' };
+  }
+}
+
+export async function listAdminDevices(pin: string): Promise<AdminDevice[]> {
+  const data = await callAppsScript('listAdminDevices', { deviceId: getDeviceId(), pin }, { allowWithoutSecret: true }) as { devices?: AdminDevice[] };
+  return data.devices ?? [];
+}
+
+export async function approveAdminDevice(targetDeviceId: string, role: AdminDeviceRole, pin: string): Promise<unknown> {
+  return callAppsScript('approveAdminDevice', { deviceId: getDeviceId(), targetDeviceId, role, pin }, { allowWithoutSecret: true });
+}
+
+export async function revokeAdminDevice(targetDeviceId: string, pin: string): Promise<unknown> {
+  return callAppsScript('revokeAdminDevice', { deviceId: getDeviceId(), targetDeviceId, pin }, { allowWithoutSecret: true });
+}
+
 export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResult> {
   const settings = getSettings();
   if (!isGoogleSyncConfigured(settings)) {
@@ -447,7 +639,7 @@ export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResul
     return {
       ok: false,
       queued: true,
-      message: 'บันทึกในเครื่องแล้ว รอซิงก์',
+      message: 'บันทึกแล้ว ระบบจะซิงก์ให้อัตโนมัติเมื่อออนไลน์',
     };
   }
 }
@@ -711,14 +903,15 @@ async function requestLocation(): Promise<{ status: GpsStatus; lat?: number; lng
 function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: string, location: { status: GpsStatus; lat?: number; lng?: number; accuracy?: number }): string {
   const gps = typeof location.lat === 'number' && typeof location.lng === 'number'
     ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
-    : 'ไม่พบตำแหน่ง / ไม่ได้รับอนุญาต';
+    : 'GPS unavailable';
   return [
-    `วันที่: ${formatDateTime(capturedAt)}`,
+    `วันที่: ${formatDatePart(capturedAt)}`,
+    `เวลา: ${formatTimePart(capturedAt)}`,
     `GPS: ${gps}`,
-    `บาร์รถ: ${record.vehicleBarcode}`,
+    `Barcode: ${record.vehicleBarcode}`,
     `ฮับ: ${record.hubCode}-${record.hubName}`,
-    `ผู้รับผิดชอบ: ${responsibleText(record)}`,
-    `รูป: ${labelThai}`,
+    `Responsible: ${responsibleText(record)}`,
+    `Photo: ${labelThai}`,
   ].join('\n');
 }
 
@@ -738,19 +931,23 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       if (watermarkText) {
-        const fontSize = Math.max(18, Math.round(canvas.width / 48));
-        const lineHeight = Math.round(fontSize * 1.35);
-        const padding = Math.max(14, Math.round(canvas.width / 80));
-        context.font = `${fontSize}px sans-serif`;
-        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, canvas.width - padding * 2));
-        const maxLines = Math.max(4, Math.floor((canvas.height * 0.45 - padding * 2) / lineHeight));
+        const fontSize = Math.max(24, Math.round(canvas.width / 38));
+        const lineHeight = Math.round(fontSize * 1.32);
+        const padding = Math.max(18, Math.round(canvas.width / 60));
+        const boxWidth = Math.min(canvas.width - padding * 2, Math.max(canvas.width * 0.62, 620));
+        context.font = `700 ${fontSize}px "Segoe UI", sans-serif`;
+        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, boxWidth - padding * 2));
+        const maxLines = Math.max(5, Math.floor((canvas.height * 0.42 - padding * 2) / lineHeight));
         const lines = wrappedLines.length > maxLines ? [...wrappedLines.slice(0, maxLines - 1), `${wrappedLines[maxLines - 1].slice(0, 80)}...`] : wrappedLines;
-        const stripHeight = Math.min(canvas.height * 0.45, Math.max(96, lines.length * lineHeight + padding * 2));
-        context.fillStyle = 'rgba(0, 0, 0, 0.62)';
-        context.fillRect(0, canvas.height - stripHeight, canvas.width, stripHeight);
+        const boxHeight = Math.min(canvas.height * 0.42, Math.max(132, lines.length * lineHeight + padding * 2));
+        const x = padding;
+        const y = canvas.height - boxHeight - padding;
+        drawRoundedRect(context, x, y, boxWidth, boxHeight, Math.max(18, padding * 0.8));
+        context.fillStyle = 'rgba(11, 31, 51, 0.78)';
+        context.fill();
         lines.forEach((line, index) => {
           context.fillStyle = index === 0 ? '#ffe044' : '#ffffff';
-          context.fillText(line, padding, canvas.height - stripHeight + padding + lineHeight * (index + 0.75));
+          context.fillText(line, x + padding, y + padding + lineHeight * (index + 0.75));
         });
       }
       resolve(canvas.toDataURL('image/jpeg', 0.78));
@@ -759,6 +956,17 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
     image.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
     image.src = URL.createObjectURL(file);
   });
+}
+
+function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.arcTo(x + width, y, x + width, y + height, safeRadius);
+  context.arcTo(x + width, y + height, x, y + height, safeRadius);
+  context.arcTo(x, y + height, x, y, safeRadius);
+  context.arcTo(x, y, x + width, y, safeRadius);
+  context.closePath();
 }
 
 function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -805,6 +1013,7 @@ function writeJson<T>(key: string, value: T): void {
 }
 
 function isGoogleSyncConfigured(settings = getSettings()): boolean {
+  if (CENTRAL_BACKEND_URL && settings.googleSyncMode === 'google_sheets') return true;
   return settings.googleSyncMode === 'google_sheets'
     && settings.googleAppsScriptUrl.trim().length > 0
     && settings.googleSharedSecret.trim().length > 0;
@@ -826,20 +1035,42 @@ function saveSyncQueue(queue: SyncQueueItem[]): void {
   writeJson(SYNC_QUEUE_KEY, queue);
 }
 
-async function callAppsScript(action: 'healthCheck' | GoogleSyncAction | 'getHubs' | 'getResponsibleStaff' | 'getRecords', payload: unknown): Promise<unknown> {
+function normalizeHubs(raw: unknown): Hub[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => item as Partial<Hub> & Record<string, unknown>).filter((item) => item.hubCode || item.HubCode).map((item) => ({
+    hubCode: String(item.hubCode ?? item.HubCode ?? ''),
+    hubName: String(item.hubName ?? item.HubName ?? ''),
+    active: item.active === undefined ? true : item.active === true || String(item.active).toLowerCase() === 'true',
+  })).filter((hub) => hub.hubCode);
+}
+
+function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => item as Partial<ResponsibleStaff> & Record<string, unknown>).filter((item) => item.employeeCode || item.EmployeeCode).map((item) => ({
+    employeeCode: String(item.employeeCode ?? item.EmployeeCode ?? ''),
+    displayName: String(item.displayName ?? item.DisplayName ?? ''),
+    hubCode: String(item.hubCode ?? item.HubCode ?? ''),
+    active: item.active === undefined ? true : item.active === true || String(item.active).toLowerCase() === 'true',
+  })).filter((staff) => staff.employeeCode && staff.hubCode);
+}
+
+type AppsScriptAction = 'bootstrap' | 'healthCheck' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'requestAdminAccess' | 'verifyAdminAccess' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
+
+async function callAppsScript(action: AppsScriptAction, payload: unknown, options: { allowWithoutSecret?: boolean } = {}): Promise<unknown> {
   const settings = getSettings();
-  if (!isGoogleSyncConfigured(settings)) {
+  const url = CENTRAL_BACKEND_URL || settings.googleAppsScriptUrl.trim();
+  if (!url || (!options.allowWithoutSecret && !isGoogleSyncConfigured(settings))) {
     throw new Error('ยังไม่ได้ตั้งค่า Google Apps Script URL หรือ shared secret');
   }
 
-  const response = await fetch(settings.googleAppsScriptUrl.trim(), {
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({
       action,
-      token: settings.googleSharedSecret,
+      token: settings.googleSharedSecret || undefined,
       payload,
-      client: 'hubchecklist-reset004',
+      client: 'hubchecklist-reset006-007-plus',
       sentAt: new Date().toISOString(),
     }),
   });

@@ -1,5 +1,17 @@
 # Real Device Test Result
 
+## RESET-006-007-FINAL-PLUS Pending Real Device Checks
+
+- [ ] Samsung S23 FE: full-screen scan fills the viewport and reads barcode/QR
+- [ ] Samsung S23 FE: trailer-drop requires rear main vehicle photo plus trailer photos
+- [ ] Samsung S23 FE: watermark is readable with no black strip
+- [ ] Galaxy Tab A7 Lite: scan/photo pages fit without horizontal overflow
+- [ ] iPad browser fallback: Frontline hides backend URL/token fields
+- [ ] Desktop browser: Backoffice central auth blocks unapproved devices
+- [ ] Apps Script `/exec`: browser GET returns health response
+- [ ] Live Apps Script deployment: bootstrap returns hubs/responsible/settings/admin auth
+- [ ] Flash live automation remains pending until physical Android device test
+
 ## RESET-005B Status
 
 RESET-005B build readiness is implemented, but physical device validation remains pending.

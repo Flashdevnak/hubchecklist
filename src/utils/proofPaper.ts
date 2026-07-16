@@ -94,13 +94,13 @@ export function parseProofPaperText(rawText: string): ProofPaperParseResult {
     };
   }
 
-  if (!result.vehicleBarcode) result.warnings.push('à¸¢à¸±à¸‡à¸­à¹ˆà¸²à¸™à¸šà¸²à¸£à¹Œà¸£à¸–à¹„à¸¡à¹ˆà¹„à¸”à¹‰');
+  if (!result.vehicleBarcode) result.warnings.push('ยังอ่านบาร์รถไม่ได้');
   if (!result.driverPhone) result.warnings.push('ยังอ่านเบอร์คนขับไม่ได้');
   if (result.driverPhoneConfidence === 'low' || result.phoneCandidates.length > 1) {
     result.warnings.push('กรุณาตรวจสอบเบอร์คนขับ');
   }
-  if (!result.routeSummary) result.warnings.push('à¸¢à¸±à¸‡à¸­à¹ˆà¸²à¸™à¹€à¸ªà¹‰à¸™à¸—à¸²à¸‡à¹„à¸¡à¹ˆà¹„à¸”à¹‰');
-  if (lines.length > 0) result.warnings.push('OCR à¸—à¸”à¸¥à¸­à¸‡ à¸à¸£à¸¸à¸“à¸²à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¹ˆà¸­à¸™à¸šà¸±à¸™à¸—à¸¶à¸');
+  if (!result.routeSummary) result.warnings.push('ยังอ่านเส้นทางไม่ได้');
+  if (lines.length > 0) result.warnings.push('OCR ทดลอง กรุณาตรวจสอบข้อมูลก่อนบันทึก');
   return result;
 }
 

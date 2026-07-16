@@ -3,13 +3,17 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ActiveWorkContext,
+  type AdminDevice,
   type AppMode,
   type Hub,
   type ProofPhotoSlot,
   type ProofRecord,
   type ResponsibleStaff,
   addAudit,
+  approveAdminDevice,
+  bootstrapCentralConfig,
   capturePhotoForSlot,
+  clearAdminSession,
   createDraftRecord,
   DEFAULT_HUB,
   DEFAULT_STAFF,
@@ -17,6 +21,9 @@ import {
   ensureSeedData,
   generateExportZip,
   getActiveContext,
+  getCentralBackendStatus,
+  getCentralBackendUrl,
+  getDeviceId,
   getLocalDateString,
   getMissingPhotoSlots,
   getRecordById,
@@ -25,12 +32,15 @@ import {
   changeAdminPin,
   hasAdminPin,
   isEmployeeDeviceMode,
+  listAdminDevices,
   listAudit,
   listHubs,
   listRecords,
   listResponsibleStaff,
   normalizeVehicleBarcode,
+  requestAdminAccess,
   retryPendingSync,
+  revokeAdminDevice,
   saveActiveContext,
   saveHubs,
   saveRecords,
@@ -40,6 +50,7 @@ import {
   setEmployeeDeviceMode,
   submitRecordWithGoogleSync,
   testGoogleConnection,
+  verifyCentralAdminAccess,
   verifyAdminPin,
   resetLocalTestData,
   updatePhotoSlotsForDropCount,
@@ -47,7 +58,7 @@ import {
 } from './services/reset003';
 
 type FrontlineStep = 'home' | 'scan' | 'photos' | 'done' | 'my-work';
-type AdminStep = 'dashboard' | 'hubs' | 'staff' | 'records' | 'photos' | 'export' | 'backup' | 'settings' | 'audit';
+type AdminStep = 'dashboard' | 'hubs' | 'staff' | 'records' | 'photos' | 'export' | 'backup' | 'settings' | 'audit' | 'admin-devices';
 
 type BarcodeDetectorShape = new (options?: { formats?: string[] }) => {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
@@ -56,8 +67,9 @@ type BarcodeDetectorShape = new (options?: { formats?: string[] }) => {
 export default function App() {
   const [mode, setMode] = useState<AppMode>('frontline');
   const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'notice' | 'setup-token' | null>(null);
+  const [adminPinPanel, setAdminPinPanel] = useState<'unlock' | 'central-unlock' | 'backend-missing' | 'notice' | 'setup-token' | null>(null);
   const [employeeMode, setEmployeeMode] = useState(isEmployeeDeviceMode());
+  const [bootstrapMessage, setBootstrapMessage] = useState('กำลังเชื่อมต่อ Backend กลาง');
   const [frontlineStep, setFrontlineStep] = useState<FrontlineStep>('home');
   const [adminStep, setAdminStep] = useState<AdminStep>('dashboard');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -66,11 +78,31 @@ export default function App() {
 
   useEffect(() => {
     ensureSeedData();
-    setRefreshKey((value) => value + 1);
+    bootstrapCentralConfig().then((result) => {
+      if (getCentralBackendStatus() === 'missing') {
+        setBootstrapMessage('ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ');
+      } else if (result.source === 'online') {
+        setBootstrapMessage('เชื่อมต่อ Backend กลางแล้ว');
+      } else {
+        setBootstrapMessage('ออฟไลน์: ใช้ข้อมูลล่าสุดในเครื่อง');
+      }
+      setRefreshKey((value) => value + 1);
+    }).catch(() => {
+      setBootstrapMessage('ออฟไลน์: ใช้ข้อมูลล่าสุดในเครื่อง');
+      setRefreshKey((value) => value + 1);
+    });
   }, []);
 
   const openBackoffice = () => {
     if (employeeMode) return;
+    if (getCentralBackendStatus() === 'missing') {
+      setAdminPinPanel('backend-missing');
+      return;
+    }
+    if (getCentralBackendUrl()) {
+      setAdminPinPanel('central-unlock');
+      return;
+    }
     setAdminPinPanel(hasAdminPin() ? 'unlock' : 'notice');
   };
 
@@ -101,6 +133,7 @@ export default function App() {
   };
 
   const lockBackoffice = () => {
+    clearAdminSession();
     setAdminUnlocked(false);
     setMode('frontline');
     setAdminPinPanel(null);
@@ -139,6 +172,7 @@ export default function App() {
         {mode === 'frontline' || !adminUnlocked ? (
           <FrontlineApp
             activeRecord={activeRecord}
+            bootstrapMessage={bootstrapMessage}
             onOpenRecord={(recordId) => {
               setActiveRecordId(recordId);
               setFrontlineStep('photos');
@@ -168,7 +202,7 @@ export default function App() {
         <nav className="reset-bottom-nav">
           <NavButton active={frontlineStep === 'home'} icon={<Home size={20} />} label="วันนี้" onClick={() => setFrontlineStep('home')} />
           <NavButton active={frontlineStep === 'scan'} icon={<QrCode size={20} />} label="สแกน" onClick={() => setFrontlineStep('scan')} />
-          <NavButton active={frontlineStep === 'photos'} icon={<Camera size={20} />} label="รูป/งานค้าง" onClick={() => setFrontlineStep('photos')} />
+          <NavButton active={frontlineStep === 'photos'} icon={<Camera size={20} />} label="รูป" onClick={() => setFrontlineStep('photos')} />
           <NavButton active={frontlineStep === 'my-work'} icon={<ClipboardList size={20} />} label="งานของฉัน" onClick={() => setFrontlineStep('my-work')} />
         </nav>
       ) : null}
@@ -176,15 +210,30 @@ export default function App() {
   );
 }
 
-function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'notice' | 'setup-token'; onCancel: () => void; onSuccess: () => void }) {
+function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'central-unlock' | 'backend-missing' | 'notice' | 'setup-token'; onCancel: () => void; onSuccess: () => void }) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [setupToken, setSetupToken] = useState('');
+  const [deviceName, setDeviceName] = useState(window.navigator.userAgent.slice(0, 60));
+  const [ownerName, setOwnerName] = useState('');
   const [message, setMessage] = useState('');
   const isSetup = mode === 'setup-token';
   const isNotice = mode === 'notice';
+  const isCentral = mode === 'central-unlock';
+  const isBackendMissing = mode === 'backend-missing';
 
-  const submit = () => {
+  const submit = async () => {
+    if (isBackendMissing) return;
+    if (isCentral) {
+      const result = await verifyCentralAdminAccess(pin);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setMessage(result.message);
+      onSuccess();
+      return;
+    }
     if (isSetup) {
       if (!verifyAdminSetupToken(setupToken)) {
         setMessage('โทเคนตั้งค่าผู้ดูแลไม่ถูกต้อง');
@@ -212,12 +261,30 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'notice
     onSuccess();
   };
 
+  const requestAccess = async () => {
+    const result = await requestAdminAccess(deviceName, ownerName);
+    setMessage(result.message);
+  };
+
+  const copyDeviceId = async () => {
+    await navigator.clipboard?.writeText(getDeviceId());
+    setMessage('คัดลอก Device ID แล้ว');
+  };
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <article className="pin-panel">
-        <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice ? 'หลังบ้านถูกล็อก' : 'ใส่ PIN แอดมิน'}</h2>
-        <p>{isNotice ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' : 'การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร'}</p>
-        {isNotice ? null : (
+        <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice || isBackendMissing ? 'หลังบ้านถูกล็อก' : isCentral ? 'ยืนยันสิทธิ์หลังบ้าน' : 'ใส่ PIN แอดมิน'}</h2>
+        <p>
+          {isBackendMissing
+            ? 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ'
+            : isNotice
+              ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล'
+              : isCentral
+                ? 'เครื่องนี้ต้องได้รับอนุมัติจากส่วนกลาง และต้องยืนยัน PIN หลังบ้านจาก Google Sheets'
+                : 'การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร'}
+        </p>
+        {isNotice || isBackendMissing ? null : (
           <>
             {isSetup ? (
               <label>
@@ -225,8 +292,15 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'notice
                 <input autoFocus type="password" value={setupToken} onChange={(event) => setSetupToken(event.target.value)} />
               </label>
             ) : null}
+            {isCentral ? (
+              <div className="device-id-box">
+                <span>Device ID</span>
+                <code>{getDeviceId()}</code>
+                <button className="secondary-action" onClick={copyDeviceId} type="button">คัดลอก Device ID</button>
+              </div>
+            ) : null}
             <label>
-              <span>Admin PIN</span>
+              <span>{isCentral ? 'Central Admin PIN' : 'Admin PIN'}</span>
               <input autoFocus={!isSetup} inputMode="numeric" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
             </label>
             {isSetup ? (
@@ -235,12 +309,25 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'notice
                 <input inputMode="numeric" type="password" value={confirmPin} onChange={(event) => setConfirmPin(event.target.value)} />
               </label>
             ) : null}
+            {isCentral ? (
+              <div className="admin-form single-column">
+                <label>
+                  <span>ชื่อเครื่อง</span>
+                  <input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
+                </label>
+                <label>
+                  <span>ชื่อผู้ขอใช้งาน</span>
+                  <input value={ownerName} onChange={(event) => setOwnerName(event.target.value)} placeholder="ระบุชื่อผู้ดูแล" />
+                </label>
+                <button className="secondary-action" onClick={requestAccess} type="button">ขออนุมัติอุปกรณ์แอดมิน</button>
+              </div>
+            ) : null}
           </>
         )}
         {message ? <p className="simple-message">{message}</p> : null}
         <div className="admin-form">
           <button className="secondary-action" onClick={onCancel} type="button">ยกเลิก</button>
-          {isNotice ? null : <button className="primary-action" onClick={submit} type="button">{isSetup ? 'ตั้งค่าและเข้าหลังบ้าน' : 'เข้าหลังบ้าน'}</button>}
+          {isNotice || isBackendMissing ? null : <button className="primary-action" onClick={() => { void submit(); }} type="button">{isSetup ? 'ตั้งค่าและเข้าหลังบ้าน' : 'เข้าหลังบ้าน'}</button>}
         </div>
       </article>
     </div>
@@ -252,8 +339,9 @@ function verifyAdminSetupToken(token: string): boolean {
   return Boolean(configured && token && token === configured);
 }
 
-function FrontlineApp({ activeRecord, onOpenRecord, onReload, onStepChange, records, step }: {
+function FrontlineApp({ activeRecord, bootstrapMessage, onOpenRecord, onReload, onStepChange, records, step }: {
   activeRecord: ProofRecord | null;
+  bootstrapMessage: string;
   onOpenRecord: (recordId: string) => void;
   onReload: () => void;
   onStepChange: (step: FrontlineStep) => void;
@@ -276,10 +364,11 @@ function FrontlineApp({ activeRecord, onOpenRecord, onReload, onStepChange, reco
   if (step === 'my-work') {
     return <MyWorkScreen onOpenRecord={onOpenRecord} records={records} />;
   }
-  return <FrontlineHome onOpenRecord={onOpenRecord} onReload={onReload} onScan={() => onStepChange('scan')} records={records} />;
+  return <FrontlineHome bootstrapMessage={bootstrapMessage} onOpenRecord={onOpenRecord} onReload={onReload} onScan={() => onStepChange('scan')} records={records} />;
 }
 
-function FrontlineHome({ onOpenRecord, onReload, onScan, records }: {
+function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, records }: {
+  bootstrapMessage: string;
   onOpenRecord: (recordId: string) => void;
   onReload: () => void;
   onScan: () => void;
@@ -311,6 +400,7 @@ function FrontlineHome({ onOpenRecord, onReload, onScan, records }: {
       <article className="hero-card">
         <h1>งานวันนี้</h1>
         <p>เลือกฮับและผู้รับผิดชอบครั้งเดียว จากนั้นสแกนรถและถ่ายรูปหลักฐาน</p>
+        <p className={getCentralBackendStatus() === 'missing' ? 'simple-message' : 'backend-status'}>{bootstrapMessage}</p>
         <div className="context-card">
           <label>
             <span>ฮับ</span>
@@ -341,7 +431,7 @@ function FrontlineHome({ onOpenRecord, onReload, onScan, records }: {
       </div>
 
       <div className="frontline-actions">
-        <button className="primary-action jumbo" onClick={onScan} type="button">สแกนใบรถ</button>
+        <button className="primary-action jumbo" onClick={onScan} type="button">สแกนบาร์รถ</button>
         <button className="secondary-action jumbo" disabled={pending.length === 0} onClick={() => pending[0] && onOpenRecord(pending[0].id)} type="button">งานที่ต้องถ่ายรูป</button>
       </div>
     </section>
@@ -390,7 +480,7 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
         scanFrame();
       }
       setCameraOn(true);
-      setMessage('เปิดกล้องแล้ว วาง Barcode หรือ QR ให้อยู่ในกรอบ');
+      setMessage('สแกนให้เต็มกรอบ');
     } catch {
       setMessage('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตกล้อง หรือกรอกบาร์โค้ดรถเอง');
     }
@@ -438,12 +528,16 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
   return (
     <section className="scan-screen">
       <article className="scan-camera">
+        <div className="scan-topline">
+          <strong>สแกนบาร์รถ</strong>
+          <span>{activeHub ? `${activeHub.hubCode}` : 'เลือกฮับก่อน'}</span>
+        </div>
         <video ref={videoRef} muted playsInline />
         {!cameraOn ? (
           <div className="scan-empty">
             <QrCode size={72} />
-            <strong>สแกน Barcode / QR</strong>
-            <span>ใช้กล้องหรือกรอกบาร์โค้ดรถเอง</span>
+            <strong>สแกนบาร์รถ</strong>
+            <span>กดเปิดกล้อง แล้วสแกนให้เต็มกรอบ</span>
           </div>
         ) : null}
         <div className="scan-frame-box" />
@@ -451,7 +545,7 @@ function ScanScreen({ activeHub, activeStaff, onCreated }: {
       <div className="scan-control-panel">
         <button className="primary-action" onClick={startCamera} type="button"><Camera size={20} /> เปิดกล้องสแกน</button>
         <label>
-          <span>บาร์โค้ดรถ</span>
+          <span>กรอกเอง</span>
           <input value={barcode} onChange={(event) => setBarcode(normalizeVehicleBarcode(event.target.value))} placeholder="NAK..." />
         </label>
         <p className="locked-date">วันที่: {getLocalDateString()}</p>
@@ -491,9 +585,7 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
 
   const submit = async () => {
     if (missing.length > 0) {
-      const text = workingRecord.hasDropTransfer
-        ? `คุณยังไม่ได้ถ่าย ${missing.map((slot) => slot.labelThai).join(', ')} หากไม่มีรูปนี้ อาจไม่สามารถร้องเรียนหรือยืนยันงานได้ และพนักงานอาจถูกตรวจสอบ/ถูกลงโทษตามระเบียบ ต้องการส่งต่อหรือไม่?`
-        : 'ยังถ่ายรูปไม่ครบ หากส่งข้อมูลไม่ครบ อาจไม่สามารถใช้เป็นหลักฐานร้องเรียนได้ และอาจมีผลต่อการตรวจสอบงานของพนักงาน ยืนยันจะส่งต่อหรือไม่?';
+      const text = `คุณยังถ่ายรูปไม่ครบ หากส่งงานโดยไม่มีรูปที่จำเป็น อาจมีผลต่อการตรวจสอบงาน กรุณาตรวจสอบก่อนส่ง\n\nรูปที่ขาด: ${missing.map((slot) => slot.labelThai).join(', ')}\n\nกด OK เพื่อส่งเป็น NEED_REVIEW หรือ Cancel เพื่อกลับไปถ่ายรูป`;
       if (!window.confirm(text)) return;
     }
     setMessage('กำลังบันทึกข้อมูล');
@@ -549,7 +641,7 @@ function PhotoCaptureScreen({ record, onDone, onReload }: { record: ProofRecord 
       </div>
       {message ? <p className="simple-message">{message}</p> : null}
       <div className="sticky-submit">
-        <span>รูปครบ {workingRecord.photoSlots.length - missing.length}/{workingRecord.photoSlots.length}</span>
+        <span>{missing.length ? `ต้องถ่ายเพิ่ม ${missing.length} รูป` : `รูปครบ ${workingRecord.photoSlots.length}/${workingRecord.photoSlots.length}`}</span>
         <button className="primary-action" onClick={submit} type="button">ส่งข้อมูล</button>
       </div>
     </section>
@@ -598,6 +690,7 @@ function AdminApp({ activeRecord, onEmployeeModeChange, onLock, onOpenRecord, on
         <NavButton active={step === 'backup'} icon={<Shield size={18} />} label="Backup" onClick={() => onStepChange('backup')} />
         <NavButton active={step === 'settings'} icon={<Settings size={18} />} label="Settings" onClick={() => onStepChange('settings')} />
         <NavButton active={step === 'audit'} icon={<FileText size={18} />} label="Audit" onClick={() => onStepChange('audit')} />
+        <NavButton active={step === 'admin-devices'} icon={<Shield size={18} />} label="AdminDevices" onClick={() => onStepChange('admin-devices')} />
       </aside>
       <div className="admin-content">
         {step === 'dashboard' ? <AdminDashboard records={records} /> : null}
@@ -609,6 +702,7 @@ function AdminApp({ activeRecord, onEmployeeModeChange, onLock, onOpenRecord, on
         {step === 'backup' ? <BackupPanel /> : null}
         {step === 'settings' ? <SettingsPanel onEmployeeModeChange={onEmployeeModeChange} onLock={onLock} onReload={onReload} /> : null}
         {step === 'audit' ? <AuditPanel /> : null}
+        {step === 'admin-devices' ? <AdminDevicesPanel /> : null}
       </div>
     </section>
   );
@@ -860,25 +954,29 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
       </article>
       <article className="admin-detail-card">
         <h2>Google Sheets Sync</h2>
-        <div className="admin-form">
-          <label>
-            <span>Sync mode</span>
-            <select value={settings.googleSyncMode} onChange={(event) => setSettings({ ...settings, googleSyncMode: event.target.value === 'google_sheets' ? 'google_sheets' : 'local_only' })}>
-              <option value="local_only">Local only</option>
-              <option value="google_sheets">Google Sheets sync</option>
-            </select>
-          </label>
-          <label>
-            <span>Google Apps Script Web App URL</span>
-            <input value={settings.googleAppsScriptUrl} onChange={(event) => setSettings({ ...settings, googleAppsScriptUrl: event.target.value })} placeholder="https://script.google.com/macros/s/..." />
-          </label>
-          <label>
-            <span>APP_SHARED_SECRET</span>
-            <input type="password" value={settings.googleSharedSecret} onChange={(event) => setSettings({ ...settings, googleSharedSecret: event.target.value })} placeholder="stored locally only" />
-          </label>
-        </div>
+        {getCentralBackendUrl() ? (
+          <p>Backend กลางถูกตั้งค่าจาก environment แล้ว พนักงานและเครื่องทั่วไปไม่ต้องกรอก URL/token</p>
+        ) : (
+          <div className="admin-form">
+            <label>
+              <span>Sync mode</span>
+              <select value={settings.googleSyncMode} onChange={(event) => setSettings({ ...settings, googleSyncMode: event.target.value === 'google_sheets' ? 'google_sheets' : 'local_only' })}>
+                <option value="local_only">Local only</option>
+                <option value="google_sheets">Google Sheets sync</option>
+              </select>
+            </label>
+            <label>
+              <span>Google Apps Script Web App URL</span>
+              <input value={settings.googleAppsScriptUrl} onChange={(event) => setSettings({ ...settings, googleAppsScriptUrl: event.target.value })} placeholder="https://script.google.com/macros/s/..." />
+            </label>
+            <label>
+              <span>APP_SHARED_SECRET</span>
+              <input type="password" value={settings.googleSharedSecret} onChange={(event) => setSettings({ ...settings, googleSharedSecret: event.target.value })} placeholder="stored locally only" />
+            </label>
+          </div>
+        )}
         <div className="sync-status-row">
-          <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'warning' : 'success'} text={settings.googleSyncMode === 'google_sheets' ? 'Google Sheets sync' : 'Local only'} />
+          <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'success' : 'warning'} text={getCentralBackendUrl() ? 'Central backend' : settings.googleSyncMode === 'google_sheets' ? 'Google Sheets sync' : 'Local only'} />
           <span>Pending sync queue: {pendingSyncCount}</span>
         </div>
         <p>ระบบจะบันทึกลง Records_All และแยกชีทตามฮับให้อัตโนมัติ</p>
@@ -920,6 +1018,72 @@ function AuditPanel() {
           <small>{new Date(entry.createdAt).toLocaleString('th-TH')} / {entry.actor}</small>
         </article>
       ))}
+    </section>
+  );
+}
+
+function AdminDevicesPanel() {
+  const [pin, setPin] = useState('');
+  const [devices, setDevices] = useState<AdminDevice[]>([]);
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    try {
+      const next = await listAdminDevices(pin);
+      setDevices(next);
+      setMessage(`โหลดอุปกรณ์แอดมิน ${next.length} รายการ`);
+    } catch {
+      setMessage('โหลดรายการอุปกรณ์ไม่สำเร็จ กรุณาตรวจสอบ PIN และสิทธิ์ส่วนกลาง');
+    }
+  };
+
+  const approve = async (device: AdminDevice) => {
+    try {
+      await approveAdminDevice(device.deviceId, 'ADMIN', pin);
+      setMessage(`อนุมัติ ${device.deviceName || device.deviceId} แล้ว`);
+      await load();
+    } catch {
+      setMessage('อนุมัติอุปกรณ์ไม่สำเร็จ');
+    }
+  };
+
+  const revoke = async (device: AdminDevice) => {
+    try {
+      await revokeAdminDevice(device.deviceId, pin);
+      setMessage(`ยกเลิกสิทธิ์ ${device.deviceName || device.deviceId} แล้ว`);
+      await load();
+    } catch {
+      setMessage('ยกเลิกสิทธิ์อุปกรณ์ไม่สำเร็จ');
+    }
+  };
+
+  return (
+    <section className="admin-stack">
+      <h1>AdminDevices</h1>
+      <article className="admin-detail-card">
+        <p>อุปกรณ์ต้องอยู่สถานะ APPROVED และ role OWNER/ADMIN จึงเข้า Backoffice ได้ พนักงานไม่สามารถอนุมัติตัวเองได้</p>
+        <div className="admin-form">
+          <label>
+            <span>Central Admin PIN</span>
+            <input type="password" inputMode="numeric" value={pin} onChange={(event) => setPin(event.target.value)} />
+          </label>
+          <button className="secondary-action" onClick={() => { void load(); }} type="button">โหลดอุปกรณ์</button>
+        </div>
+      </article>
+      {devices.map((device) => (
+        <article className="admin-row device-row" key={device.deviceId}>
+          <div>
+            <strong>{device.deviceName || 'Unknown device'}</strong>
+            <span>{device.ownerName || '-'} / {device.role} / {device.status}</span>
+            <small>{device.deviceId}</small>
+          </div>
+          <div className="row-actions">
+            <button className="secondary-action compact-action" disabled={device.status === 'APPROVED'} onClick={() => { void approve(device); }} type="button">Approve</button>
+            <button className="danger-action compact-action" disabled={device.status === 'REVOKED'} onClick={() => { void revoke(device); }} type="button">Revoke</button>
+          </div>
+        </article>
+      ))}
+      {message ? <p className="simple-message">{message}</p> : null}
     </section>
   );
 }

@@ -1,5 +1,44 @@
 # APK Build Result
 
+## RESET-006-007-FINAL-PLUS Result
+
+Fresh verification on 2026-07-16:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Web/PWA result:
+
+```text
+dist/ generated with index.html and production assets
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 5s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+APK generated:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Relative APK path:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+RESET-006-007-FINAL-PLUS includes central Apps Script bootstrap/admin authorization, full-screen scan UI, trailer-drop photo rule fix, cleaner watermark, Bangkok timestamp handling, and responsive mobile hardening.
+
 ## RESET-005B Result
 
 RESET-005B protects first-time Admin PIN setup on employee devices.

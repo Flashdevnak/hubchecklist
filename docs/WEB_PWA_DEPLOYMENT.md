@@ -2,6 +2,17 @@
 
 RESET-005 supports one codebase for Android APK and Web/PWA. iPhone and iPad users must use the web/PWA link because iOS cannot install the Android APK.
 
+## RESET-006-007-FINAL-PLUS
+
+Build the same Web/PWA with central backend env values:
+
+```env
+VITE_APPS_SCRIPT_WEB_APP_URL=https://script.google.com/macros/s/.../exec
+VITE_APP_CLIENT_MODE=central
+```
+
+The deployed PWA bootstraps hubs/responsible/settings from Apps Script, hides URL/token settings from Frontline, and keeps local-first pending sync if offline.
+
 ## Build Output
 
 ```powershell

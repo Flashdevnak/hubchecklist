@@ -5,6 +5,25 @@ Hub Photo Proof is one system with two delivery paths:
 - Android phones/tablets: install the APK.
 - iPhone/iPad/Desktop: open the HTTPS Web/PWA link.
 
+## RESET-006-007-FINAL-PLUS
+
+Admin builds the app with `VITE_APPS_SCRIPT_WEB_APP_URL` so employee devices use central configuration automatically.
+
+Employee handoff:
+
+1. Install APK or PWA.
+2. Open app and confirm Frontline loads.
+3. Confirm no backend URL/token fields are visible.
+4. Select hub/responsible from central data.
+5. Use full-screen scan, photo capture, and submit.
+
+Backoffice:
+
+- Employee devices cannot create admin authorization.
+- Unapproved devices cannot enter Backoffice.
+- Admin approval happens through AdminDevices in protected Backoffice.
+- If backend is missing, employee devices show the contact-admin backend message.
+
 ## Android APK
 
 1. Admin installs the debug APK or future signed APK.

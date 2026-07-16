@@ -2,6 +2,19 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-006-007-FINAL-PLUS Flow Checks
+
+1. App opens Frontline by default.
+2. Backend status comes from `VITE_APPS_SCRIPT_WEB_APP_URL`; staff never enter URL/token.
+3. Bootstrap caches hubs and responsible staff for offline use.
+4. Backoffice unlock requires approved AdminDevices row plus central Admin PIN.
+5. New/unapproved device shows Device ID and cannot self-approve.
+6. Scan page uses a large full-screen camera viewport and manual entry as secondary action.
+7. Non-trailer-drop requires rear vehicle and front drop photos.
+8. Trailer-drop requires rear main vehicle, trailer 1, trailer 2, and extra trailer photos if added.
+9. Missing required photos show a clear warning before saving NEED_REVIEW.
+10. Watermark is readable, rounded, and contains accurate capture values.
+
 ## RESET-005B Employee Device PIN Flow
 
 1. Fresh install opens Frontline.

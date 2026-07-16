@@ -5,6 +5,7 @@ const SHEETS = {
   RESPONSIBLE_STAFF: 'ResponsibleStaff',
   AUDIT: 'Audit',
   SETTINGS: 'Settings',
+  ADMIN_DEVICES: 'AdminDevices',
   EXPORT_LOGS: 'ExportLogs',
 };
 
@@ -56,18 +57,33 @@ const HEADERS = {
   ResponsibleStaff: ['employeeCode', 'displayName', 'hubCode', 'active', 'updatedAt'],
   Audit: ['id', 'recordId', 'action', 'detail', 'actor', 'createdAt'],
   Settings: ['key', 'value', 'updatedAt'],
+  AdminDevices: ['deviceId', 'deviceName', 'ownerName', 'role', 'status', 'approvedAt', 'revokedAt', 'lastLoginAt', 'note'],
   ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
 };
+
+function doGet() {
+  return json_({
+    ok: true,
+    service: 'Hub Photo Proof API',
+    message: 'Apps Script Web App is running',
+    method: 'GET',
+    note: 'Use POST for application actions',
+    serverTime: new Date().toISOString(),
+  });
+}
 
 function doPost(e) {
   try {
     const request = parseRequest_(e);
-    validateToken_(request.token);
     ensureSheets_();
 
     switch (request.action) {
       case 'healthCheck':
         return json_({ ok: true, app: 'hubchecklist', storage: 'Records_All + hub sheets', checkedAt: new Date().toISOString() });
+      case 'bootstrap':
+        return json_(bootstrap_(request.payload));
+      case 'getAppSettings':
+        return json_({ ok: true, appSettings: readSettingsMap_() });
       case 'createRecord':
       case 'syncRecord':
         return json_({ ok: true, result: syncRecord_(request.payload.record, request.payload.photoMetadata || []) });
@@ -81,6 +97,18 @@ function doPost(e) {
         return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
       case 'appendAudit':
         return json_({ ok: true, result: appendAudit_(request.payload) });
+      case 'requestAdminAccess':
+        return json_(requestAdminAccess_(request.payload));
+      case 'verifyAdminAccess':
+        return json_(verifyAdminAccess_(request.payload));
+      case 'listAdminDevices':
+        return json_({ ok: true, devices: listAdminDevices_(request.payload) });
+      case 'approveAdminDevice':
+        return json_(approveAdminDevice_(request.payload));
+      case 'revokeAdminDevice':
+        return json_(revokeAdminDevice_(request.payload));
+      case 'getAdminAuthStatus':
+        return json_(getAdminAuthStatus_(request.payload));
       default:
         return json_({ ok: false, error: 'Unknown action' });
     }
@@ -123,12 +151,192 @@ function ensureDefaultSettings_() {
   ensureHeaders_(sheet, HEADERS.Settings);
   upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false');
   upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '');
+  upsertSettingDefault_(sheet, 'MINIMUM_APP_VERSION', '0.1.0');
+  upsertSettingDefault_(sheet, 'GPS_MANDATORY', 'false');
+  upsertSettingDefault_(sheet, 'WATERMARK_ENABLED', 'true');
 }
 
 function upsertSettingDefault_(sheet, key, value) {
   const rowIndex = findRowByValue_(sheet, 1, key);
   if (rowIndex > 0) return;
   sheet.appendRow([key, value, new Date().toISOString()]);
+}
+
+function bootstrap_(payload) {
+  const settings = readSettingsMap_();
+  return {
+    ok: true,
+    serverTime: new Date().toISOString(),
+    appSettings: settings,
+    hubs: readRows_(SHEETS.HUBS),
+    responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF),
+    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true',
+    minimumAppVersion: settings.MINIMUM_APP_VERSION || '0.1.0',
+    deviceId: payload && payload.deviceId ? payload.deviceId : '',
+  };
+}
+
+function readSettingsMap_() {
+  const rows = readRows_(SHEETS.SETTINGS);
+  const settings = {};
+  rows.forEach(function (row) {
+    if (row.key) settings[row.key] = row.value;
+  });
+  return settings;
+}
+
+function requestAdminAccess_(payload) {
+  if (!payload || !payload.deviceId) throw new Error('Missing deviceId');
+  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
+  ensureHeaders_(sheet, HEADERS.AdminDevices);
+  const rowIndex = findRowByValue_(sheet, 1, payload.deviceId);
+  const existing = rowIndex > 0 ? readRowObject_(sheet, rowIndex) : null;
+  if (existing && existing.status === 'APPROVED') {
+    return { ok: true, message: 'อุปกรณ์นี้ได้รับอนุมัติแล้ว', device: normalizeAdminDevice_(existing) };
+  }
+  const device = {
+    deviceId: payload.deviceId,
+    deviceName: payload.deviceName || 'Unknown device',
+    ownerName: payload.ownerName || '',
+    role: existing && existing.role ? existing.role : 'VIEWER',
+    status: 'PENDING',
+    approvedAt: '',
+    revokedAt: '',
+    lastLoginAt: '',
+    note: existing && existing.note ? existing.note : 'requested from app',
+  };
+  const row = HEADERS.AdminDevices.map(function (key) { return device[key] || ''; });
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_access_requested',
+    detail: payload.deviceId,
+    actor: payload.ownerName || 'unknown',
+    createdAt: new Date().toISOString(),
+  });
+  return { ok: true, message: 'ส่งคำขออนุมัติแล้ว', device: device };
+}
+
+function verifyAdminAccess_(payload) {
+  if (!payload || !payload.deviceId) throw new Error('Missing deviceId');
+  const settings = readSettingsMap_();
+  if (String(settings.ADMIN_PIN_ENABLED).toLowerCase() !== 'true' || !settings.ADMIN_PIN_HASH) {
+    return { ok: false, message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' };
+  }
+  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
+  ensureHeaders_(sheet, HEADERS.AdminDevices);
+  const rowIndex = findRowByValue_(sheet, 1, payload.deviceId);
+  if (rowIndex < 0) {
+    return { ok: false, message: 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล' };
+  }
+  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
+  if (device.status !== 'APPROVED' || (device.role !== 'OWNER' && device.role !== 'ADMIN')) {
+    return { ok: false, message: 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล', device: device, role: device.role };
+  }
+  if (sha256_(payload.pin || '') !== settings.ADMIN_PIN_HASH) {
+    return { ok: false, message: 'PIN หลังบ้านไม่ถูกต้อง', device: device, role: device.role };
+  }
+  device.lastLoginAt = new Date().toISOString();
+  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_login',
+    detail: payload.deviceId,
+    actor: device.ownerName || device.deviceName,
+    createdAt: new Date().toISOString(),
+  });
+  return { ok: true, message: 'อนุมัติหลังบ้านแล้ว', device: device, role: device.role };
+}
+
+function listAdminDevices_(payload) {
+  requireApprovedAdmin_(payload);
+  return readRows_(SHEETS.ADMIN_DEVICES).map(normalizeAdminDevice_);
+}
+
+function approveAdminDevice_(payload) {
+  requireApprovedAdmin_(payload);
+  if (!payload.targetDeviceId) throw new Error('Missing targetDeviceId');
+  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
+  const rowIndex = findRowByValue_(sheet, 1, payload.targetDeviceId);
+  if (rowIndex < 0) throw new Error('Device request not found');
+  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
+  device.role = payload.role === 'OWNER' ? 'OWNER' : 'ADMIN';
+  device.status = 'APPROVED';
+  device.approvedAt = new Date().toISOString();
+  device.revokedAt = '';
+  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_device_approved',
+    detail: payload.targetDeviceId,
+    actor: payload.deviceId || 'admin',
+    createdAt: new Date().toISOString(),
+  });
+  return { ok: true, device: device };
+}
+
+function revokeAdminDevice_(payload) {
+  requireApprovedAdmin_(payload);
+  if (!payload.targetDeviceId) throw new Error('Missing targetDeviceId');
+  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
+  const rowIndex = findRowByValue_(sheet, 1, payload.targetDeviceId);
+  if (rowIndex < 0) throw new Error('Device not found');
+  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
+  device.status = 'REVOKED';
+  device.revokedAt = new Date().toISOString();
+  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_device_revoked',
+    detail: payload.targetDeviceId,
+    actor: payload.deviceId || 'admin',
+    createdAt: new Date().toISOString(),
+  });
+  return { ok: true, device: device };
+}
+
+function getAdminAuthStatus_(payload) {
+  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
+  const rowIndex = payload && payload.deviceId ? findRowByValue_(sheet, 1, payload.deviceId) : -1;
+  const device = rowIndex > 0 ? normalizeAdminDevice_(readRowObject_(sheet, rowIndex)) : null;
+  const settings = readSettingsMap_();
+  return {
+    ok: true,
+    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true',
+    device: device,
+  };
+}
+
+function requireApprovedAdmin_(payload) {
+  const result = verifyAdminAccess_(payload);
+  if (!result.ok) throw new Error(result.message || 'Unauthorized admin device');
+  return result;
+}
+
+function normalizeAdminDevice_(row) {
+  return {
+    deviceId: row.deviceId || '',
+    deviceName: row.deviceName || '',
+    ownerName: row.ownerName || '',
+    role: row.role || 'VIEWER',
+    status: row.status || 'PENDING',
+    approvedAt: row.approvedAt || '',
+    revokedAt: row.revokedAt || '',
+    lastLoginAt: row.lastLoginAt || '',
+    note: row.note || '',
+  };
+}
+
+function sha256_(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8);
+  return bytes.map(function (byte) {
+    const value = byte < 0 ? byte + 256 : byte;
+    return ('0' + value.toString(16)).slice(-2);
+  }).join('');
 }
 
 function syncRecord_(record, photoMetadata) {

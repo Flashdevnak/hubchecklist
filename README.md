@@ -2,6 +2,17 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
+RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
+
+- `VITE_APPS_SCRIPT_WEB_APP_URL` provides the central Apps Script `/exec` URL at build time.
+- Frontline staff never enter or see backend URL/token settings.
+- App startup bootstraps central hubs, responsible staff, app settings, admin auth status, and minimum app version, then caches data for offline use.
+- Backoffice requires central AdminDevices approval plus central Admin PIN verification.
+- Unapproved devices show Device ID and can request approval, but cannot self-approve.
+- Full-screen scan uses a larger mobile camera viewport with Thai operational labels.
+- Trailer-drop photo rules require rear main vehicle photo plus trailer photos.
+- Watermarks use a larger rounded overlay with accurate Bangkok date/time, GPS status, barcode, hub, responsible staff, and photo slot.
+
 RESET-003 rebuilds the visible app again into a very simple **one APK** vehicle photo proof system:
 
 - **Frontline**: select hub, select responsible person, scan Barcode/QR, locked current date, choose drop condition, capture required photos with real timestamp/GPS metadata, submit.

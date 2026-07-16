@@ -2,6 +2,27 @@
 
 RESET-004 adds free central storage using Google Sheets, Google Apps Script, and Google Drive.
 
+## RESET-006-007-FINAL-PLUS Central Backend
+
+Deploy `google-apps-script/Code.gs` as a Web App and set the resulting `/exec` URL in:
+
+```env
+VITE_APPS_SCRIPT_WEB_APP_URL=https://script.google.com/macros/s/.../exec
+VITE_APP_CLIENT_MODE=central
+```
+
+Opening `/exec` in a browser should return a JSON health response from `doGet`.
+
+The app calls `bootstrap` on startup to load Settings, Hubs, ResponsibleStaff, AdminDevices status, and policy values. Frontline staff do not configure or see Apps Script URL/token fields.
+
+Settings keys used by central admin auth:
+
+- `ADMIN_PIN_ENABLED`
+- `ADMIN_PIN_HASH`
+- `MINIMUM_APP_VERSION`
+- `GPS_MANDATORY`
+- `WATERMARK_ENABLED`
+
 The app still works without this setup. When Sync mode is `Local only`, records/photos/audit remain on the device and export still works locally. When Google sync is configured, submitted records are sent to Apps Script. If sync fails, the app saves locally and shows:
 
 ```text

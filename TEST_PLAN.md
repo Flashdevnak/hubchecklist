@@ -1,5 +1,30 @@
 # Test Plan
 
+## RESET-006-007-FINAL-PLUS
+
+Central backend:
+
+- Build with `VITE_APPS_SCRIPT_WEB_APP_URL` and `VITE_APP_CLIENT_MODE=central`.
+- Open the app and confirm Frontline loads without asking staff for URL/token.
+- Temporarily remove the backend URL and confirm the Thai contact-admin backend message appears.
+- Open the Apps Script `/exec` URL in a browser and confirm it returns a health response instead of missing `doGet`.
+
+Central admin authorization:
+
+- Open Backoffice on a new device and confirm it cannot unlock until approved.
+- Copy Device ID and submit an admin access request.
+- From an already approved admin device, list AdminDevices, approve the pending device, then verify login with central PIN.
+- Revoke the device and confirm Backoffice no longer unlocks.
+
+Frontline scan/photo:
+
+- Confirm the scan view fills most of the phone viewport and uses `สแกนบาร์รถ`, `สแกนให้เต็มกรอบ`, and `กรอกเอง`.
+- Scan or manually enter a barcode, confirm locked Bangkok date is automatic, choose drop condition, and continue to photos.
+- For non-trailer-drop, confirm required slots are rear vehicle and front drop.
+- For trailer-drop, confirm required slots are rear main vehicle, trailer 1, trailer 2, and optional extra trailer drops.
+- Attempt submit with missing photos and confirm the NEED_REVIEW warning appears.
+- Capture photos and confirm watermark is large, rounded, readable, and contains date, time, GPS, barcode, hub, responsible, and photo slot.
+
 ## RESET-005B
 
 Goal: verify employees cannot create their own Backoffice PIN on fresh installs.
