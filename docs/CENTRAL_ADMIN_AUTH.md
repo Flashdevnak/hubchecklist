@@ -1,42 +1,61 @@
 # Central Admin Authorization
 
-Backoffice access is centrally controlled through Google Sheets + Apps Script.
+RESET-008A uses simple central Admin PIN protection by default.
 
-## AdminDevices Sheet
+## Default Login
 
-Columns:
+1. App opens Frontline.
+2. Admin taps the small Backoffice icon.
+3. Login modal asks only for `Admin PIN`.
+4. Apps Script verifies the PIN server-side.
+5. Correct PIN opens Backoffice.
+6. Wrong PIN shows `PIN ไม่ถูกต้อง`.
 
-- `deviceId`
-- `deviceName`
-- `ownerName`
-- `role`
-- `status`
-- `approvedAt`
-- `revokedAt`
-- `lastLoginAt`
-- `note`
+No device approval is required by default. This keeps daily operation practical.
 
-Valid statuses: `PENDING`, `APPROVED`, `REVOKED`.
+## PIN Storage
 
-Valid admin roles: `OWNER`, `ADMIN`. `VIEWER` cannot unlock Backoffice.
+Apps Script stores the PIN as a SHA-256 hash:
 
-## Rules
+- Script Properties: `ADMIN_PIN_HASH`
+- Settings sheet status: `ADMIN_PIN_ENABLED`, `ADMIN_PIN_SET`
 
-- Employee devices open Frontline only by default.
-- An unapproved device cannot enter Backoffice.
-- Employees cannot approve themselves.
-- Backoffice unlock requires an approved AdminDevices row and central Admin PIN verification.
-- If the central Admin PIN is not configured, Backoffice stays locked and shows the contact-admin message.
+The real PIN is never returned to the app.
+
+Backoffice Settings can change the central PIN through the `setAdminPin` action. Admins should not manually edit `ADMIN_PIN_HASH`.
+
+## First Setup
+
+If no PIN exists, Backoffice shows:
+
+```text
+ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแลระบบ
+```
+
+First setup requires Apps Script property `ADMIN_SETUP_TOKEN` and the Backoffice Settings PIN setup flow after an authorized setup path. Normal staff never see first-time setup.
+
+## Optional Device Approval
+
+AdminDevices remains available as optional advanced security.
+
+Default:
+
+- `REQUIRE_ADMIN_DEVICE_APPROVAL=false`
+- Admin PIN only
+
+If enabled:
+
+- deviceId must exist in AdminDevices
+- status must be `APPROVED`
+- role must be `OWNER` or `ADMIN`
+- Admin PIN must also be correct
 
 ## Apps Script Actions
 
-Implemented actions:
-
-- `requestAdminAccess`
 - `verifyAdminAccess`
+- `setAdminPin`
+- `getAdminAuthStatus`
+- `requestAdminAccess`
 - `listAdminDevices`
 - `approveAdminDevice`
 - `revokeAdminDevice`
-- `getAdminAuthStatus`
-
-`ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` live in the Settings sheet. The PIN hash is SHA-256 hex.

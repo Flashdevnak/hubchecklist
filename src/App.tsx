@@ -23,7 +23,6 @@ import {
   getActiveContext,
   getCentralBackendStatus,
   getCentralBackendUrl,
-  getDeviceId,
   getLocalDateString,
   getMissingPhotoSlots,
   getRecordById,
@@ -38,7 +37,6 @@ import {
   listRecords,
   listResponsibleStaff,
   normalizeVehicleBarcode,
-  requestAdminAccess,
   retryPendingSync,
   revokeAdminDevice,
   saveActiveContext,
@@ -47,6 +45,8 @@ import {
   saveResponsibleStaff,
   saveSettings,
   setAdminPin,
+  setCentralAdminDeviceApprovalRequired,
+  setCentralAdminPin,
   setEmployeeDeviceMode,
   submitRecordWithGoogleSync,
   testGoogleConnection,
@@ -107,6 +107,10 @@ export default function App() {
   };
 
   const hiddenAdminEntry = () => {
+    if (getCentralBackendUrl()) {
+      setAdminPinPanel('central-unlock');
+      return;
+    }
     if (hasAdminPin()) {
       setAdminPinPanel('unlock');
       return;
@@ -214,8 +218,6 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'centra
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [setupToken, setSetupToken] = useState('');
-  const [deviceName, setDeviceName] = useState(window.navigator.userAgent.slice(0, 60));
-  const [ownerName, setOwnerName] = useState('');
   const [message, setMessage] = useState('');
   const isSetup = mode === 'setup-token';
   const isNotice = mode === 'notice';
@@ -261,27 +263,17 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'centra
     onSuccess();
   };
 
-  const requestAccess = async () => {
-    const result = await requestAdminAccess(deviceName, ownerName);
-    setMessage(result.message);
-  };
-
-  const copyDeviceId = async () => {
-    await navigator.clipboard?.writeText(getDeviceId());
-    setMessage('คัดลอก Device ID แล้ว');
-  };
-
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <article className="pin-panel">
-        <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice || isBackendMissing ? 'หลังบ้านถูกล็อก' : isCentral ? 'ยืนยันสิทธิ์หลังบ้าน' : 'ใส่ PIN แอดมิน'}</h2>
+        <h2>{isSetup ? 'ตั้งค่า PIN หลังบ้านสำหรับผู้ดูแล' : isNotice || isBackendMissing ? 'หลังบ้านถูกล็อก' : isCentral ? 'เข้าสู่หลังบ้าน' : 'ใส่ PIN แอดมิน'}</h2>
         <p>
           {isBackendMissing
             ? 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ'
             : isNotice
-              ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล'
+              ? 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแลระบบ'
               : isCentral
-                ? 'เครื่องนี้ต้องได้รับอนุมัติจากส่วนกลาง และต้องยืนยัน PIN หลังบ้านจาก Google Sheets'
+                ? 'สำหรับผู้ดูแลระบบเท่านั้น'
                 : 'การป้องกันนี้เป็น PIN ภายในเครื่องเท่านั้น ไม่ใช่ระบบความปลอดภัยระดับองค์กร'}
         </p>
         {isNotice || isBackendMissing ? null : (
@@ -292,15 +284,8 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'centra
                 <input autoFocus type="password" value={setupToken} onChange={(event) => setSetupToken(event.target.value)} />
               </label>
             ) : null}
-            {isCentral ? (
-              <div className="device-id-box">
-                <span>Device ID</span>
-                <code>{getDeviceId()}</code>
-                <button className="secondary-action" onClick={copyDeviceId} type="button">คัดลอก Device ID</button>
-              </div>
-            ) : null}
             <label>
-              <span>{isCentral ? 'Central Admin PIN' : 'Admin PIN'}</span>
+              <span>Admin PIN</span>
               <input autoFocus={!isSetup} inputMode="numeric" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
             </label>
             {isSetup ? (
@@ -309,19 +294,7 @@ function AdminPinPanel({ mode, onCancel, onSuccess }: { mode: 'unlock' | 'centra
                 <input inputMode="numeric" type="password" value={confirmPin} onChange={(event) => setConfirmPin(event.target.value)} />
               </label>
             ) : null}
-            {isCentral ? (
-              <div className="admin-form single-column">
-                <label>
-                  <span>ชื่อเครื่อง</span>
-                  <input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
-                </label>
-                <label>
-                  <span>ชื่อผู้ขอใช้งาน</span>
-                  <input value={ownerName} onChange={(event) => setOwnerName(event.target.value)} placeholder="ระบุชื่อผู้ดูแล" />
-                </label>
-                <button className="secondary-action" onClick={requestAccess} type="button">ขออนุมัติอุปกรณ์แอดมิน</button>
-              </div>
-            ) : null}
+            {isCentral ? <p className="backend-status">ลืม PIN กรุณาติดต่อเจ้าของระบบ</p> : null}
           </>
         )}
         {message ? <p className="simple-message">{message}</p> : null}
@@ -883,7 +856,12 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   const [syncMessage, setSyncMessage] = useState('');
   const [currentPin, setCurrentPin] = useState('');
   const [nextPin, setNextPin] = useState('');
+  const [confirmNextPin, setConfirmNextPin] = useState('');
+  const [pinSetupToken, setPinSetupToken] = useState('');
   const [pinMessage, setPinMessage] = useState('');
+  const [deviceApprovalRequired, setDeviceApprovalRequiredState] = useState(false);
+  const [deviceApprovalPin, setDeviceApprovalPin] = useState('');
+  const [deviceApprovalMessage, setDeviceApprovalMessage] = useState('');
   const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
   const save = () => {
     saveSettings(settings);
@@ -906,9 +884,29 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
     setPendingSyncCount(getPendingSyncCount());
     onReload();
   };
-  const saveNewPin = () => {
+  const saveNewPin = async () => {
     if (nextPin.trim().length < 4) {
       setPinMessage('PIN ใหม่ต้องมีอย่างน้อย 4 ตัว');
+      return;
+    }
+    if (nextPin !== confirmNextPin) {
+      setPinMessage('PIN ใหม่ไม่ตรงกัน');
+      return;
+    }
+    if (getCentralBackendUrl()) {
+      setPinMessage('กำลังบันทึก PIN หลังบ้าน');
+      const result = await setCentralAdminPin({
+        currentPin,
+        setupToken: pinSetupToken,
+        newPin: nextPin,
+      });
+      setPinMessage(result.message);
+      if (result.ok) {
+        setCurrentPin('');
+        setNextPin('');
+        setConfirmNextPin('');
+        setPinSetupToken('');
+      }
       return;
     }
     if (!changeAdminPin(currentPin, nextPin)) {
@@ -917,6 +915,7 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
     }
     setCurrentPin('');
     setNextPin('');
+    setConfirmNextPin('');
     setPinMessage('เปลี่ยน PIN แอดมินแล้ว');
   };
   const resetData = () => {
@@ -932,6 +931,16 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
     onEmployeeModeChange();
     onReload();
     if (enabled) onLock();
+  };
+  const toggleDeviceApproval = async (enabled: boolean) => {
+    if (!getCentralBackendUrl()) return;
+    if (!deviceApprovalPin.trim()) {
+      setDeviceApprovalMessage('กรุณาใส่ Admin PIN ก่อนเปลี่ยนโหมดนี้');
+      return;
+    }
+    const result = await setCentralAdminDeviceApprovalRequired({ adminPin: deviceApprovalPin, enabled });
+    setDeviceApprovalMessage(result.message);
+    if (result.ok) setDeviceApprovalRequiredState(enabled);
   };
   return (
     <section className="admin-stack">
@@ -987,16 +996,32 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
         {syncMessage ? <p className="simple-message">{syncMessage}</p> : null}
       </article>
       <article className="admin-detail-card">
-        <h2>Admin PIN</h2>
-        <p>PIN นี้ป้องกันหลังบ้านเฉพาะในเครื่องนี้เท่านั้น</p>
+        <h2>ตั้งค่า PIN หลังบ้าน</h2>
+        <p>{getCentralBackendUrl() ? 'PIN นี้บันทึกที่ Apps Script ส่วนกลาง ผู้ดูแลไม่ต้องแก้ Google Sheet เอง' : 'PIN นี้ป้องกันหลังบ้านเฉพาะในเครื่องนี้เท่านั้น'}</p>
         <div className="admin-form">
           <input type="password" inputMode="numeric" value={currentPin} onChange={(event) => setCurrentPin(event.target.value)} placeholder="PIN ปัจจุบัน" />
+          {getCentralBackendUrl() ? <input type="password" value={pinSetupToken} onChange={(event) => setPinSetupToken(event.target.value)} placeholder="Setup token เฉพาะครั้งแรก" /> : null}
           <input type="password" inputMode="numeric" value={nextPin} onChange={(event) => setNextPin(event.target.value)} placeholder="PIN ใหม่" />
-          <button className="secondary-action" onClick={saveNewPin} type="button">เปลี่ยน PIN แอดมิน</button>
+          <input type="password" inputMode="numeric" value={confirmNextPin} onChange={(event) => setConfirmNextPin(event.target.value)} placeholder="ยืนยัน PIN ใหม่" />
+          <button className="secondary-action" onClick={() => { void saveNewPin(); }} type="button">บันทึก PIN</button>
           <button className="secondary-action" onClick={onLock} type="button"><Lock size={18} /> ล็อกหลังบ้าน</button>
         </div>
         {pinMessage ? <p className="simple-message">{pinMessage}</p> : null}
       </article>
+      {getCentralBackendUrl() ? (
+        <article className="admin-detail-card">
+          <h2>โหมดจำกัดเครื่องแอดมิน</h2>
+          <p>ค่าเริ่มต้นปิดอยู่: ผู้ดูแลเข้า Backoffice ด้วย Admin PIN อย่างเดียว เปิดเฉพาะเมื่อต้องการให้เครื่องแอดมินต้องอยู่ใน AdminDevices ด้วย</p>
+          <div className="admin-form">
+            <input type="password" inputMode="numeric" value={deviceApprovalPin} onChange={(event) => setDeviceApprovalPin(event.target.value)} placeholder="Admin PIN" />
+            <label className="checkbox-row">
+              <input checked={deviceApprovalRequired} onChange={(event) => { void toggleDeviceApproval(event.target.checked); }} type="checkbox" />
+              เปิดจำกัดเครื่องแอดมิน
+            </label>
+          </div>
+          {deviceApprovalMessage ? <p className="simple-message">{deviceApprovalMessage}</p> : null}
+        </article>
+      ) : null}
       <article className="admin-detail-card">
         <h2>Local Test Data</h2>
         <p>ใช้สำหรับล้างข้อมูลทดสอบในเครื่องนี้เท่านั้น ไม่ลบข้อมูลใน Google Sheets หรือ Google Drive</p>

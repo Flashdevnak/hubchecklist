@@ -568,19 +568,39 @@ export async function verifyCentralAdminAccess(pin: string): Promise<{ ok: boole
   try {
     const data = await callAppsScript('verifyAdminAccess', {
       deviceId: getDeviceId(),
-      pin,
-    }, { allowWithoutSecret: true }) as { ok?: boolean; message?: string; role?: AdminDeviceRole; device?: AdminDevice };
-    if (data.ok && (data.role === 'OWNER' || data.role === 'ADMIN')) {
+      adminPin: pin,
+    }, { allowWithoutSecret: true }) as { ok?: boolean; message?: string; role?: AdminDeviceRole; device?: AdminDevice; sessionExpiresAt?: string };
+    if (data.ok) {
       const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-      writeJson(ADMIN_SESSION_KEY, { deviceId: getDeviceId(), role: data.role, expiresAt });
+      writeJson(ADMIN_SESSION_KEY, { deviceId: getDeviceId(), role: data.role ?? 'ADMIN', expiresAt: data.sessionExpiresAt || expiresAt });
       return { ok: true, message: data.message || 'อนุมัติหลังบ้านแล้ว', role: data.role, device: data.device };
     }
-    return { ok: false, message: data.message || 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล', role: data.role, device: data.device };
+    return { ok: false, message: data.message || 'PIN ไม่ถูกต้อง', role: data.role, device: data.device };
   } catch {
     if (hasAuthorizedAdminSession() && verifyAdminPin(pin)) {
       return { ok: true, message: 'ออฟไลน์: ใช้ session ผู้ดูแลเดิมบนเครื่องนี้', role: 'ADMIN' };
     }
-    return { ok: false, message: 'ตรวจสอบสิทธิ์หลังบ้านไม่สำเร็จ กรุณาติดต่อผู้ดูแล' };
+    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
+  }
+}
+
+export async function setCentralAdminPin(values: { currentPin?: string; setupToken?: string; newPin: string }): Promise<{ ok: boolean; message: string }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  try {
+    const data = await callAppsScript('setAdminPin', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
+    return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึก PIN หลังบ้านแล้ว' : 'บันทึก PIN ไม่สำเร็จ') };
+  } catch {
+    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
+  }
+}
+
+export async function setCentralAdminDeviceApprovalRequired(values: { adminPin: string; enabled: boolean }): Promise<{ ok: boolean; message: string }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่า Backend กลาง กรุณาติดต่อผู้ดูแลระบบ' };
+  try {
+    const data = await callAppsScript('setAdminDeviceApprovalRequired', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
+    return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึกการจำกัดเครื่องแอดมินแล้ว' : 'บันทึกไม่สำเร็จ') };
+  } catch {
+    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
   }
 }
 
@@ -1054,7 +1074,7 @@ function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
   })).filter((staff) => staff.employeeCode && staff.hubCode);
 }
 
-type AppsScriptAction = 'bootstrap' | 'healthCheck' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'requestAdminAccess' | 'verifyAdminAccess' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
+type AppsScriptAction = 'bootstrap' | 'healthCheck' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
 
 async function callAppsScript(action: AppsScriptAction, payload: unknown, options: { allowWithoutSecret?: boolean } = {}): Promise<unknown> {
   const settings = getSettings();

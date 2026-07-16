@@ -21,9 +21,13 @@ Settings keys used by central admin auth:
 
 - `ADMIN_PIN_ENABLED`
 - `ADMIN_PIN_HASH`
+- `ADMIN_PIN_SET`
+- `REQUIRE_ADMIN_DEVICE_APPROVAL`
 - `MINIMUM_APP_VERSION`
 - `GPS_MANDATORY`
 - `WATERMARK_ENABLED`
+
+RESET-008A stores the real Admin PIN only as a hash. Admins should change the PIN from Backoffice Settings; they should not manually type hash values into Google Sheets.
 
 The app still works without this setup. When Sync mode is `Local only`, records/photos/audit remain on the device and export still works locally. When Google sync is configured, submitted records are sent to Apps Script. If sync fails, the app saves locally and shows:
 

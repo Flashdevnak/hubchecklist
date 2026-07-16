@@ -12,10 +12,13 @@ New central bootstrap/admin actions:
 - `getAppSettings`
 - `requestAdminAccess`
 - `verifyAdminAccess`
+- `setAdminPin`
 - `listAdminDevices`
 - `approveAdminDevice`
 - `revokeAdminDevice`
 - `getAdminAuthStatus`
+
+RESET-008A default admin login requires only central Admin PIN. Device approval uses AdminDevices only when `REQUIRE_ADMIN_DEVICE_APPROVAL=true`.
 
 New sheet: `AdminDevices`
 

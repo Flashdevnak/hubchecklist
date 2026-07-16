@@ -1,5 +1,17 @@
 # Test Plan
 
+## RESET-008A Simple Admin PIN Login
+
+- Deploy Apps Script with RESET-008A `Code.gs`.
+- Configure central PIN using Backoffice Settings or Apps Script `ADMIN_SETUP_TOKEN` first setup path.
+- Open the app and confirm Frontline loads.
+- Tap Backoffice icon.
+- Confirm modal shows only `Admin PIN`, cancel, and enter buttons.
+- Enter wrong PIN and confirm `PIN ไม่ถูกต้อง`.
+- Enter correct PIN and confirm Backoffice opens.
+- In Backoffice Settings, change PIN and confirm the old PIN no longer works.
+- Confirm AdminDevices approval is not required unless the advanced device approval toggle is enabled.
+
 ## RESET-008 Final Deployment
 
 Vercel/Web/PWA:

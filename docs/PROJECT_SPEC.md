@@ -1,5 +1,15 @@
 # Project Specification
 
+## RESET-008A Simple Admin PIN Login
+
+Backoffice access is simplified for production usability:
+
+- Admin login asks only for one central Admin PIN.
+- Apps Script verifies the PIN server-side.
+- AdminDevices approval is disabled by default and remains optional advanced security.
+- Backoffice Settings can change the central PIN through Apps Script.
+- Frontline remains employee-only and does not show backend URL/token/admin settings.
+
 ## RESET-008 Final Production Deployment Fix
 
 RESET-008 keeps one app with two delivery paths:

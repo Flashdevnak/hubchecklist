@@ -9,14 +9,21 @@ RESET-008 prepares final production deployment paths:
 - Vercel URL is the actual iPhone/iPad/Desktop app URL.
 - Apps Script `/exec` is API/backend only and returns a health response when opened.
 - Employees never configure backend URL/token on device.
-- Backoffice remains protected by central AdminDevices approval and central Admin PIN verification.
+- Backoffice is protected by one central Admin PIN by default. AdminDevices approval is optional advanced security.
+
+RESET-008A simplifies admin login:
+
+- Admin login asks only for `Admin PIN`.
+- Correct central PIN opens Backoffice.
+- No deviceName, ownerName, Device ID, or approval request appears in the default login modal.
+- Backoffice Settings can change the central PIN through Apps Script.
 
 RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
 
 - `VITE_APPS_SCRIPT_WEB_APP_URL` provides the central Apps Script `/exec` URL at build time.
 - Frontline staff never enter or see backend URL/token settings.
 - App startup bootstraps central hubs, responsible staff, app settings, admin auth status, and minimum app version, then caches data for offline use.
-- Backoffice requires central AdminDevices approval plus central Admin PIN verification.
+- Backoffice requires central Admin PIN verification by default; AdminDevices can be enabled later as an advanced restriction.
 - Unapproved devices show Device ID and can request approval, but cannot self-approve.
 - Full-screen scan uses a larger mobile camera viewport with Thai operational labels.
 - Trailer-drop photo rules require rear main vehicle photo plus trailer photos.

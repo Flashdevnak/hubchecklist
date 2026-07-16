@@ -29,8 +29,8 @@ Employee handoff:
 Backoffice:
 
 - Employee devices cannot create admin authorization.
-- Unapproved devices cannot enter Backoffice.
-- Admin approval happens through AdminDevices in protected Backoffice.
+- Admin login uses one central Admin PIN by default.
+- AdminDevices approval is optional advanced mode only.
 - If backend is missing, employee devices show the contact-admin backend message.
 
 ## Android APK

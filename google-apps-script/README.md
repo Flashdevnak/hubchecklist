@@ -9,6 +9,13 @@ This folder contains the free central storage bridge for RESET-004.
 - `AdminDevices` supports central Backoffice authorization with request/list/approve/revoke actions.
 - `ADMIN_PIN_ENABLED` and `ADMIN_PIN_HASH` are Settings keys for central Admin PIN verification.
 
+## RESET-008A
+
+- Default Backoffice login is central Admin PIN only.
+- `verifyAdminAccess` verifies the PIN server-side.
+- `setAdminPin` stores `ADMIN_PIN_HASH` automatically; admins do not manually edit hash values.
+- `REQUIRE_ADMIN_DEVICE_APPROVAL=false` by default. AdminDevices is optional advanced security.
+
 Storage stack:
 
 - Google Sheets stores simplified records, photo metadata, hubs, responsible staff, and audit rows.

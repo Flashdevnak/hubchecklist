@@ -1,5 +1,38 @@
 # APK Build Result
 
+## RESET-008A Result
+
+Fresh verification on 2026-07-17:
+
+```text
+npm.cmd install: PASSED
+npx.cmd tsc -b: PASSED
+npm.cmd run build: PASSED
+npx.cmd cap sync android: PASSED
+.\gradlew.bat assembleDebug: PASSED
+```
+
+Web/PWA and Vercel build result:
+
+```text
+dist/ generated with index.html and production assets
+```
+
+Android result:
+
+```text
+BUILD SUCCESSFUL in 11s
+82 actionable tasks: 23 executed, 59 up-to-date
+```
+
+APK generated:
+
+```text
+C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+RESET-008A simplifies admin login to central Admin PIN only by default. Device approval remains optional advanced mode.
+
 ## RESET-008 Result
 
 Fresh verification on 2026-07-16:

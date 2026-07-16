@@ -101,6 +101,10 @@ function doPost(e) {
         return json_(requestAdminAccess_(request.payload));
       case 'verifyAdminAccess':
         return json_(verifyAdminAccess_(request.payload));
+      case 'setAdminPin':
+        return json_(setAdminPin_(request.payload));
+      case 'setAdminDeviceApprovalRequired':
+        return json_(setAdminDeviceApprovalRequired_(request.payload));
       case 'listAdminDevices':
         return json_({ ok: true, devices: listAdminDevices_(request.payload) });
       case 'approveAdminDevice':
@@ -151,6 +155,8 @@ function ensureDefaultSettings_() {
   ensureHeaders_(sheet, HEADERS.Settings);
   upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false');
   upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '');
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_SET', 'false');
+  upsertSettingDefault_(sheet, 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'false');
   upsertSettingDefault_(sheet, 'MINIMUM_APP_VERSION', '0.1.0');
   upsertSettingDefault_(sheet, 'GPS_MANDATORY', 'false');
   upsertSettingDefault_(sheet, 'WATERMARK_ENABLED', 'true');
@@ -162,6 +168,18 @@ function upsertSettingDefault_(sheet, key, value) {
   sheet.appendRow([key, value, new Date().toISOString()]);
 }
 
+function upsertSetting_(key, value) {
+  const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
+  ensureHeaders_(sheet, HEADERS.Settings);
+  const rowIndex = findRowByValue_(sheet, 1, key);
+  const row = [key, value, new Date().toISOString()];
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+}
+
 function bootstrap_(payload) {
   const settings = readSettingsMap_();
   return {
@@ -170,7 +188,7 @@ function bootstrap_(payload) {
     appSettings: settings,
     hubs: readRows_(SHEETS.HUBS),
     responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF),
-    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true',
+    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
     minimumAppVersion: settings.MINIMUM_APP_VERSION || '0.1.0',
     deviceId: payload && payload.deviceId ? payload.deviceId : '',
   };
@@ -222,11 +240,34 @@ function requestAdminAccess_(payload) {
 }
 
 function verifyAdminAccess_(payload) {
-  if (!payload || !payload.deviceId) throw new Error('Missing deviceId');
+  if (!payload) throw new Error('Missing payload');
   const settings = readSettingsMap_();
   if (String(settings.ADMIN_PIN_ENABLED).toLowerCase() !== 'true' || !settings.ADMIN_PIN_HASH) {
-    return { ok: false, message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' };
+    return { ok: false, code: 'PIN_NOT_CONFIGURED', message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน' };
   }
+  if (sha256_(payload.adminPin || payload.pin || '') !== settings.ADMIN_PIN_HASH) {
+    return { ok: false, code: 'PIN_WRONG', message: 'PIN ไม่ถูกต้อง' };
+  }
+
+  const requireDeviceApproval = String(settings.REQUIRE_ADMIN_DEVICE_APPROVAL).toLowerCase() === 'true';
+  if (!requireDeviceApproval) {
+    appendAudit_({
+      id: Utilities.getUuid(),
+      action: 'admin_login',
+      detail: 'central PIN login',
+      actor: 'admin',
+      createdAt: new Date().toISOString(),
+    });
+    return {
+      ok: true,
+      message: 'เข้าสู่หลังบ้านแล้ว',
+      role: 'ADMIN',
+      sessionExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      deviceApprovalRequired: false,
+    };
+  }
+
+  if (!payload.deviceId) throw new Error('Missing deviceId');
   const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
   ensureHeaders_(sheet, HEADERS.AdminDevices);
   const rowIndex = findRowByValue_(sheet, 1, payload.deviceId);
@@ -237,9 +278,6 @@ function verifyAdminAccess_(payload) {
   if (device.status !== 'APPROVED' || (device.role !== 'OWNER' && device.role !== 'ADMIN')) {
     return { ok: false, message: 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล', device: device, role: device.role };
   }
-  if (sha256_(payload.pin || '') !== settings.ADMIN_PIN_HASH) {
-    return { ok: false, message: 'PIN หลังบ้านไม่ถูกต้อง', device: device, role: device.role };
-  }
   device.lastLoginAt = new Date().toISOString();
   sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
   appendAudit_({
@@ -249,7 +287,65 @@ function verifyAdminAccess_(payload) {
     actor: device.ownerName || device.deviceName,
     createdAt: new Date().toISOString(),
   });
-  return { ok: true, message: 'อนุมัติหลังบ้านแล้ว', device: device, role: device.role };
+  return {
+    ok: true,
+    message: 'เข้าสู่หลังบ้านแล้ว',
+    device: device,
+    role: device.role,
+    sessionExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+    deviceApprovalRequired: true,
+  };
+}
+
+function setAdminPin_(payload) {
+  if (!payload || !payload.newPin) throw new Error('Missing newPin');
+  const newPin = String(payload.newPin);
+  if (newPin.length < 4) return { ok: false, message: 'PIN ใหม่ต้องมีอย่างน้อย 4 ตัว' };
+
+  const settings = readSettingsMap_();
+  const currentHash = settings.ADMIN_PIN_HASH || PropertiesService.getScriptProperties().getProperty('ADMIN_PIN_HASH') || '';
+  if (currentHash) {
+    if (sha256_(payload.currentPin || '') !== currentHash) {
+      return { ok: false, message: 'PIN ปัจจุบันไม่ถูกต้อง' };
+    }
+  } else {
+    const expectedSetupToken = PropertiesService.getScriptProperties().getProperty('ADMIN_SETUP_TOKEN') || '';
+    if (!expectedSetupToken || payload.setupToken !== expectedSetupToken) {
+      return { ok: false, message: 'โทเคนตั้งค่า PIN ไม่ถูกต้อง' };
+    }
+  }
+
+  const hash = sha256_(newPin);
+  PropertiesService.getScriptProperties().setProperty('ADMIN_PIN_HASH', hash);
+  upsertSetting_('ADMIN_PIN_ENABLED', 'true');
+  upsertSetting_('ADMIN_PIN_HASH', hash);
+  upsertSetting_('ADMIN_PIN_SET', 'true');
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_pin_changed',
+    detail: 'Central Admin PIN hash updated',
+    actor: 'admin',
+    createdAt: new Date().toISOString(),
+  });
+  return { ok: true, message: 'บันทึก PIN หลังบ้านแล้ว' };
+}
+
+function setAdminDeviceApprovalRequired_(payload) {
+  const result = verifyAdminAccess_(payload || {});
+  if (!result.ok) return result;
+  upsertSetting_('REQUIRE_ADMIN_DEVICE_APPROVAL', payload.enabled === true ? 'true' : 'false');
+  appendAudit_({
+    id: Utilities.getUuid(),
+    action: 'admin_device_approval_setting_changed',
+    detail: payload.enabled === true ? 'enabled' : 'disabled',
+    actor: 'admin',
+    createdAt: new Date().toISOString(),
+  });
+  return {
+    ok: true,
+    message: payload.enabled === true ? 'เปิดจำกัดเครื่องแอดมินแล้ว' : 'ปิดจำกัดเครื่องแอดมินแล้ว',
+    deviceApprovalRequired: payload.enabled === true,
+  };
 }
 
 function listAdminDevices_(payload) {
@@ -306,7 +402,9 @@ function getAdminAuthStatus_(payload) {
   const settings = readSettingsMap_();
   return {
     ok: true,
-    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true',
+    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
+    adminPinSet: Boolean(settings.ADMIN_PIN_HASH),
+    deviceApprovalRequired: String(settings.REQUIRE_ADMIN_DEVICE_APPROVAL).toLowerCase() === 'true',
     device: device,
   };
 }

@@ -1,5 +1,15 @@
 # QA Checklist
 
+## RESET-008A Simple Admin PIN Login
+
+- [x] Admin login modal asks only for Admin PIN by default
+- [x] No deviceName, ownerName, Device ID, or request approval button appears in default login
+- [x] Apps Script verifies central PIN with `verifyAdminAccess`
+- [x] Apps Script can change PIN with `setAdminPin`
+- [x] Device approval is optional and disabled by default
+- [x] Frontline still hides backend URL/token/settings/export/audit
+- [ ] Live Apps Script deployment with real central PIN remains manual
+
 ## RESET-008 Final Deployment Checks
 
 - [x] `vercel.json` exists with Vite build, `dist` output, and SPA fallback
