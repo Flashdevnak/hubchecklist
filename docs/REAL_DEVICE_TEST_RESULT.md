@@ -1,5 +1,21 @@
 # Real Device Test Result
 
+## RESET-003 Status
+
+The debug APK can be built locally. Physical device validation is still pending.
+
+Do not mark these passed until tested on real devices:
+
+- [ ] Samsung S23 FE full-screen Barcode/QR scan
+- [ ] Galaxy Tab A7 Lite full-screen Barcode/QR scan
+- [ ] Manual barcode fallback
+- [ ] Photo capture through Android camera picker
+- [ ] GPS permission allowed path
+- [ ] GPS denied path with warning and no fake coordinates
+- [ ] Extra drop photo slot flow
+- [ ] Submit with missing photo warning
+- [ ] Admin export ZIP on device/browser
+
 ## RESET-001 Status
 
 The app remains one APK with Frontline and Backoffice modes inside the same app. RESET-001 web/Android build can be generated locally, but physical device validation is still pending.

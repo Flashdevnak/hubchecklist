@@ -1,5 +1,33 @@
 # Test Plan
 
+## RESET-003
+
+Goal: verify the simplified Frontline + Admin Backoffice photo proof app in one APK.
+
+Frontline:
+
+- Select hub `26NAK_BHUB-นครราชสีมา`.
+- Confirm responsible list only shows staff for that hub.
+- Confirm `25845 TUI` auto-selects when it is the only active responsible person for the hub.
+- Scan Barcode/QR or type a manual vehicle barcode.
+- Confirm date shows as read-only `YYYY-MM-DD`.
+- Select `ไม่พ่วงดรอป`; confirm required slots are rear vehicle photo and front drop photo.
+- Select `พ่วงดรอป`; confirm required slots are drop rear 1 and drop rear 2.
+- Add an extra drop and confirm another required photo slot appears.
+- Capture/retake photos and confirm timestamp appears.
+- Deny GPS and confirm GPS warning appears without fake coordinates.
+- Submit with all photos and confirm status becomes `COMPLETE`.
+- Submit with missing photos only after warning confirmation and confirm status becomes `NEED_REVIEW`.
+
+Admin Backoffice:
+
+- Add/edit/delete hubs.
+- Add/edit/delete responsible staff and assign each to one hub.
+- Review records, missing photos, timestamp/GPS metadata, and audit.
+- Export ZIP and confirm `workbook.xlsx`, `photos/`, and `manifest.json` exist.
+- Confirm Frontline does not show export/backoffice menus.
+- Confirm physical device QA remains pending until tested on real hardware.
+
 ## RESET-001
 
 Goal: verify one APK with separated Frontline and Backoffice modes, one unified table, full-screen scan/review/photo capture, export mapping, and Android debug APK build.

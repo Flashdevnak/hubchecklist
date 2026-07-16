@@ -1,6 +1,6 @@
 # APK Build Result
 
-## RESET-001 Result
+## RESET-003 Result
 
 Date: 2026-07-03
 
@@ -72,7 +72,7 @@ From `android`:
 
 ## Build Result
 
-PASSED. RESET-001 rebuild must complete TypeScript, web build, Capacitor sync, and Android `assembleDebug` before commit/push.
+PASSED. RESET-003 completed TypeScript, web build, Capacitor sync, and Android `assembleDebug` on 2026-07-16. The APK remains `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Manual build result reported after Android Studio SDK installation:
 

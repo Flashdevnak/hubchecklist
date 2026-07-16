@@ -2,6 +2,27 @@
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 
+## RESET-003 Frontline Flow
+
+1. Select hub `26NAK_BHUB-นครราชสีมา`.
+2. Select or auto-select responsible `25845 TUI`.
+3. Scan Barcode/QR or type vehicle barcode manually.
+4. Confirm date is read-only current date.
+5. Select drop condition.
+6. Capture required photos.
+7. Confirm each photo shows timestamp and GPS result.
+8. Submit complete record, or confirm missing-photo warning to submit `NEED_REVIEW`.
+
+## RESET-003 Admin Flow
+
+1. Manage hubs and responsible staff.
+2. Review records and photo GPS/timestamp metadata.
+3. Export ZIP.
+4. Open `workbook.xlsx` and confirm Records sheet columns.
+5. Confirm `photos/` contains captured photos.
+6. Confirm `manifest.json` exists.
+7. Confirm audit entries are created for record/photo/export actions.
+
 ## RESET-001 Frontline Flow
 
 1. Frontline Home shows active responsible person and today/pending/complete summary.

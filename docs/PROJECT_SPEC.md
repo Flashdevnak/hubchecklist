@@ -1,5 +1,30 @@
 # Project Specification
 
+## RESET-003 Simple Hub Barcode Photo Proof App
+
+RESET-003 replaces the visible app workflow with a simple local-first photo proof system in one APK.
+
+Frontline:
+
+- Select hub.
+- Select responsible staff filtered by hub.
+- Scan Barcode/QR or use manual vehicle barcode input.
+- Date is locked to current device date.
+- Choose drop condition.
+- Capture required photos.
+- Store real timestamp and GPS metadata when available.
+- Warn before submitting with missing photos.
+- Submit as `COMPLETE` or `NEED_REVIEW`.
+
+Admin Backoffice:
+
+- Manage hubs and responsible staff.
+- Review records/photos/timestamp/GPS/missing-photo warnings.
+- Export Excel/ZIP with `workbook.xlsx`, `photos/`, and `manifest.json`.
+- Manage settings and audit.
+
+No fake GPS, timestamp, photo, export, cloud sync, OCR, or Flash success is added. Frontline does not show OCR proof-paper parsing, Flash technical UI, Supabase/R2 warnings, or debug cards.
+
 ## RESET-001 Frontline / Backoffice Unified Table Rebuild
 
 RESET-001 defines the app as one Android app / one APK with two clearly separated modes:

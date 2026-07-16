@@ -1,5 +1,29 @@
 # QA Checklist
 
+## RESET-003 Required Checks
+
+- [x] One Android app / one APK only
+- [x] Frontline has no OCR proof-paper page, Flash technical flow, debug cards, or Supabase/R2 warnings
+- [x] Frontline selects hub first and responsible staff second
+- [x] Responsible staff list is filtered by selected hub
+- [x] If only one responsible exists for a hub, the app auto-selects that person
+- [x] Active hub/responsible context is stored locally
+- [x] Barcode/QR scanner captures vehicle barcode with manual fallback
+- [x] Date is current device date and read-only for Frontline
+- [x] Drop condition controls required photo slots
+- [x] Non-drop requires rear vehicle photo and front drop photo
+- [x] Drop requires rear drop photo 1 and 2, with extra drop slots supported
+- [x] Every captured photo stores real capturedAt timestamp
+- [x] GPS is requested and stored when available
+- [x] GPS denied/unavailable is stored as warning; GPS is not faked
+- [x] Missing photo warning appears before submit
+- [x] Submit saves COMPLETE or NEED_REVIEW record locally
+- [x] Admin Backoffice manages hubs and responsible staff
+- [x] Admin Backoffice has records/photos/export/settings/audit areas
+- [x] Excel/ZIP export creates `workbook.xlsx`, `photos/`, and `manifest.json`
+- [x] Rendered RESET-003 UI files have no mojibake patterns
+- [ ] Physical Android device QA is still pending
+
 ## RESET-001 Required Checks
 
 - [x] One Android app / one APK only

@@ -2,6 +2,13 @@
 
 Mobile-first Hub vehicle proof capture app for QR intake, Flash proof workflow, checklist photos, audit history, dashboard operations, XLSX/ZIP export, and backup-safe cleanup.
 
+RESET-003 rebuilds the visible app again into a very simple **one APK** vehicle photo proof system:
+
+- **Frontline**: select hub, select responsible person, scan Barcode/QR, locked current date, choose drop condition, capture required photos with real timestamp/GPS metadata, submit.
+- **Admin Backoffice**: manage hubs, responsible staff, records, photos, export ZIP/Excel, settings, backup guard, and audit.
+
+Frontline no longer exposes OCR proof-paper parsing, Flash WebView technical flow, Supabase/R2 warnings, placeholder cards, or debug data. OCR/Flash code may remain in the repository for previous compatibility, but it is not part of the RESET-003 Frontline workflow.
+
 RESET-001 rebuilds the product as **one Android app / one APK** with two modes inside the same app:
 
 - **Frontline**: Today -> full-screen Scan -> Review one unified table row -> Photos -> Done.
@@ -54,6 +61,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | MVP-016 Real camera scan + fast staff flow | Complete | Camera scanner and one-screen phone flow implemented |
 | MVP-017 Simple staff scan/review/create flow | Complete | QR/barcode/manual/OCR parser foundation; real device QA still pending |
 | RESET-001 Frontline/Backoffice unified table rebuild | Complete | One APK, mode separation, unified table export, real device QA still pending |
+| RESET-003 Simple hub barcode photo proof app | Complete | Frontline hub/responsible/barcode/photo submit; Admin backoffice/export; device QA pending |
 
 ## Key Docs
 
