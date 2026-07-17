@@ -47,7 +47,7 @@ import {
   verifyAdminPin,
 } from './services/reset003';
 
-type FrontTab = 'today' | 'scan' | 'photos' | 'work';
+type FrontTab = 'today' | 'scan' | 'photos' | 'work' | 'success';
 type AdminTab = 'overview' | 'hubs' | 'staff' | 'records' | 'photos' | 'history' | 'export' | 'settings' | 'central';
 type BarcodeDetectorShape = new (options?: { formats?: string[] }) => { detect(source: HTMLVideoElement): Promise<Array<{ rawValue?: string }>> };
 
@@ -57,6 +57,7 @@ export default function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [activeRecordId, setActiveRecordId] = useState('');
+  const [submittedRecordId, setSubmittedRecordId] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [banner, setBanner] = useState('กำลังดึงข้อมูล');
@@ -148,7 +149,14 @@ export default function App() {
             }}
             onRefresh={() => { void refreshCentral('หน้างาน'); }}
             onReload={reload}
+            onSubmitted={(record) => {
+              setSubmittedRecordId(record.recordId);
+              setActiveRecordId(record.recordId);
+              setFrontTab('success');
+            }}
             onSelectTab={setFrontTab}
+            onSetActiveRecord={setActiveRecordId}
+            submittedRecord={submittedRecordId ? getRecord(submittedRecordId) : null}
             records={records}
             tab={frontTab}
           />
@@ -175,18 +183,35 @@ function FrontlineArea(props: {
   onOpenRecord: (recordId: string) => void;
   onRefresh: () => void;
   onReload: () => void;
+  onSubmitted: (record: ProofRecord) => void;
   onSelectTab: (tab: FrontTab) => void;
+  onSetActiveRecord: (recordId: string) => void;
   records: ProofRecord[];
+  submittedRecord: ProofRecord | null;
   tab: FrontTab;
 }) {
   if (props.tab === 'scan') {
     return <ScannerScreen onClose={() => props.onSelectTab('today')} onCreated={(record) => { props.onReload(); props.onOpenRecord(record.recordId); }} />;
   }
   if (props.tab === 'photos') {
-    return <PhotoScreen record={props.activeRecord} onDone={() => { props.onReload(); props.onSelectTab('work'); }} onReload={props.onReload} />;
+    return <PhotoScreen record={props.activeRecord} onDone={(record) => { props.onReload(); props.onSubmitted(record); }} onReload={props.onReload} />;
   }
   if (props.tab === 'work') {
     return <MyWorkScreen onOpenRecord={props.onOpenRecord} onRefresh={props.onRefresh} records={props.records} />;
+  }
+  if (props.tab === 'success') {
+    return <SubmitSuccessScreen
+      record={props.submittedRecord}
+      onDetail={(recordId) => {
+        props.onSetActiveRecord(recordId);
+        props.onSelectTab('photos');
+      }}
+      onMyWork={() => props.onSelectTab('work')}
+      onScanNext={() => {
+        props.onSetActiveRecord('');
+        props.onSelectTab('scan');
+      }}
+    />;
   }
   return <TodayScreen banner={props.banner} onRefresh={props.onRefresh} onScan={() => props.onSelectTab('scan')} records={props.records} />;
 }
@@ -384,7 +409,7 @@ function ScannerScreen({ onClose, onCreated }: { onClose: () => void; onCreated:
   );
 }
 
-function PhotoScreen({ onDone, onReload, record }: { onDone: () => void; onReload: () => void; record: ProofRecord | null }) {
+function PhotoScreen({ onDone, onReload, record }: { onDone: (record: ProofRecord) => void; onReload: () => void; record: ProofRecord | null }) {
   const [current, setCurrent] = useState(record);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -427,7 +452,10 @@ function PhotoScreen({ onDone, onReload, record }: { onDone: () => void; onReloa
     setMessage(result.message);
     setSaving(false);
     onReload();
-    if (result.record.status === 'SYNCED' || result.record.status === 'PENDING_SYNC' || result.record.status === 'SYNC_FAILED') onDone();
+    if (result.record.status === 'SYNCED') onDone(result.record);
+    if (result.record.status === 'PENDING_SYNC' || result.record.status === 'SYNC_FAILED') {
+      setMessage('บันทึกไว้ในเครื่องแล้ว แต่ยังซิงก์ไม่สำเร็จ');
+    }
   };
 
   const missing = getMissingPhotoSlots(current);
@@ -505,6 +533,39 @@ function MyWorkScreen({ onOpenRecord, onRefresh, records }: { onOpenRecord: (rec
         <button className="soft-button" onClick={onRefresh} type="button"><RefreshCcw size={18} /> รีเฟรชข้อมูล</button>
       </div>
       <RecordList empty="ยังไม่มีงาน" onOpen={onOpenRecord} records={visible} />
+    </section>
+  );
+}
+
+function SubmitSuccessScreen({ onDetail, onMyWork, onScanNext, record }: {
+  onDetail: (recordId: string) => void;
+  onMyWork: () => void;
+  onScanNext: () => void;
+  record: ProofRecord | null;
+}) {
+  const photoCount = record?.photoSlots.filter((slot) => slot.captured).length ?? 0;
+  return (
+    <section className="stack">
+      <article className="success-card">
+        <CheckCircle2 size={58} />
+        <h1>ส่งข้อมูลแล้ว</h1>
+        <p>บันทึกข้อมูลและรูปภาพเข้าระบบกลางแล้ว</p>
+        {record ? (
+          <div className="summary-list">
+            <span>วันที่: {record.date}</span>
+            <span>ฮับ: {record.hubCode}</span>
+            <span>ผู้รับผิดชอบ: {record.responsibleEmployeeCode} {record.responsibleName}</span>
+            <span>บาร์โค้ดรถ: {record.vehicleBarcode}</span>
+            <span>สถานะ: {statusText(record.status)}</span>
+            <span>จำนวนรูปที่ส่ง: {photoCount}</span>
+          </div>
+        ) : null}
+        <div className="success-actions">
+          <button className="primary-button" onClick={onScanNext} type="button">สแกนคันถัดไป</button>
+          <button className="soft-button" onClick={onMyWork} type="button">ดูงานของฉัน</button>
+          <button className="soft-button" disabled={!record} onClick={() => record && onDetail(record.recordId)} type="button">ดูรายละเอียด</button>
+        </div>
+      </article>
     </section>
   );
 }

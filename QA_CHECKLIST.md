@@ -302,3 +302,21 @@ Every MVP must update this file before commit. If QA fails, do not mark complete
 - [ ] Two-device central sync test completed.
 - [ ] Physical Android scanner/photo QA completed.
 - [ ] iPad browser fallback QA completed.
+
+## RESET-012 Central Photo Sync Checks
+
+- [x] Frontend sends `slotId`, `slotType`, and `labelThai` for each captured photo.
+- [x] Apps Script rejects photo sync when slot metadata is missing.
+- [x] Apps Script uploads photos to Drive and attempts anyone-with-link view sharing.
+- [x] Apps Script returns and stores `driveFileId`, `driveUrl`, `imagePreviewUrl`, and `imageFormula`.
+- [x] `Photos` sheet headers include image preview and complete slot metadata columns.
+- [x] `Records_All` headers include manager-facing photo columns.
+- [x] `Records_All` photo columns are updated from matching photo rows after sync.
+- [x] Submit success screen appears only after central sync returns success.
+- [x] Sync failure stays pending/failed and does not show fake success.
+- [x] Duplicate status priority favors `SYNCED`, `COMPLETE`, and `NEED_REVIEW` over stale drafts.
+- [x] TypeScript passes.
+- [x] Apps Script syntax check passes.
+- [ ] Live Google Sheet confirms image previews display in `Records_All`.
+- [ ] Live Google Sheet confirms image previews display in `Photos`.
+- [ ] Physical two-device central refresh QA completed.

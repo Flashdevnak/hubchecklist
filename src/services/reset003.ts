@@ -10,7 +10,7 @@ export type ProofStatus =
   | 'VOIDED';
 
 export type DropType = 'NO_DROP' | 'DROP';
-export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2' | 'DROP_REAR_EXTRA';
+export type SlotType = 'REAR' | 'DROP_FRONT' | 'MAIN_REAR' | 'TRAILER_REAR' | 'TRAILER_REAR_EXTRA';
 export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
 
 export interface Hub {
@@ -45,6 +45,8 @@ export interface PhotoSlot {
   imageLocalData?: string;
   driveUrl?: string;
   driveFileId?: string;
+  imagePreviewUrl?: string;
+  imageFormula?: string;
   capturedAt?: string;
   latitude?: number;
   longitude?: number;
@@ -410,15 +412,18 @@ export async function syncOneRecord(record: ProofRecord): Promise<{ record: Proo
   try {
     const response = await callCentral<{ record?: unknown }>('syncRecord', {
       record: toCentralRecord(record),
-      photoMetadata: record.photoSlots.map((slot) => toCentralPhoto(record, slot)),
+      photoMetadata: record.photoSlots.filter((slot) => slot.captured).map((slot) => toCentralPhoto(record, slot)),
     });
+    const centralRecord = response.data?.record ? normalizeRecordFromAny(response.data.record) : null;
     const synced = upsertLocalRecord({
       ...record,
+      ...(centralRecord ?? {}),
       status: 'SYNCED',
       syncedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     removePending(record.recordId);
+    await pullCentralData();
     return { record: synced, message: response.message || 'ซิงก์แล้ว' };
   } catch (error) {
     const failed = upsertLocalRecord({ ...record, status: 'SYNC_FAILED', updatedAt: new Date().toISOString() });
@@ -607,9 +612,9 @@ export function statusRank(record: ProofRecord): number {
     SYNCED: 90,
     COMPLETE: 80,
     NEED_REVIEW: 70,
-    PENDING_SYNC: 60,
-    SYNCING: 55,
-    SYNC_FAILED: 50,
+    SYNC_FAILED: 60,
+    PENDING_SYNC: 50,
+    SYNCING: 45,
     IN_PROGRESS: 40,
     DRAFT: 30,
     VOIDED: 10,
@@ -637,20 +642,24 @@ function seedFallbackData(): void {
 function createPhotoSlots(dropType: DropType, dropCount: number): PhotoSlot[] {
   if (dropType === 'NO_DROP') {
     return [
-      makeSlot('REAR_MAIN', 'รูปหลังรถ'),
-      makeSlot('FRONT_DROP', 'รูปหน้าดรอป'),
+      makeSlot('rear', 'REAR', 'รูปหลังรถ'),
+      makeSlot('dropFront', 'DROP_FRONT', 'รูปหน้าดรอป'),
     ];
   }
-  const slots: PhotoSlot[] = [makeSlot('REAR_MAIN', 'รูปหลังรถหลัก')];
+  const slots: PhotoSlot[] = [makeSlot('mainRear', 'MAIN_REAR', 'รูปหลังรถหลัก')];
   for (let index = 1; index <= Math.max(2, dropCount); index += 1) {
-    slots.push(makeSlot(index === 1 ? 'DROP_REAR_1' : index === 2 ? 'DROP_REAR_2' : 'DROP_REAR_EXTRA', `รูปหลังรถพ่วง ${index}`));
+    slots.push(makeSlot(
+      index <= 2 ? `trailerRear${index}` : `trailerRearExtra${index}`,
+      index <= 2 ? 'TRAILER_REAR' : 'TRAILER_REAR_EXTRA',
+      `รูปหลังรถพ่วง ${index}`,
+    ));
   }
   return slots;
 }
 
-function makeSlot(slotType: SlotType, label: string): PhotoSlot {
+function makeSlot(slotId: string, slotType: SlotType, label: string): PhotoSlot {
   return {
-    slotId: crypto.randomUUID?.() ?? `${slotType}-${Date.now()}-${Math.random()}`,
+    slotId,
     slotType,
     label,
     required: true,
@@ -660,7 +669,7 @@ function makeSlot(slotType: SlotType, label: string): PhotoSlot {
 }
 
 function carryExistingPhotos(existing: PhotoSlot[], next: PhotoSlot[]): PhotoSlot[] {
-  return next.map((slot) => existing.find((item) => item.slotType === slot.slotType && item.label === slot.label) ?? slot);
+  return next.map((slot) => existing.find((item) => item.slotId === slot.slotId || (item.slotType === slot.slotType && item.label === slot.label)) ?? slot);
 }
 
 function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]): ProofRecord[] {
@@ -758,15 +767,27 @@ function toCentralPhoto(record: ProofRecord, slot: PhotoSlot): Record<string, un
     hubCode: record.hubCode,
     responsibleEmployeeCode: record.responsibleEmployeeCode,
     vehicleBarcode: record.vehicleBarcode,
-    photoSlot: slot.slotType,
+    photoSlot: slot.slotId,
+    slotId: slot.slotId,
+    slotType: slot.slotType,
+    labelThai: slot.label,
     photoType: slot.label,
     fileName: slot.fileName ?? '',
+    driveFileId: slot.driveFileId ?? '',
+    driveUrl: slot.driveUrl ?? '',
+    imagePreviewUrl: slot.imagePreviewUrl ?? '',
+    imageFormula: slot.imageFormula ?? '',
     imageLocalData: slot.imageLocalData ?? '',
     capturedAt: slot.capturedAt ?? '',
     latitude: slot.latitude ?? '',
     longitude: slot.longitude ?? '',
     accuracy: slot.accuracy ?? '',
+    gpsLat: slot.latitude ?? '',
+    gpsLng: slot.longitude ?? '',
+    gpsAccuracy: slot.accuracy ?? '',
+    gpsStatus: slot.gpsStatus,
     addressText: slot.addressText ?? '',
+    watermarkText: slot.watermarkText ?? '',
     watermarkApplied: Boolean(slot.watermarkText),
   };
 }

@@ -480,3 +480,37 @@ Do not mark Flash live automation passed until a physical Android device has loa
     - `.\gradlew.bat assembleDebug` from `android`
     - Apps Script syntax check
     - mojibake scan
+
+## RESET-012 Central Photo Preview Test Plan
+
+1. Submit one `ไม่พ่วงดรอป` record with two photos.
+   - Confirm `Records_All` has one logical row for the duplicate key.
+   - Confirm `Records_All` photo columns are not empty.
+   - Confirm `Photos` has two rows.
+   - Confirm `Photos.slotId`, `Photos.slotType`, and `Photos.labelThai` are not empty.
+   - Confirm `Photos.imagePreview` contains an `IMAGE()` formula.
+
+2. Open Google Sheets after Apps Script deployment.
+   - Confirm `Records_All` shows image previews or clickable formula/link cells.
+   - Confirm `Photos` shows image previews.
+   - Confirm raw Drive URLs remain available.
+
+3. Cross-device refresh.
+   - Device A submits a completed record.
+   - Device B presses `รีเฟรชข้อมูล`.
+   - Confirm Device B sees the submitted central record.
+   - Confirm completed/synced records are hidden from active My Work unless `ดูงานที่ส่งแล้ว` is enabled.
+
+4. Duplicate prevention.
+   - Submit a barcode once.
+   - Scan the same barcode again for the same date, hub, and responsible staff.
+   - Confirm no stale pending duplicate appears.
+
+5. Submit success and failure.
+   - With central configured and Apps Script returning OK, confirm `ส่งข้อมูลแล้ว` appears.
+   - Confirm buttons work: `สแกนคันถัดไป`, `ดูงานของฉัน`, and `ดูรายละเอียด`.
+   - With central missing or failing, confirm the app shows pending/failed sync and does not show `ส่งข้อมูลแล้ว`.
+
+6. Time and text.
+   - Confirm Sheet times use Bangkok `yyyy-MM-dd HH:mm:ss`.
+   - Run mojibake scan and confirm no broken Thai text is present.

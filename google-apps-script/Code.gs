@@ -16,54 +16,71 @@ const HEADERS = {
   Hubs: ['hubCode', 'hubName', 'active', 'note', 'updatedAt'],
   ResponsibleStaff: ['employeeCode', 'employeeName', 'hubCode', 'active', 'note', 'updatedAt'],
   Records_All: [
+    'วันที่',
+    'ฮับ',
+    'ผู้รับผิดชอบ',
+    'บาร์โค้ดรถ',
+    'พ่วงดรอปหรือไม่',
+    'จำนวนดรอป',
+    'สถานะ',
+    'รูปหลังรถ',
+    'รูปหน้าดรอป',
+    'รูปหลังรถพ่วงที่ 1',
+    'รูปหลังรถพ่วงที่ 2',
+    'รูปหลังรถพ่วงเพิ่ม',
+    'รายการรูปที่ขาด',
+    'เวลาส่งข้อมูล',
+    'หมายเหตุ',
     'recordId',
     'duplicateKey',
-    'date',
-    'วันที่',
+    'syncStatus',
+    'updatedAt',
     'hubCode',
-    'ฮับ',
     'responsibleEmployeeCode',
     'responsibleName',
-    'ผู้รับผิดชอบ',
-    'vehicleBarcode',
-    'บาร์โค้ดรถ',
-    'dropType',
-    'พ่วงดรอปหรือไม่',
-    'dropCount',
-    'จำนวนดรอป',
-    'statusInternal',
-    'สถานะ',
     'photoRequiredCount',
     'photoDoneCount',
-    'รายการรูปที่ขาด',
     'submittedAt',
     'syncedAt',
     'createdAt',
-    'updatedAt',
     'duplicateOfRecordId',
     'duplicateReason',
+    'date',
+    'vehicleBarcode',
+    'dropType',
+    'dropCount',
+    'statusInternal',
     'note',
   ],
   Photos: [
     'photoId',
     'recordId',
     'duplicateKey',
-    'date',
-    'hubCode',
-    'responsibleEmployeeCode',
     'vehicleBarcode',
-    'photoSlot',
-    'ประเภทรูป',
+    'slotId',
+    'slotType',
+    'labelThai',
+    'capturedAt',
     'fileName',
     'driveFileId',
     'driveUrl',
-    'capturedAt',
-    'latitude',
-    'longitude',
-    'accuracy',
+    'imagePreviewUrl',
+    'imagePreview',
+    'imageFormula',
+    'gpsLat',
+    'gpsLng',
+    'gpsAccuracy',
+    'gpsStatus',
     'addressText',
-    'watermarkApplied',
+    'watermarkText',
+    'hub',
+    'responsible',
     'createdAt',
+    'updatedAt',
+    'date',
+    'hubCode',
+    'responsibleEmployeeCode',
+    'watermarkApplied',
   ],
   Settings: ['key', 'value', 'updatedAt', 'note'],
   Audit: ['auditId', 'action', 'message', 'recordId', 'actor', 'detailJson', 'createdAt'],
@@ -313,6 +330,8 @@ function syncRecord_(record, photoMetadata) {
   if (!record) throw new Error('Missing record');
   const duplicateKey = clean_(record.duplicateKey) || duplicateKey_(record);
   const now = bangkokNow_();
+  const incomingStatus = clean_(record.statusInternal || record.status);
+  const finalStatus = incomingStatus === 'COMPLETE' ? 'SYNCED' : incomingStatus;
   const values = {
     recordId: clean_(record.recordId) || Utilities.getUuid(),
     duplicateKey: duplicateKey,
@@ -329,8 +348,9 @@ function syncRecord_(record, photoMetadata) {
     'พ่วงดรอปหรือไม่': clean_(record.dropType) === 'DROP' ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
     dropCount: Number(record.dropCount || 0),
     'จำนวนดรอป': Number(record.dropCount || 0),
-    statusInternal: clean_(record.statusInternal || record.status),
-    'สถานะ': statusThai_(clean_(record.statusInternal || record.status)),
+    statusInternal: finalStatus,
+    syncStatus: finalStatus === 'SYNCED' ? 'SYNCED' : '',
+    'สถานะ': statusThai_(finalStatus),
     photoRequiredCount: Number(record.photoRequiredCount || 0),
     photoDoneCount: Number(record.photoDoneCount || 0),
     'รายการรูปที่ขาด': Array.isArray(record.missingPhotoLabels) ? record.missingPhotoLabels.join(', ') : clean_(record.missingPhotoLabels),
@@ -341,13 +361,27 @@ function syncRecord_(record, photoMetadata) {
     duplicateOfRecordId: clean_(record.duplicateOfRecordId),
     duplicateReason: clean_(record.duplicateReason),
     note: clean_(record.note),
+    'เวลาส่งข้อมูล': formatBangkok_(record.submittedAt || now),
+    'หมายเหตุ': clean_(record.note),
   };
   upsertByKey_(SHEETS.RECORDS, 'duplicateKey', duplicateKey, values);
   (photoMetadata || []).forEach(function (photo) {
-    savePhotoMetadata_(photo);
+    savePhotoMetadata_(Object.assign({}, photo, {
+      recordId: values.recordId,
+      duplicateKey: duplicateKey,
+      date: values.date,
+      hubCode: values.hubCode,
+      responsibleEmployeeCode: values.responsibleEmployeeCode,
+      vehicleBarcode: values.vehicleBarcode,
+      hub: values['ฮับ'],
+      responsible: values['ผู้รับผิดชอบ'],
+    }));
   });
+  updateRecordPhotoColumns_(values.recordId, duplicateKey);
+  const finalRowIndex = findRow_(sheet_(SHEETS.RECORDS), 'duplicateKey', duplicateKey);
+  const finalRecord = finalRowIndex > 1 ? rowObject_(sheet_(SHEETS.RECORDS), finalRowIndex) : values;
   logAudit_({ action: 'record_sync', message: 'ซิงก์งาน', recordId: values.recordId, actor: values.responsibleEmployeeCode, detailJson: JSON.stringify({ duplicateKey: duplicateKey }) });
-  return { record: values };
+  return { record: finalRecord };
 }
 
 function syncBatch_(payload) {
@@ -360,31 +394,128 @@ function syncBatch_(payload) {
 
 function savePhotoMetadata_(photo) {
   if (!photo) throw new Error('Missing photo');
-  const id = clean_(photo.photoId) || [photo.recordId, photo.photoSlot || photo.slotId].filter(Boolean).join('_') || Utilities.getUuid();
+  const slotId = clean_(photo.slotId || photo.photoSlot);
+  const slotType = clean_(photo.slotType);
+  const labelThai = clean_(photo.labelThai || photo.photoType || photo.label);
+  if (!slotId || !slotType || !labelThai) throw new Error('ข้อมูลประเภทรูปไม่ครบ กรุณาถ่ายรูปใหม่');
+  const id = clean_(photo.photoId) || [photo.recordId, slotId].filter(Boolean).join('_') || Utilities.getUuid();
   const upload = uploadPhoto_(photo);
+  const imageFormula = upload.imagePreviewUrl ? imageFormula_(upload.imagePreviewUrl, 100, 140) : clean_(photo.imageFormula);
   const values = {
     photoId: id,
     recordId: clean_(photo.recordId),
     duplicateKey: clean_(photo.duplicateKey),
-    date: clean_(photo.date),
-    hubCode: clean_(photo.hubCode),
-    responsibleEmployeeCode: clean_(photo.responsibleEmployeeCode),
     vehicleBarcode: clean_(photo.vehicleBarcode).toUpperCase(),
-    photoSlot: clean_(photo.photoSlot || photo.slotType || photo.slotId),
-    'ประเภทรูป': clean_(photo.photoType || photo.labelThai || photo.label),
+    slotId: slotId,
+    slotType: slotType,
+    labelThai: labelThai,
+    capturedAt: formatBangkok_(photo.capturedAt),
     fileName: clean_(photo.fileName),
     driveFileId: upload.driveFileId,
     driveUrl: upload.driveUrl,
-    capturedAt: formatBangkok_(photo.capturedAt),
-    latitude: clean_(photo.latitude),
-    longitude: clean_(photo.longitude),
-    accuracy: clean_(photo.accuracy),
+    imagePreviewUrl: upload.imagePreviewUrl,
+    imagePreview: imageFormula,
+    imageFormula: imageFormula,
+    gpsLat: clean_(photo.gpsLat || photo.latitude),
+    gpsLng: clean_(photo.gpsLng || photo.longitude),
+    gpsAccuracy: clean_(photo.gpsAccuracy || photo.accuracy),
+    gpsStatus: clean_(photo.gpsStatus),
     addressText: clean_(photo.addressText),
-    watermarkApplied: photo.watermarkApplied === true ? 'TRUE' : 'FALSE',
+    watermarkText: clean_(photo.watermarkText),
+    hub: clean_(photo.hub),
+    responsible: clean_(photo.responsible),
     createdAt: bangkokNow_(),
+    updatedAt: bangkokNow_(),
+    date: clean_(photo.date),
+    hubCode: clean_(photo.hubCode),
+    responsibleEmployeeCode: clean_(photo.responsibleEmployeeCode),
+    watermarkApplied: photo.watermarkApplied === true ? 'TRUE' : 'FALSE',
   };
-  upsertByKey_(SHEETS.PHOTOS, 'photoId', id, values);
+  upsertPhotoByRecordSlot_(values);
+  updateRecordPhotoColumns_(values.recordId, values.duplicateKey);
   return values;
+}
+
+function upsertPhotoByRecordSlot_(values) {
+  const sheet = sheet_(SHEETS.PHOTOS);
+  let rowIndex = findRow_(sheet, 'photoId', values.photoId);
+  if (rowIndex < 2) rowIndex = findPhotoRowByRecordSlot_(sheet, values.recordId, values.slotId);
+  if (rowIndex > 1) writeRow_(sheet, rowIndex, values);
+  else sheet.appendRow(rowFor_(sheet, values));
+}
+
+function findPhotoRowByRecordSlot_(sheet, recordId, slotId) {
+  const all = rows_(SHEETS.PHOTOS);
+  for (let index = 0; index < all.length; index += 1) {
+    if (clean_(all[index].recordId) === clean_(recordId) && clean_(all[index].slotId) === clean_(slotId)) return index + 2;
+  }
+  return -1;
+}
+
+function updateRecordPhotoColumns_(recordId, duplicateKey) {
+  const sheet = sheet_(SHEETS.RECORDS);
+  let rowIndex = findRow_(sheet, 'recordId', clean_(recordId));
+  if (rowIndex < 2) rowIndex = findRow_(sheet, 'duplicateKey', clean_(duplicateKey));
+  if (rowIndex < 2) return;
+
+  const record = rowObject_(sheet, rowIndex);
+  const photos = rows_(SHEETS.PHOTOS).filter(function (photo) {
+    return (recordId && clean_(photo.recordId) === clean_(recordId))
+      || (duplicateKey && clean_(photo.duplicateKey) === clean_(duplicateKey));
+  });
+  const columnValues = photoColumnValues_(record, photos);
+  Object.keys(columnValues).forEach(function (header) {
+    setCellByHeader_(sheet, rowIndex, header, columnValues[header]);
+  });
+  setCellByHeader_(sheet, rowIndex, 'photoDoneCount', photos.filter(function (photo) { return clean_(photo.driveUrl) || clean_(photo.imagePreviewUrl); }).length);
+  setCellByHeader_(sheet, rowIndex, 'updatedAt', bangkokNow_());
+}
+
+function photoColumnValues_(record, photos) {
+  const bySlot = {};
+  photos.forEach(function (photo) {
+    const slotId = clean_(photo.slotId);
+    const slotType = clean_(photo.slotType);
+    const cell = clean_(photo.imageFormula) || clean_(photo.imagePreview) || clean_(photo.driveUrl);
+    if (!cell) return;
+    if (slotId === 'rear' || slotType === 'REAR' || slotType === 'REAR_MAIN') bySlot.rear = cell;
+    if (slotId === 'dropFront' || slotType === 'DROP_FRONT' || slotType === 'FRONT_DROP') bySlot.dropFront = cell;
+    if (slotId === 'mainRear' || slotType === 'MAIN_REAR') bySlot.mainRear = cell;
+    if (slotId === 'trailerRear1') bySlot.trailerRear1 = cell;
+    else if (slotId === 'trailerRear2') bySlot.trailerRear2 = cell;
+    else if (slotType === 'DROP_REAR_1') bySlot.trailerRear1 = cell;
+    else if (slotType === 'DROP_REAR_2') bySlot.trailerRear2 = cell;
+    else if (slotType === 'DROP_REAR_EXTRA') bySlot.extra = bySlot.extra || cell;
+    else if (slotType === 'TRAILER_REAR' && !bySlot.trailerRear1) bySlot.trailerRear1 = cell;
+    else if (slotType === 'TRAILER_REAR' && !bySlot.trailerRear2) bySlot.trailerRear2 = cell;
+    if (slotId.indexOf('trailerRearExtra') === 0 || slotType === 'TRAILER_REAR_EXTRA') bySlot.extra = bySlot.extra || cell;
+  });
+
+  const isDrop = clean_(record.dropType) === 'DROP' || clean_(record['พ่วงดรอปหรือไม่']).indexOf('พ่วง') >= 0;
+  const missing = [];
+  if (isDrop) {
+    if (!bySlot.mainRear) missing.push('รูปหลังรถหลัก');
+    if (!bySlot.trailerRear1) missing.push('รูปหลังรถพ่วง 1');
+    if (!bySlot.trailerRear2) missing.push('รูปหลังรถพ่วง 2');
+  } else {
+    if (!bySlot.rear) missing.push('รูปหลังรถ');
+    if (!bySlot.dropFront) missing.push('รูปหน้าดรอป');
+  }
+
+  return {
+    'รูปหลังรถ': isDrop ? (bySlot.mainRear || '') : (bySlot.rear || ''),
+    'รูปหน้าดรอป': isDrop ? '' : (bySlot.dropFront || ''),
+    'รูปหลังรถพ่วงที่ 1': bySlot.trailerRear1 || '',
+    'รูปหลังรถพ่วงที่ 2': bySlot.trailerRear2 || '',
+    'รูปหลังรถพ่วงเพิ่ม': bySlot.extra || '',
+    'รายการรูปที่ขาด': missing.join(', '),
+  };
+}
+
+function setCellByHeader_(sheet, rowIndex, header, value) {
+  const column = headers_(sheet).indexOf(header) + 1;
+  if (column <= 0) return;
+  sheet.getRange(rowIndex, column).setValue(value);
 }
 
 function filterRecords_(payload) {
@@ -452,13 +583,37 @@ function seedDefaultRows_() {
 
 function uploadPhoto_(photo) {
   const data = clean_(photo.imageLocalData);
-  if (!data || data.indexOf('data:image/') !== 0) return { driveFileId: clean_(photo.driveFileId), driveUrl: clean_(photo.driveUrl) };
+  if (!data || data.indexOf('data:image/') !== 0) {
+    const fileId = clean_(photo.driveFileId);
+    return {
+      driveFileId: fileId,
+      driveUrl: clean_(photo.driveUrl),
+      imagePreviewUrl: clean_(photo.imagePreviewUrl) || (fileId ? previewUrl_(fileId, 400) : ''),
+    };
+  }
   const match = data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) return { driveFileId: '', driveUrl: '' };
+  if (!match) return { driveFileId: '', driveUrl: '', imagePreviewUrl: '' };
   const folder = photoFolder_(photo);
   const blob = Utilities.newBlob(Utilities.base64Decode(match[2]), match[1], safeName_(photo.fileName || `${photo.vehicleBarcode}_${photo.photoSlot}.jpg`));
   const file = folder.createFile(blob);
-  return { driveFileId: file.getId(), driveUrl: file.getUrl() };
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (error) {
+    logAudit_({ action: 'photo_preview_warning', message: 'แสดงรูปไม่ได้', actor: 'system', detailJson: JSON.stringify({ error: String(error).slice(0, 120) }) });
+  }
+  return {
+    driveFileId: file.getId(),
+    driveUrl: `https://drive.google.com/file/d/${file.getId()}/view?usp=drivesdk`,
+    imagePreviewUrl: previewUrl_(file.getId(), 400),
+  };
+}
+
+function previewUrl_(fileId, size) {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}`;
+}
+
+function imageFormula_(url, height, width) {
+  return url ? `=IMAGE("${url}", 4, ${height}, ${width})` : '';
 }
 
 function photoFolder_(photo) {

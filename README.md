@@ -146,6 +146,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | RESET-009A Central sync history cleanup and final UI polish | Complete | Central admin saves, clean Frontline active/history split, Backoffice filters, Apps Script history aliases, and UI polish implemented; live sheet/device QA pending |
 | RESET-010 Central sync dedupe fullscreen scanner watermark UI | Complete | Central pull/merge, duplicate hiding, fullscreen scanner shell, safe cache tools, and watermark location fallback implemented; live deployment/device QA pending |
 | RESET-011 Full rebuild central-first Hub Photo Proof | Complete | React app, central API service, Apps Script router, scanner, photo flow, Backoffice, cache tools, and docs rebuilt around Google Sheets as source of truth; live deployment/device QA pending |
+| RESET-012 Central photo previews and submit success flow | Complete | Photo slot metadata, Drive thumbnail formulas, Records_All photo linking, stricter central sync success, and Thai submit success screen implemented; live Sheet/device QA pending |
 
 ## Key Docs
 
@@ -181,6 +182,18 @@ Apps Script formats readable Sheet times with `Asia/Bangkok` as `yyyy-MM-dd HH:m
 - Scanner is fullscreen with dark overlay, yellow scan frame, close button, manual input bottom sheet, and no normal app chrome.
 - Watermark draws direct text with shadow/stroke and includes date, time, GPS, location fallback, barcode, hub, responsible staff, and photo type. It does not fake an address.
 - Safe cache clear only removes local display/cache preferences and refuses to run while pending sync exists. It never deletes Google Sheet rows or Drive files.
+
+## RESET-012 Central Photo Sync Fix
+
+- Frontend now sends complete photo slot metadata for every captured photo: `slotId`, `slotType`, and `labelThai`.
+- Apps Script rejects photo rows with missing slot metadata using Thai error text instead of writing blank slot cells.
+- Drive uploads are shared with anyone-with-link view when possible.
+- Apps Script stores `driveUrl`, `imagePreviewUrl`, and `imageFormula`.
+- `Photos` sheet receives an `imagePreview` formula cell.
+- `Records_All` photo columns are updated from the matching `Photos` rows by `recordId` or `duplicateKey`.
+- Complete central saves return `ซิงก์แล้ว`; the app does not show the success screen unless central sync returns OK.
+- After successful submit, staff see `ส่งข้อมูลแล้ว` with actions for scanning the next vehicle, viewing My Work, or opening details.
+- Cross-device refresh uses central `getRecords` and local dedupe by duplicate key so another device can see submitted records after pulling latest data.
 
 ## RESET-009 Polish
 

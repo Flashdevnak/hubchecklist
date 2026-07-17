@@ -414,3 +414,27 @@ Still manual:
 - Run real two-device sync test.
 - Run Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop browser QA.
 - Confirm real camera scanning and photo capture on physical devices.
+
+## RESET-012 Central Sync Photo Preview Fix
+
+Status: complete in code, pending live Apps Script deployment and live Google Sheet/device QA.
+
+RESET-012 fixes real central sync issues found during Google Sheet review:
+
+- Captured photos now sync complete slot metadata: `slotId`, `slotType`, and `labelThai`.
+- Apps Script rejects photo metadata when the photo type fields are incomplete.
+- Drive uploads are shared with anyone-with-link view when possible.
+- Apps Script writes `driveUrl`, `imagePreviewUrl`, and `imageFormula`.
+- `Photos.imagePreview` uses a Google Sheets `IMAGE()` formula for in-sheet preview.
+- `Records_All` photo columns are filled from the matching photo rows by `recordId` or `duplicateKey`.
+- Complete centrally saved work is marked `ซิงก์แล้ว`.
+- The app shows `ส่งข้อมูลแล้ว` only after central sync succeeds.
+- Failed central sync remains `รอซิงก์` or `ซิงก์ไม่สำเร็จ` and does not show fake success.
+
+Live checks still required:
+
+- Deploy the updated Apps Script Web App.
+- Submit one real record with two photos.
+- Confirm `Records_All` photo preview columns render images or clickable image cells.
+- Confirm `Photos` has non-empty `slotId`, `slotType`, `labelThai`, and image preview formulas.
+- Confirm another device sees the submitted work after `รีเฟรชข้อมูล`.
