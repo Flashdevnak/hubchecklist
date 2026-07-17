@@ -41,10 +41,13 @@ import {
   normalizeVehicleBarcode,
   retryPendingSync,
   revokeAdminDevice,
+  deactivateCentralHub,
+  deactivateCentralResponsibleStaff,
   saveActiveContext,
   saveHubs,
   saveRecords,
   saveResponsibleStaff,
+  saveCentralSafeSettings,
   saveSettings,
   setAdminPin,
   setCentralAdminDeviceApprovalRequired,
@@ -56,6 +59,8 @@ import {
   verifyAdminPin,
   resetLocalTestData,
   updatePhotoSlotsForDropCount,
+  upsertCentralHub,
+  upsertCentralResponsibleStaff,
   upsertRecord,
 } from './services/reset003';
 
@@ -793,16 +798,60 @@ function HubManager({ onReload }: { onReload: () => void }) {
   const [hubs, setHubs] = useState(listHubs());
   const [hubCode, setHubCode] = useState(DEFAULT_HUB.hubCode);
   const [hubName, setHubName] = useState(DEFAULT_HUB.hubName);
-  const save = () => {
-    const next = [...hubs.filter((hub) => hub.hubCode !== hubCode), { hubCode, hubName, active: true }];
-    saveHubs(next);
-    setHubs(next);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const refreshCentral = async () => {
+    const cache = await bootstrapCentralConfig();
+    setHubs(cache.hubs);
     onReload();
   };
-  const remove = (code: string) => {
-    const next = hubs.filter((hub) => hub.hubCode !== code);
+  const save = async () => {
+    const cleanedCode = hubCode.trim();
+    const cleanedName = hubName.trim();
+    if (!cleanedCode || !cleanedName) return;
+    setSaving(true);
+    setMessage('');
+    const currentSettings = getSettings();
+    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
+    if (centralReady) {
+      const result = await upsertCentralHub({ hubCode: cleanedCode, hubName: cleanedName, active: true });
+      if (result.ok) {
+        await refreshCentral();
+        setMessage('บันทึกลงระบบกลางแล้ว');
+      } else {
+        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      }
+      setSaving(false);
+      return;
+    }
+    const next = [...hubs.filter((hub) => hub.hubCode !== cleanedCode), { hubCode: cleanedCode, hubName: cleanedName, active: true }];
     saveHubs(next);
     setHubs(next);
+    setMessage('บันทึกในเครื่องแล้ว');
+    setSaving(false);
+    onReload();
+  };
+  const remove = async (code: string) => {
+    setSaving(true);
+    setMessage('');
+    const currentSettings = getSettings();
+    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
+    if (centralReady) {
+      const result = await deactivateCentralHub(code);
+      if (result.ok) {
+        await refreshCentral();
+        setMessage('บันทึกลงระบบกลางแล้ว');
+      } else {
+        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      }
+      setSaving(false);
+      return;
+    }
+    const next = hubs.map((hub) => hub.hubCode === code ? { ...hub, active: false } : hub);
+    saveHubs(next);
+    setHubs(next);
+    setMessage('ปิดใช้งานฮับแล้ว');
+    setSaving(false);
     onReload();
   };
   return (
@@ -811,29 +860,75 @@ function HubManager({ onReload }: { onReload: () => void }) {
       <div className="admin-form">
         <input value={hubCode} onChange={(event) => setHubCode(event.target.value)} placeholder="26NAK_BHUB" />
         <input value={hubName} onChange={(event) => setHubName(event.target.value)} placeholder="นครราชสีมา" />
-        <button className="primary-action" onClick={save} type="button"><Save size={18} /> บันทึกฮับ</button>
+        <button className="primary-action" disabled={saving} onClick={save} type="button"><Save size={18} /> เพิ่มฮับ / แก้ไขฮับ</button>
       </div>
-      {hubs.map((hub) => <AdminRow key={hub.hubCode} title={`${hub.hubCode}-${hub.hubName}`} onDelete={() => remove(hub.hubCode)} />)}
+      {saving ? <p className="simple-message">กำลังบันทึก</p> : null}
+      {message ? <p className="simple-message">{message}</p> : null}
+      {hubs.filter((hub) => hub.active).map((hub) => <AdminRow key={hub.hubCode} title={`${hub.hubCode}-${hub.hubName}`} onDelete={() => void remove(hub.hubCode)} deleteLabel="ปิดใช้งานฮับ" />)}
     </section>
   );
 }
 
 function StaffManager({ onReload }: { onReload: () => void }) {
   const [staff, setStaff] = useState(listResponsibleStaff());
-  const hubs = listHubs();
+  const hubs = listHubs().filter((hub) => hub.active);
   const [employeeCode, setEmployeeCode] = useState(DEFAULT_STAFF.employeeCode);
   const [displayName, setDisplayName] = useState(DEFAULT_STAFF.displayName);
   const [hubCode, setHubCode] = useState(hubs[0]?.hubCode ?? DEFAULT_HUB.hubCode);
-  const save = () => {
-    const next = [...staff.filter((item) => item.employeeCode !== employeeCode), { employeeCode, displayName, hubCode, active: true }];
-    saveResponsibleStaff(next);
-    setStaff(next);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const refreshCentral = async () => {
+    const cache = await bootstrapCentralConfig();
+    setStaff(cache.responsibleStaff);
     onReload();
   };
-  const remove = (code: string) => {
-    const next = staff.filter((item) => item.employeeCode !== code);
+  const save = async () => {
+    const cleanedCode = employeeCode.trim();
+    const cleanedName = displayName.trim();
+    if (!cleanedCode || !cleanedName || !hubCode) return;
+    setSaving(true);
+    setMessage('');
+    const currentSettings = getSettings();
+    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
+    if (centralReady) {
+      const result = await upsertCentralResponsibleStaff({ employeeCode: cleanedCode, displayName: cleanedName, hubCode, active: true });
+      if (result.ok) {
+        await refreshCentral();
+        setMessage('บันทึกลงระบบกลางแล้ว');
+      } else {
+        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      }
+      setSaving(false);
+      return;
+    }
+    const next = [...staff.filter((item) => !(item.employeeCode === cleanedCode && item.hubCode === hubCode)), { employeeCode: cleanedCode, displayName: cleanedName, hubCode, active: true }];
     saveResponsibleStaff(next);
     setStaff(next);
+    setMessage('บันทึกในเครื่องแล้ว');
+    setSaving(false);
+    onReload();
+  };
+  const remove = async (code: string, targetHubCode: string) => {
+    setSaving(true);
+    setMessage('');
+    const currentSettings = getSettings();
+    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
+    if (centralReady) {
+      const result = await deactivateCentralResponsibleStaff(code, targetHubCode);
+      if (result.ok) {
+        await refreshCentral();
+        setMessage('บันทึกลงระบบกลางแล้ว');
+      } else {
+        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      }
+      setSaving(false);
+      return;
+    }
+    const next = staff.map((item) => item.employeeCode === code && item.hubCode === targetHubCode ? { ...item, active: false } : item);
+    saveResponsibleStaff(next);
+    setStaff(next);
+    setMessage('ปิดใช้งานผู้รับผิดชอบแล้ว');
+    setSaving(false);
     onReload();
   };
   return (
@@ -845,9 +940,11 @@ function StaffManager({ onReload }: { onReload: () => void }) {
         <select value={hubCode} onChange={(event) => setHubCode(event.target.value)}>
           {hubs.map((hub) => <option key={hub.hubCode} value={hub.hubCode}>{hub.hubCode}-{hub.hubName}</option>)}
         </select>
-        <button className="primary-action" onClick={save} type="button"><Save size={18} /> บันทึกผู้รับผิดชอบ</button>
+        <button className="primary-action" disabled={saving} onClick={save} type="button"><Save size={18} /> เพิ่มผู้รับผิดชอบ / แก้ไขผู้รับผิดชอบ</button>
       </div>
-      {staff.map((item) => <AdminRow key={item.employeeCode} title={`${item.employeeCode} ${item.displayName} / ${item.hubCode}`} onDelete={() => remove(item.employeeCode)} />)}
+      {saving ? <p className="simple-message">กำลังบันทึก</p> : null}
+      {message ? <p className="simple-message">{message}</p> : null}
+      {staff.filter((item) => item.active).map((item) => <AdminRow key={`${item.employeeCode}-${item.hubCode}`} title={`${item.employeeCode} ${item.displayName} / ${item.hubCode}`} onDelete={() => void remove(item.employeeCode, item.hubCode)} deleteLabel="ปิดใช้งานผู้รับผิดชอบ" />)}
     </section>
   );
 }
@@ -955,8 +1052,25 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   const [deviceApprovalMessage, setDeviceApprovalMessage] = useState('');
   const [repairMessage, setRepairMessage] = useState('');
   const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
-  const save = () => {
+  const save = async () => {
+    setSyncMessage('กำลังบันทึก');
+    const centralReady = Boolean(getCentralBackendUrl() || (settings.googleSyncMode === 'google_sheets' && settings.googleAppsScriptUrl.trim() && settings.googleSharedSecret.trim()));
+    if (centralReady) {
+      saveSettings(settings);
+      const result = await saveCentralSafeSettings(settings);
+      if (!result.ok) {
+        setSyncMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+        return;
+      }
+      saveSettings(settings);
+      await bootstrapCentralConfig();
+      setSyncMessage('บันทึกลงระบบกลางแล้ว');
+      setPendingSyncCount(getPendingSyncCount());
+      onReload();
+      return;
+    }
     saveSettings(settings);
+    setSyncMessage('บันทึกในเครื่องแล้ว');
     setPendingSyncCount(getPendingSyncCount());
     onReload();
   };
@@ -1234,11 +1348,11 @@ function RecordList({ actionLabel, onOpenRecord, records }: { actionLabel?: stri
   );
 }
 
-function AdminRow({ onDelete, title }: { onDelete: () => void; title: string }) {
+function AdminRow({ deleteLabel = 'ลบ', onDelete, title }: { deleteLabel?: string; onDelete: () => void; title: string }) {
   return (
     <article className="admin-row">
       <strong>{title}</strong>
-      <button className="icon-button" onClick={onDelete} type="button"><Trash2 size={18} /></button>
+      <button aria-label={deleteLabel} className="icon-button" onClick={onDelete} title={deleteLabel} type="button"><Trash2 size={18} /></button>
     </article>
   );
 }

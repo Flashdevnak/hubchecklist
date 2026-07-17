@@ -108,6 +108,15 @@ Apps Script creates these master sheets automatically:
 
 It also creates one readable hub-specific sheet per hub. `Records_All` remains the source of truth; hub sheets are views/copies for easier daily viewing.
 
+RESET-009A central admin settings:
+
+- `Hubs` columns are `hubCode | hubName | active | note`.
+- `ResponsibleStaff` columns are `employeeCode | employeeName | hubCode | active | note`.
+- Backoffice add/edit saves through Apps Script and refreshes bootstrap data after success.
+- Deactivate sets `active = FALSE` instead of hard deleting rows.
+- Responsible staff appears in Frontline only when `active = TRUE` and `hubCode` matches the selected hub exactly.
+- Safe Settings updates are limited to `GPS_REQUIRED` / `GPS_MANDATORY`, `WATERMARK_ENABLED`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `MINIMUM_APP_VERSION`.
+
 Record rows use the same simplified 15 columns as Excel export. Responsible appears as one value such as `25845 TUI`. Photo date/time/GPS are on the watermarked image and full metadata remains in `Photos`.
 
 Photo files are uploaded to Google Drive under:

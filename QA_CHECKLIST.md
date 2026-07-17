@@ -1,5 +1,26 @@
 ﻿# QA Checklist
 
+## RESET-009A Admin Settings Central Save
+
+- [x] Apps Script router supports `upsertHub`, `deactivateHub`, `getHubs`, `upsertResponsibleStaff`, `deactivateResponsibleStaff`, `getResponsibleStaff`, `updateSetting`, `getSettings`, and `getBootstrapData`
+- [x] `Hubs` uses `hubCode | hubName | active | note`
+- [x] Hub add/edit updates by `hubCode`
+- [x] Hub deactivate is soft delete only and sets `active = FALSE`
+- [x] `ResponsibleStaff` uses `employeeCode | employeeName | hubCode | active | note`
+- [x] Responsible staff add/edit updates by exact `employeeCode + hubCode`
+- [x] Responsible staff deactivate is soft delete only and sets `active = FALSE`
+- [x] Bootstrap/dropdowns consume active hubs and active responsible staff
+- [x] Responsible staff remains filtered by exact selected `hubCode`
+- [x] Backoffice Settings saves safe settings through Apps Script when central config exists
+- [x] Secret/admin keys `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not exposed as editable settings
+- [x] Admin changes write audit actions `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update`
+- [x] UI only shows `บันทึกลงระบบกลางแล้ว` after the Apps Script call succeeds
+- [x] UI shows `บันทึกไม่สำเร็จ กรุณาลองใหม่` when the Apps Script call fails
+- [x] TypeScript passes
+- [x] Apps Script syntax check passes
+- [ ] Live Apps Script deployment and real Google Sheet row verification remain manual
+- [ ] Physical Android device QA remains manual
+
 ## RESET-008A Simple Admin PIN Login
 
 - [x] Admin login modal asks only for Admin PIN by default

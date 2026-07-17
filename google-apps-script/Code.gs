@@ -10,7 +10,7 @@ const SHEETS = {
 };
 
 const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
-const APP_VERSION = 'RESET-009';
+const APP_VERSION = 'RESET-009A';
 const MISSING_PHOTO_TEXT = 'ยังไม่ได้ถ่าย';
 
 const SIMPLE_RECORD_HEADERS = [
@@ -68,8 +68,8 @@ const HEADERS = {
     'createdAt',
   ],
   Hubs: ['hubCode', 'hubName', 'active', 'note'],
-  ResponsibleStaff: ['employeeCode', 'displayName', 'hubCode', 'active', 'note'],
-  Audit: ['id', 'recordId', 'action', 'detail', 'actor', 'createdAt'],
+  ResponsibleStaff: ['employeeCode', 'employeeName', 'hubCode', 'active', 'note'],
+  Audit: ['id', 'recordId', 'action', 'message', 'detail', 'detailJson', 'actor', 'createdAt'],
   Settings: ['key', 'value', 'note', 'updatedAt'],
   AdminDevices: ['deviceId', 'deviceName', 'ownerName', 'role', 'status', 'approvedAt', 'revokedAt', 'lastLoginAt', 'note'],
   ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
@@ -106,6 +106,8 @@ function doPost(e) {
       case 'getSettings':
       case 'getAppSettings':
         return json_({ ok: true, appSettings: safeSettings_() });
+      case 'updateSetting':
+        return json_(updateSettingFromAdmin_(request.payload));
       case 'findRecordByKey':
         return json_(findRecordByKey_(request.payload));
       case 'upsertRecordByKey':
@@ -122,9 +124,17 @@ function doPost(e) {
       case 'getMyWork':
         return json_(getMyWork_(request.payload));
       case 'getHubs':
-        return json_({ ok: true, hubs: readRows_(SHEETS.HUBS) });
+        return json_({ ok: true, hubs: readActiveHubs_() });
+      case 'upsertHub':
+        return json_(upsertHub_(request.payload));
+      case 'deactivateHub':
+        return json_(deactivateHub_(request.payload));
       case 'getResponsibleStaff':
-        return json_({ ok: true, responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF) });
+        return json_({ ok: true, responsibleStaff: readActiveResponsibleStaff_() });
+      case 'upsertResponsibleStaff':
+        return json_(upsertResponsibleStaff_(request.payload));
+      case 'deactivateResponsibleStaff':
+        return json_(deactivateResponsibleStaff_(request.payload));
       case 'getRecords':
         return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
       case 'appendAudit':
@@ -237,8 +247,8 @@ function bootstrap_(payload) {
     serverTimeBangkok: formatBangkokDateTime_(new Date()),
     appVersion: APP_VERSION,
     appSettings: safeSettings_(),
-    hubs: readRows_(SHEETS.HUBS),
-    responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF),
+    hubs: readActiveHubs_(),
+    responsibleStaff: readActiveResponsibleStaff_(),
     adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
     minimumAppVersion: settings.MINIMUM_APP_VERSION || '0.1.0',
     deviceId: payload && payload.deviceId ? payload.deviceId : '',
@@ -253,9 +263,177 @@ function safeSettings_() {
     REQUIRE_ADMIN_DEVICE_APPROVAL: settings.REQUIRE_ADMIN_DEVICE_APPROVAL || 'false',
     APP_VERSION: settings.APP_VERSION || APP_VERSION,
     MINIMUM_APP_VERSION: settings.MINIMUM_APP_VERSION || '0.1.0',
+    GPS_REQUIRED: settings.GPS_REQUIRED || settings.GPS_MANDATORY || 'false',
     GPS_MANDATORY: settings.GPS_MANDATORY || 'false',
     WATERMARK_ENABLED: settings.WATERMARK_ENABLED || 'true',
   };
+}
+
+function updateSettingFromAdmin_(payload) {
+  if (!payload || !payload.key) throw new Error('Missing setting key');
+  const key = String(payload.key).trim().toUpperCase();
+  const allowed = {
+    GPS_REQUIRED: true,
+    GPS_MANDATORY: true,
+    WATERMARK_ENABLED: true,
+    REQUIRE_ADMIN_DEVICE_APPROVAL: true,
+    MINIMUM_APP_VERSION: true,
+  };
+  if (!allowed[key]) throw new Error('Setting is not editable from UI');
+  const value = normalizeSettingValue_(key, payload.value);
+  upsertSetting_(key, value);
+  if (key === 'GPS_REQUIRED') upsertSetting_('GPS_MANDATORY', value);
+  if (key === 'GPS_MANDATORY') upsertSetting_('GPS_REQUIRED', value);
+  appendAudit_({
+    action: 'setting_update',
+    message: 'Admin setting updated',
+    detailJson: JSON.stringify({ key: key, value: value }),
+    actor: payload.actor || payload.deviceId || 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: safeSettings_() };
+}
+
+function normalizeSettingValue_(key, value) {
+  if (key === 'MINIMUM_APP_VERSION') return String(value || '').trim();
+  return value === true || String(value).toLowerCase() === 'true' ? 'true' : 'false';
+}
+
+function readActiveHubs_() {
+  return readRows_(SHEETS.HUBS).filter(function (hub) {
+    return isActive_(hub.active);
+  });
+}
+
+function readActiveResponsibleStaff_() {
+  return readRows_(SHEETS.RESPONSIBLE_STAFF).filter(function (staff) {
+    return isActive_(staff.active);
+  });
+}
+
+function upsertHub_(payload) {
+  if (!payload || !payload.hubCode) throw new Error('Missing hubCode');
+  const sheet = getOrCreateSheet_(SHEETS.HUBS);
+  ensureHeaders_(sheet, HEADERS.Hubs);
+  const hubCode = String(payload.hubCode).trim();
+  const values = {
+    hubCode: hubCode,
+    hubName: String(payload.hubName || '').trim(),
+    active: payload.active === false || String(payload.active).toLowerCase() === 'false' ? 'FALSE' : 'TRUE',
+    note: payload.note || '',
+  };
+  const headers = getSheetHeaders_(sheet);
+  const row = rowForHeaders_(headers, values);
+  const rowIndex = findRowByHeaderValue_(sheet, 'hubCode', hubCode);
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  appendAudit_({
+    action: 'hub_upsert',
+    message: 'Hub saved',
+    detailJson: JSON.stringify(values),
+    actor: payload.actor || payload.deviceId || 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', hubs: readActiveHubs_() };
+}
+
+function deactivateHub_(payload) {
+  const hubCode = String(payload && payload.hubCode ? payload.hubCode : '').trim();
+  if (!hubCode) throw new Error('Missing hubCode');
+  const sheet = getOrCreateSheet_(SHEETS.HUBS);
+  ensureHeaders_(sheet, HEADERS.Hubs);
+  const rowIndex = findRowByHeaderValue_(sheet, 'hubCode', hubCode);
+  if (rowIndex < 0) throw new Error('Hub not found');
+  const existing = readRowObject_(sheet, rowIndex);
+  existing.active = 'FALSE';
+  existing.note = payload.note || existing.note || '';
+  const row = rowForHeaders_(getSheetHeaders_(sheet), existing);
+  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  appendAudit_({
+    action: 'hub_deactivate',
+    message: 'Hub deactivated',
+    detailJson: JSON.stringify({ hubCode: hubCode }),
+    actor: payload.actor || payload.deviceId || 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', hubs: readActiveHubs_() };
+}
+
+function upsertResponsibleStaff_(payload) {
+  if (!payload || !payload.employeeCode || !payload.hubCode) throw new Error('Missing employeeCode or hubCode');
+  const sheet = getOrCreateSheet_(SHEETS.RESPONSIBLE_STAFF);
+  ensureHeaders_(sheet, HEADERS.ResponsibleStaff);
+  const values = {
+    employeeCode: String(payload.employeeCode).trim(),
+    employeeName: String(payload.employeeName || payload.displayName || '').trim(),
+    hubCode: String(payload.hubCode).trim(),
+    active: payload.active === false || String(payload.active).toLowerCase() === 'false' ? 'FALSE' : 'TRUE',
+    note: payload.note || '',
+  };
+  const headers = getSheetHeaders_(sheet);
+  const row = rowForHeaders_(headers, values);
+  const rowIndex = findResponsibleStaffRow_(sheet, values.employeeCode, values.hubCode);
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  appendAudit_({
+    action: 'responsible_upsert',
+    message: 'Responsible staff saved',
+    detailJson: JSON.stringify(values),
+    actor: payload.actor || payload.deviceId || 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', responsibleStaff: readActiveResponsibleStaff_() };
+}
+
+function deactivateResponsibleStaff_(payload) {
+  const employeeCode = String(payload && payload.employeeCode ? payload.employeeCode : '').trim();
+  const hubCode = String(payload && payload.hubCode ? payload.hubCode : '').trim();
+  if (!employeeCode || !hubCode) throw new Error('Missing employeeCode or hubCode');
+  const sheet = getOrCreateSheet_(SHEETS.RESPONSIBLE_STAFF);
+  ensureHeaders_(sheet, HEADERS.ResponsibleStaff);
+  const rowIndex = findResponsibleStaffRow_(sheet, employeeCode, hubCode);
+  if (rowIndex < 0) throw new Error('Responsible staff not found');
+  const existing = readRowObject_(sheet, rowIndex);
+  existing.active = 'FALSE';
+  existing.note = payload.note || existing.note || '';
+  const row = rowForHeaders_(getSheetHeaders_(sheet), existing);
+  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  appendAudit_({
+    action: 'responsible_deactivate',
+    message: 'Responsible staff deactivated',
+    detailJson: JSON.stringify({ employeeCode: employeeCode, hubCode: hubCode }),
+    actor: payload.actor || payload.deviceId || 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', responsibleStaff: readActiveResponsibleStaff_() };
+}
+
+function findResponsibleStaffRow_(sheet, employeeCode, hubCode) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const headers = getSheetHeaders_(sheet);
+  const employeeColumn = headers.indexOf('employeeCode') + 1;
+  const hubColumn = headers.indexOf('hubCode') + 1;
+  if (employeeColumn <= 0 || hubColumn <= 0) return -1;
+  const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  for (let index = 0; index < values.length; index += 1) {
+    if (String(values[index][employeeColumn - 1]) === String(employeeCode)
+      && String(values[index][hubColumn - 1]) === String(hubCode)) {
+      return index + 2;
+    }
+  }
+  return -1;
+}
+
+function isActive_(value) {
+  if (value === false) return false;
+  return String(value === undefined || value === null || value === '' ? 'TRUE' : value).toLowerCase() === 'true';
 }
 
 function readSettingsMap_() {
@@ -823,9 +1001,11 @@ function appendAudit_(entry) {
     id: entry.id || Utilities.getUuid(),
     recordId: entry.recordId || '',
     action: entry.action || '',
-    detail: entry.detail || '',
+    message: entry.message || entry.detail || '',
+    detail: entry.detail || entry.message || '',
+    detailJson: entry.detailJson || '',
     actor: entry.actor || '',
-    createdAt: entry.createdAt || new Date().toISOString(),
+    createdAt: entry.createdAt || formatBangkokDateTime_(new Date()),
   };
   sheet.appendRow(rowForHeaders_(getSheetHeaders_(sheet), next));
   return next;

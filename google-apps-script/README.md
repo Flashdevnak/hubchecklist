@@ -64,10 +64,25 @@ Supported actions:
 - `uploadPhotoMetadata`
 - `syncRecord`
 - `getHubs`
+- `upsertHub`
+- `deactivateHub`
 - `getResponsibleStaff`
+- `upsertResponsibleStaff`
+- `deactivateResponsibleStaff`
+- `getSettings`
+- `updateSetting`
+- `getBootstrapData`
 - `getRecords`
 - `appendAudit`
 - `healthCheck`
+
+RESET-009A admin settings persistence:
+
+- `Hubs` columns are `hubCode | hubName | active | note`.
+- `ResponsibleStaff` columns are `employeeCode | employeeName | hubCode | active | note`.
+- Deactivate actions set `active = FALSE` instead of hard deleting rows.
+- `updateSetting` allows only safe UI settings: `GPS_REQUIRED` / `GPS_MANDATORY`, `WATERMARK_ENABLED`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `MINIMUM_APP_VERSION`.
+- Secret/admin keys such as `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not exposed through editable app settings.
 
 ## RESET-005A Layout
 

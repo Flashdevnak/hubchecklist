@@ -133,6 +133,14 @@ export interface SyncResult {
   response?: unknown;
 }
 
+export interface CentralAdminSaveResult {
+  ok: boolean;
+  message: string;
+  hubs?: Hub[];
+  responsibleStaff?: ResponsibleStaff[];
+  appSettings?: Partial<AppSettings> & Record<string, unknown>;
+}
+
 export interface RetrySyncResult {
   attempted: number;
   synced: number;
@@ -507,7 +515,7 @@ export async function testGoogleConnection(): Promise<SyncResult> {
 
 export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
   ensureSeedData();
-  if (!CENTRAL_BACKEND_URL) {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) {
     const local: BootstrapCache = {
       ok: false,
       hubs: listHubs(),
@@ -554,6 +562,95 @@ export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
       source: 'local',
     };
   }
+}
+
+export async function upsertCentralHub(hub: Hub): Promise<CentralAdminSaveResult> {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  try {
+    const data = await callAppsScript('upsertHub', {
+      ...hub,
+      deviceId: getDeviceId(),
+      actor: 'admin',
+    }) as { ok?: boolean; message?: string; hubs?: unknown };
+    const hubs = normalizeHubs(data.hubs);
+    if (hubs.length > 0) saveHubs(hubs);
+    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', hubs };
+  } catch {
+    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+export async function deactivateCentralHub(hubCode: string): Promise<CentralAdminSaveResult> {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  try {
+    const data = await callAppsScript('deactivateHub', {
+      hubCode,
+      deviceId: getDeviceId(),
+      actor: 'admin',
+    }) as { ok?: boolean; message?: string; hubs?: unknown };
+    const hubs = normalizeHubs(data.hubs);
+    if (hubs.length > 0) saveHubs(hubs);
+    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', hubs };
+  } catch {
+    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+export async function upsertCentralResponsibleStaff(staff: ResponsibleStaff): Promise<CentralAdminSaveResult> {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  try {
+    const data = await callAppsScript('upsertResponsibleStaff', {
+      ...staff,
+      employeeName: staff.displayName,
+      deviceId: getDeviceId(),
+      actor: 'admin',
+    }) as { ok?: boolean; message?: string; responsibleStaff?: unknown };
+    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
+    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
+    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', responsibleStaff };
+  } catch {
+    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+export async function deactivateCentralResponsibleStaff(employeeCode: string, hubCode: string): Promise<CentralAdminSaveResult> {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  try {
+    const data = await callAppsScript('deactivateResponsibleStaff', {
+      employeeCode,
+      hubCode,
+      deviceId: getDeviceId(),
+      actor: 'admin',
+    }) as { ok?: boolean; message?: string; responsibleStaff?: unknown };
+    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
+    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
+    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', responsibleStaff };
+  } catch {
+    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+export async function updateCentralSetting(key: 'GPS_REQUIRED' | 'GPS_MANDATORY' | 'WATERMARK_ENABLED' | 'REQUIRE_ADMIN_DEVICE_APPROVAL' | 'MINIMUM_APP_VERSION', value: boolean | string): Promise<CentralAdminSaveResult> {
+  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  try {
+    const data = await callAppsScript('updateSetting', {
+      key,
+      value,
+      deviceId: getDeviceId(),
+      actor: 'admin',
+    }) as { ok?: boolean; message?: string; appSettings?: Partial<AppSettings> & Record<string, unknown> };
+    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', appSettings: data.appSettings };
+  } catch {
+    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
+  }
+}
+
+export async function saveCentralSafeSettings(settings: Pick<AppSettings, 'gpsMandatory' | 'watermarkEnabled'>): Promise<CentralAdminSaveResult> {
+  const gps = await updateCentralSetting('GPS_MANDATORY', settings.gpsMandatory);
+  if (!gps.ok) return gps;
+  const watermark = await updateCentralSetting('WATERMARK_ENABLED', settings.watermarkEnabled);
+  if (!watermark.ok) return watermark;
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: { ...gps.appSettings, ...watermark.appSettings } };
 }
 
 export async function requestAdminAccess(deviceName: string, ownerName: string): Promise<{ ok: boolean; message: string; device?: AdminDevice }> {
@@ -1119,13 +1216,13 @@ function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item) => item as Partial<ResponsibleStaff> & Record<string, unknown>).filter((item) => item.employeeCode || item.EmployeeCode).map((item) => ({
     employeeCode: String(item.employeeCode ?? item.EmployeeCode ?? ''),
-    displayName: String(item.displayName ?? item.DisplayName ?? ''),
+    displayName: String(item.displayName ?? item.employeeName ?? item.DisplayName ?? item.EmployeeName ?? ''),
     hubCode: String(item.hubCode ?? item.HubCode ?? ''),
     active: item.active === undefined ? true : item.active === true || String(item.active).toLowerCase() === 'true',
   })).filter((staff) => staff.employeeCode && staff.hubCode);
 }
 
-type AppsScriptAction = 'bootstrap' | 'getBootstrapData' | 'health' | 'healthCheck' | 'initOrRepairStorage' | 'getSettings' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'findRecordByKey' | 'upsertRecordByKey' | 'saveRecord' | 'savePhotoMetadata' | 'syncBatch' | 'getMyWork' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
+type AppsScriptAction = 'bootstrap' | 'getBootstrapData' | 'health' | 'healthCheck' | 'initOrRepairStorage' | 'getSettings' | 'getAppSettings' | 'updateSetting' | 'getHubs' | 'upsertHub' | 'deactivateHub' | 'getResponsibleStaff' | 'upsertResponsibleStaff' | 'deactivateResponsibleStaff' | 'getRecords' | 'findRecordByKey' | 'upsertRecordByKey' | 'saveRecord' | 'savePhotoMetadata' | 'syncBatch' | 'getMyWork' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
 
 async function callAppsScript(action: AppsScriptAction, payload: unknown, options: { allowWithoutSecret?: boolean } = {}): Promise<unknown> {
   const settings = getSettings();

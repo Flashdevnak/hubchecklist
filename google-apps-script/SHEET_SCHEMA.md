@@ -99,11 +99,13 @@ Photo date/time/GPS remain in metadata and are also rendered directly onto the p
 
 - `Records_All`
 - `Photos`
-- `Hubs`
-- `ResponsibleStaff`
+- `Hubs`: `hubCode | hubName | active | note`
+- `ResponsibleStaff`: `employeeCode | employeeName | hubCode | active | note`
 - `Audit`
 - `Settings`
 - `ExportLogs`
+
+RESET-009A keeps admin-managed rows instead of hard deleting them. Hub and responsible staff deactivation sets `active = FALSE`; bootstrap and Frontline dropdowns use only active rows. Responsible staff updates are keyed by exact `employeeCode + hubCode`.
 
 ## Settings Keys
 
@@ -113,6 +115,8 @@ RESET-005B reserves these Settings keys for central admin PIN hardening:
 - `ADMIN_PIN_HASH`
 
 The current app still enforces the local MVP protection path: fresh employee installs cannot create a PIN from the normal Backoffice entry, and admin setup requires the hidden setup token.
+
+Editable Backoffice Settings are limited to safe operational keys: `GPS_REQUIRED` / `GPS_MANDATORY`, `WATERMARK_ENABLED`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `MINIMUM_APP_VERSION`. `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not exposed as editable settings.
 
 ## Photo Upload Limitation
 

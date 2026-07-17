@@ -1,5 +1,23 @@
 ﻿# Test Plan
 
+## RESET-009A Admin Settings Central Save
+
+- Deploy the updated `google-apps-script/Code.gs` as a new Apps Script Web App version.
+- Confirm the sheet has `Hubs` headers `hubCode | hubName | active | note`.
+- In Backoffice Hubs, add a hub and confirm a row appears in `Hubs`.
+- Edit the same hub and confirm the row updates by `hubCode`, not a duplicate append.
+- Deactivate the hub and confirm `active` becomes `FALSE` and the row is not hard deleted.
+- Confirm the sheet has `ResponsibleStaff` headers `employeeCode | employeeName | hubCode | active | note`.
+- In Backoffice Responsible Staff, add a staff row and confirm it appears in `ResponsibleStaff`.
+- Edit the same staff for the same hub and confirm the row updates by `employeeCode + hubCode`.
+- Deactivate the staff row and confirm `active` becomes `FALSE`.
+- Refresh the app and confirm Frontline hub and responsible dropdowns show only active rows.
+- Select a hub and confirm responsible staff appears only when `hubCode` matches exactly.
+- In Backoffice Settings, toggle GPS/watermark and confirm safe `Settings` rows update centrally.
+- Confirm `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not shown or editable in UI settings.
+- Disconnect or break Apps Script temporarily and confirm the UI shows `บันทึกไม่สำเร็จ กรุณาลองใหม่` instead of pretending success.
+- Confirm `Audit` receives `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update` rows with Bangkok `createdAt`.
+
 ## RESET-009 Final Polish Checks
 
 - Open Frontline and confirm the header uses `Hub Photo Proof`, `หน้างาน`, and a short `ออนไลน์` / `ออฟไลน์` / `รอซิงก์` status.

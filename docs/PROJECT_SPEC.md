@@ -1,5 +1,22 @@
 ﻿# Project Specification
 
+## RESET-009A Admin Settings Save To Google Sheets
+
+RESET-009A is complete as a code/build implementation. It does not claim live Google Sheet mutation QA until the updated Apps Script is deployed and manually tested.
+
+- Backoffice Hubs saves centrally through Apps Script actions `upsertHub`, `deactivateHub`, and `getHubs`.
+- The `Hubs` sheet schema is `hubCode | hubName | active | note`.
+- Hub add/edit updates the row by `hubCode`; deactivate is a soft delete that sets `active = FALSE`.
+- Backoffice Responsible Staff saves centrally through Apps Script actions `upsertResponsibleStaff`, `deactivateResponsibleStaff`, and `getResponsibleStaff`.
+- The `ResponsibleStaff` sheet schema is `employeeCode | employeeName | hubCode | active | note`.
+- Responsible staff add/edit updates by exact `employeeCode + hubCode`; deactivate is a soft delete that sets `active = FALSE`.
+- Bootstrap returns active hubs and active responsible staff only, so Frontline dropdowns refresh after central saves and remain filtered by exact selected `hubCode`.
+- Backoffice Settings saves safe settings through `updateSetting` and reads through `getSettings`.
+- UI-editable settings are limited to `GPS_REQUIRED` / `GPS_MANDATORY`, `WATERMARK_ENABLED`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `MINIMUM_APP_VERSION`.
+- `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not exposed as editable app settings.
+- Admin mutations write Audit actions `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update` with actor, message/detail JSON, and Bangkok `createdAt`.
+- The UI shows `บันทึกลงระบบกลางแล้ว` only after Apps Script success and `บันทึกไม่สำเร็จ กรุณาลองใหม่` on failure.
+
 ## RESET-009 Final Production Polish
 
 RESET-009 is complete as an implementation/build polish pass. It does not claim physical device QA, Vercel deployment, or live Apps Script production verification.

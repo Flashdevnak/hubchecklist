@@ -17,6 +17,11 @@ RESET-008A simplifies admin login:
 - Correct central PIN opens Backoffice.
 - No deviceName, ownerName, Device ID, or approval request appears in the default login modal.
 - Backoffice Settings can change the central PIN through Apps Script.
+- RESET-009A makes Backoffice Hubs, Responsible Staff, and safe Settings save to Google Sheets through Apps Script instead of only local state.
+- Hubs write to `Hubs` (`hubCode | hubName | active | note`) with soft deactivate by setting `active = FALSE`.
+- Responsible staff write to `ResponsibleStaff` (`employeeCode | employeeName | hubCode | active | note`) with exact `employeeCode + hubCode` updates and soft deactivate.
+- Safe Settings writes allow only `GPS_REQUIRED` / `GPS_MANDATORY`, `WATERMARK_ENABLED`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `MINIMUM_APP_VERSION`; admin PIN hash, setup token, and shared secret are never exposed as editable UI settings.
+- After central saves, the app refreshes bootstrap data so Frontline hub/responsible dropdowns use the latest active rows.
 - RESET-009 final polish removes the photo watermark background box, uses clean Thai watermark labels, opens the scanner full-screen, groups My Work by active responsible person, and writes Google Sheets time values as Bangkok `yyyy-MM-dd HH:mm:ss` strings.
 - RESET-009 one-shot backend final adds Apps Script `doGet` health, `initOrRepairStorage`, central duplicate-key lookup, and idempotent record upsert by date + hub + responsible + barcode.
 
@@ -88,6 +93,9 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 - Android SDK exists at `C:\Users\myhou\AppData\Local\Android\Sdk`.
 - Android debug APK build passes.
 - APK path: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- RESET-009A TypeScript check passes.
+- RESET-009A Apps Script syntax check passes with stdin `node --check`.
+- RESET-009A central settings persistence is implemented in code; live Google Sheet row verification requires deploying the updated Apps Script and testing against the real sheet.
 - Staff/Admin mode is local-first and clearly labeled as not connected to central login.
 - Staff navigation is simplified to Today, Scan, Photos, and My Work.
 - Admin navigation keeps dashboard, records, export, backup, settings, and audit-oriented tools separate.
@@ -124,6 +132,7 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | RESET-004 Free Google Sheets storage sync | Complete | Optional Apps Script sync, Drive photo upload, pending queue; live Sheet setup/test still manual |
 | RESET-005 Final PWA/admin lock/responsive/icon pass | Complete | Admin PIN, PWA docs/icons, Android icon, responsive hardening; real device QA still pending |
 | RESET-009 final production UI scan photo watermark time polish | Complete | UI/watermark/scan/photo/time polish implemented; physical device QA and live Apps Script verification still pending |
+| RESET-009A Admin settings save to Google Sheets | Complete | Apps Script upsert/deactivate/update actions implemented; live sheet mutation QA pending deployment |
 
 ## Key Docs
 
