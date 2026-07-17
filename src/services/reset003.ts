@@ -150,6 +150,13 @@ export interface RetrySyncResult {
 
 export type WorkViewStatus = ProofStatus | RecordSyncStatus;
 
+export interface CentralPullResult {
+  ok: boolean;
+  message: string;
+  recordsPulled: number;
+  bootstrap: BootstrapCache;
+}
+
 const HUBS_KEY = 'reset003.hubs';
 const STAFF_KEY = 'reset003.responsibleStaff';
 const ACTIVE_CONTEXT_KEY = 'reset003.activeContext';
@@ -336,16 +343,20 @@ export function resetLocalTestData(): void {
 }
 
 export function listRecords(): ProofRecord[] {
-  return readJson<ProofRecord[]>(RECORDS_KEY, []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return dedupeRecords(readJson<ProofRecord[]>(RECORDS_KEY, [])).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function saveRecords(records: ProofRecord[]): void {
-  writeJson(RECORDS_KEY, records);
+  writeJson(RECORDS_KEY, dedupeRecords(records));
 }
 
 export function upsertRecord(record: ProofRecord): void {
-  const records = listRecords().filter((item) => item.id !== record.id);
-  records.push(record);
+  const keyed = ensureDuplicateKey(record);
+  const records = listRecords().filter((item) => (
+    item.id !== keyed.id
+    && (keyed.forceCreateNew || duplicateKeyForRecord(item) !== duplicateKeyForRecord(keyed))
+  ));
+  records.push(keyed);
   saveRecords(records);
 }
 
@@ -365,7 +376,7 @@ export function isActiveFrontlineRecord(record: ProofRecord): boolean {
   if (record.status === 'VOIDED') return false;
   if (record.syncStatus === 'SYNC_FAILED' || record.syncStatus === 'PENDING_SYNC') return true;
   if (record.status === 'DRAFT' || record.status === 'IN_PROGRESS' || record.status === 'NEED_REVIEW') return true;
-  return getMissingPhotoSlots(record).length > 0;
+  return false;
 }
 
 export function getRecordById(recordId: string): ProofRecord | null {
@@ -472,6 +483,7 @@ export function createDraftRecord(values: {
     status: 'DRAFT',
     missingPhotoWarnings: [],
     missingPhotoConfirmed: false,
+    duplicateKey: duplicateKeyFromParts(getLocalDateString(), values.hub.hubCode, values.responsible.employeeCode, normalizeVehicleBarcode(values.vehicleBarcode)),
     createdAt: now,
     updatedAt: now,
   };
@@ -509,8 +521,9 @@ export async function submitRecordWithGoogleSync(record: ProofRecord, confirmMis
   if (!isGoogleSyncConfigured()) {
     return { record: submitted, sync: { ok: true, queued: false, message: 'บันทึกข้อมูลแล้ว' } };
   }
-  void syncRecordToGoogle(submitted);
-  return { record: submitted, sync: { ok: true, queued: true, message: 'บันทึกข้อมูลแล้ว' } };
+  const sync = await syncRecordToGoogle(submitted);
+  const syncedRecord = getRecordById(submitted.id) ?? submitted;
+  return { record: syncedRecord, sync };
 }
 
 export function getPendingSyncCount(): number {
@@ -591,6 +604,21 @@ export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
       source: 'local',
     };
   }
+}
+
+export async function pullCentralData(): Promise<CentralPullResult> {
+  const bootstrap = await bootstrapCentralConfig();
+  if (bootstrap.source !== 'online') {
+    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้', recordsPulled: 0, bootstrap };
+  }
+  const records = await fetchCentralRecords();
+  saveRecords(mergeRecords(listRecords(), records));
+  return {
+    ok: true,
+    message: 'ดึงข้อมูลล่าสุดแล้ว',
+    recordsPulled: records.length,
+    bootstrap,
+  };
 }
 
 export async function upsertCentralHub(hub: Hub): Promise<CentralAdminSaveResult> {
@@ -825,11 +853,11 @@ export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResul
 
   try {
     const response = await callAppsScript('syncRecord', payload);
-    upsertRecord({ ...record, syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
+    upsertRecord({ ...ensureDuplicateKey(record), syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
     return { ok: true, queued: false, message: 'บันทึกและซิงก์แล้ว', response };
   } catch (error) {
     queueSync('syncRecord', payload, error instanceof Error ? error.message : 'Sync failed');
-    upsertRecord({ ...record, syncStatus: 'PENDING_SYNC', updatedAt: new Date().toISOString() });
+    upsertRecord({ ...ensureDuplicateKey(record), syncStatus: 'PENDING_SYNC', updatedAt: new Date().toISOString() });
     return {
       ok: false,
       queued: true,
@@ -850,6 +878,10 @@ export async function retryPendingSync(): Promise<RetrySyncResult> {
   for (const item of queue) {
     try {
       await callAppsScript(item.action, item.payload);
+      const payload = item.payload as { record?: ProofRecord };
+      if ((item.action === 'syncRecord' || item.action === 'createRecord') && payload.record) {
+        upsertRecord({ ...payload.record, syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
+      }
       synced += 1;
     } catch (error) {
       failedItems.push({
@@ -869,6 +901,22 @@ export async function retryPendingSync(): Promise<RetrySyncResult> {
     failed,
     message: failed === 0 ? `ซิงก์สำเร็จ ${synced} รายการ` : `ซิงก์สำเร็จ ${synced} รายการ, ยังไม่สำเร็จ ${failed} รายการ`,
   };
+}
+
+export function canClearLocalCache(): boolean {
+  return getSyncQueue().length === 0
+    && listRecords().every((record) => record.syncStatus !== 'PENDING_SYNC' && record.syncStatus !== 'SYNC_FAILED');
+}
+
+export async function clearSafeLocalCache(): Promise<{ ok: boolean; message: string }> {
+  if (!canClearLocalCache()) {
+    return { ok: false, message: 'ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้' };
+  }
+  window.localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
+  window.localStorage.removeItem(ACTIVE_CONTEXT_KEY);
+  addAudit({ action: 'clear_local_cache', detail: 'Local cache cleared; central data untouched', actor: 'admin' });
+  const result = await pullCentralData();
+  return { ok: result.ok, message: result.ok ? 'ล้างแคชเครื่องนี้แล้ว' : result.message };
 }
 
 export async function capturePhotoForSlot(record: ProofRecord, slotId: string, file: File): Promise<ProofRecord> {
@@ -893,7 +941,7 @@ export async function capturePhotoForSlot(record: ProofRecord, slotId: string, f
     watermarkText,
     retakeCount: item.captured ? item.retakeCount + 1 : item.retakeCount,
   } : item);
-  const updated = { ...record, photoSlots: nextSlots, updatedAt: new Date().toISOString() };
+  const updated = { ...record, status: record.status === 'DRAFT' ? 'IN_PROGRESS' as const : record.status, photoSlots: nextSlots, updatedAt: new Date().toISOString() };
   upsertRecord(updated);
   addAudit({
     recordId: record.id,
@@ -1106,10 +1154,14 @@ function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: 
   const gps = typeof location.lat === 'number' && typeof location.lng === 'number'
     ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
     : 'ไม่พบตำแหน่ง';
+  const place = typeof location.lat === 'number' && typeof location.lng === 'number'
+    ? 'ไม่พบชื่อสถานที่'
+    : 'ไม่พบชื่อสถานที่';
   return [
     `วันที่: ${formatDatePart(capturedAt)}`,
     `เวลา: ${formatTimePart(capturedAt)}`,
     `พิกัด: ${gps}`,
+    `สถานที่: ${place}`,
     `บาร์โค้ดรถ: ${record.vehicleBarcode}`,
     `ฮับ: ${record.hubCode}-${record.hubName}`,
     `ผู้รับผิดชอบ: ${responsibleText(record)}`,
@@ -1230,6 +1282,151 @@ function queueSync(action: GoogleSyncAction, payload: unknown, error?: string): 
 
 function saveSyncQueue(queue: SyncQueueItem[]): void {
   writeJson(SYNC_QUEUE_KEY, queue);
+}
+
+async function fetchCentralRecords(): Promise<ProofRecord[]> {
+  try {
+    const data = await callAppsScript('getRecords', {}, { allowWithoutSecret: true }) as { records?: unknown };
+    return normalizeCentralRecords(data.records);
+  } catch {
+    return [];
+  }
+}
+
+function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]): ProofRecord[] {
+  return dedupeRecords([...localRecords, ...centralRecords]);
+}
+
+function dedupeRecords(records: ProofRecord[]): ProofRecord[] {
+  const grouped = new Map<string, ProofRecord[]>();
+  records.map(ensureDuplicateKey).forEach((record) => {
+    const key = record.forceCreateNew ? `${duplicateKeyForRecord(record)}|${record.id}` : duplicateKeyForRecord(record);
+    grouped.set(key, [...(grouped.get(key) ?? []), record]);
+  });
+  return Array.from(grouped.values()).map((items) => items.sort(compareRecordPreference)[0]);
+}
+
+function compareRecordPreference(a: ProofRecord, b: ProofRecord): number {
+  const rank = statusPreference(b) - statusPreference(a);
+  if (rank !== 0) return rank;
+  const photoRank = b.photoSlots.filter((slot) => slot.captured).length - a.photoSlots.filter((slot) => slot.captured).length;
+  if (photoRank !== 0) return photoRank;
+  return b.updatedAt.localeCompare(a.updatedAt);
+}
+
+function statusPreference(record: ProofRecord): number {
+  if (record.syncStatus === 'SYNCED') return 70;
+  if (record.status === 'COMPLETE') return 60;
+  if (record.status === 'NEED_REVIEW') return 50;
+  if (record.syncStatus === 'PENDING_SYNC') return 40;
+  if (record.status === 'IN_PROGRESS') return 30;
+  if (record.status === 'DRAFT') return 20;
+  if (record.status === 'VOIDED') return 10;
+  return 0;
+}
+
+function ensureDuplicateKey(record: ProofRecord): ProofRecord {
+  return {
+    ...record,
+    duplicateKey: record.duplicateKey || duplicateKeyForRecord(record),
+  };
+}
+
+function duplicateKeyForRecord(record: ProofRecord): string {
+  return duplicateKeyFromParts(record.date, record.hubCode, record.responsibleEmployeeCode, record.vehicleBarcode);
+}
+
+function duplicateKeyFromParts(date: string, hubCode: string, employeeCode: string, vehicleBarcode: string): string {
+  return [date, hubCode, employeeCode, vehicleBarcode].map((part) => String(part || '').trim().toUpperCase()).join('|');
+}
+
+function normalizeCentralRecords(raw: unknown): ProofRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => centralRowToRecord(item as Record<string, unknown>)).filter((record): record is ProofRecord => Boolean(record));
+}
+
+function centralRowToRecord(row: Record<string, unknown>): ProofRecord | null {
+  const date = String(row.date ?? row['วันที่'] ?? '');
+  const hubCode = String(row.hubCode ?? extractCode(row['ฮับ']) ?? '');
+  const hubName = String(row.hubName ?? extractName(row['ฮับ']) ?? '');
+  const responsibleEmployeeCode = String(row.responsibleEmployeeCode ?? extractCode(row['ผู้รับผิดชอบ']) ?? '');
+  const responsibleName = String(row.responsibleName ?? extractName(row['ผู้รับผิดชอบ']) ?? '');
+  const vehicleBarcode = normalizeVehicleBarcode(String(row.vehicleBarcode ?? row['บาร์โค้ดรถ'] ?? ''));
+  if (!date || !hubCode || !responsibleEmployeeCode || !vehicleBarcode) return null;
+  const status = normalizeStatus(String(row.statusInternal ?? row['สถานะ'] ?? 'COMPLETE'));
+  const syncStatus = normalizeSyncStatus(String(row.syncStatus ?? (status === 'COMPLETE' ? 'SYNCED' : '')));
+  const createdAt = parseCentralDate(row.createdAt ?? row['เวลาส่งข้อมูล']) || new Date().toISOString();
+  const updatedAt = parseCentralDate(row.updatedAt ?? row['เวลาส่งข้อมูล']) || createdAt;
+  return {
+    id: String(row.recordId ?? row.id ?? duplicateKeyFromParts(date, hubCode, responsibleEmployeeCode, vehicleBarcode)),
+    hubCode,
+    hubName,
+    responsibleEmployeeCode,
+    responsibleName,
+    date,
+    vehicleBarcode,
+    hasDropTransfer: String(row['พ่วงดรอปหรือไม่'] ?? '').includes('พ่วง'),
+    dropCount: Number(row['จำนวนดรอป'] ?? 0) || 0,
+    photoSlots: buildCentralPhotoSlots(row, status),
+    status,
+    missingPhotoWarnings: String(row['รายการรูปที่ขาด'] ?? '').split(',').map((item) => item.trim()).filter(Boolean),
+    missingPhotoConfirmed: status === 'NEED_REVIEW',
+    submittedAt: parseCentralDate(row.submittedAt ?? row['เวลาส่งข้อมูล']) || undefined,
+    createdAt,
+    updatedAt,
+    syncStatus,
+    duplicateKey: String(row.duplicateKey ?? duplicateKeyFromParts(date, hubCode, responsibleEmployeeCode, vehicleBarcode)),
+    duplicateOfRecordId: String(row.duplicateOfRecordId ?? '') || undefined,
+    duplicateReason: String(row.duplicateReason ?? '') || undefined,
+    notes: String(row['หมายเหตุ'] ?? '') || undefined,
+  };
+}
+
+function buildCentralPhotoSlots(row: Record<string, unknown>, status: ProofStatus): ProofPhotoSlot[] {
+  if (status === 'COMPLETE') return [];
+  const slots = createPhotoSlots(String(row['พ่วงดรอปหรือไม่'] ?? '').includes('พ่วง'), Number(row['จำนวนดรอป'] ?? 0) || 0);
+  return slots.map((slot, index) => {
+    const value = String(row[EXPORT_HEADERS[7 + index]] ?? '');
+    return {
+      ...slot,
+      captured: Boolean(value && !value.includes('ยังไม่ได้ถ่าย')),
+      fileName: value || undefined,
+    };
+  });
+}
+
+function normalizeStatus(value: string): ProofStatus {
+  if (value === 'DRAFT' || value.includes('เริ่ม')) return 'DRAFT';
+  if (value === 'IN_PROGRESS' || value.includes('กำลัง')) return 'IN_PROGRESS';
+  if (value === 'NEED_REVIEW' || value.includes('ไม่ครบ')) return 'NEED_REVIEW';
+  if (value === 'VOIDED' || value.includes('ยกเลิก')) return 'VOIDED';
+  return 'COMPLETE';
+}
+
+function normalizeSyncStatus(value: string): RecordSyncStatus | undefined {
+  if (value === 'PENDING_SYNC') return 'PENDING_SYNC';
+  if (value === 'SYNC_FAILED') return 'SYNC_FAILED';
+  if (value === 'LOCAL_ONLY') return 'LOCAL_ONLY';
+  if (value === 'SYNCED') return 'SYNCED';
+  return undefined;
+}
+
+function parseCentralDate(value: unknown): string {
+  if (!value) return '';
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return new Date(`${text.replace(' ', 'T')}+07:00`).toISOString();
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function extractCode(value: unknown): string {
+  return String(value || '').split(/[-\s]/)[0]?.trim() ?? '';
+}
+
+function extractName(value: unknown): string {
+  const text = String(value || '');
+  const code = extractCode(text);
+  return text.replace(code, '').replace(/^-/, '').trim();
 }
 
 function normalizeHubs(raw: unknown): Hub[] {

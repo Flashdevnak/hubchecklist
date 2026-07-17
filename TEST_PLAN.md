@@ -1,5 +1,17 @@
 ﻿# Test Plan
 
+## RESET-010 Production Sync, Scanner, Dedupe, Watermark
+
+- Deploy the updated Apps Script before live testing.
+- Submit a record in browser/device A, then tap `รีเฟรชข้อมูล` in browser/device B and confirm the record appears from central data.
+- Create one barcode work round, submit it, and confirm `งานของฉัน` shows one completed/synced item only when `ดูงานที่ส่งแล้ว` is enabled.
+- Start a barcode, capture a photo, leave it incomplete, scan the same barcode again, and confirm it resumes the existing work.
+- Retry pending sync and confirm the local pending status clears after Apps Script success.
+- Open scanner and confirm normal header/nav are hidden, camera fills the screen, and manual barcode entry remains available.
+- Capture a photo and confirm the watermark includes date, time, GPS, `สถานที่`, barcode, hub, and responsible person.
+- Try `ล้างแคชเครื่องนี้` while pending sync exists and confirm it is blocked.
+- Run desktop/mobile/tablet layout checks for scanner, photo sticky submit, and Backoffice settings diagnostics.
+
 ## RESET-009A Admin Settings Central Save
 
 - Deploy the updated `google-apps-script/Code.gs` as a new Apps Script Web App version.

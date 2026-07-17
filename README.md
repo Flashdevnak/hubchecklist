@@ -13,6 +13,12 @@ RESET-008 prepares final production deployment paths:
 
 RESET-008A simplifies admin login:
 
+- RESET-010 fixes the production sync path so startup/manual refresh pulls central bootstrap and central records, merges them with pending local work, and dedupes by `date + hubCode + responsibleEmployeeCode + vehicleBarcode`.
+- RESET-010 makes submitted work await Apps Script sync before showing `ซิงก์แล้ว`; failed sync stays queued and visible as pending/failed instead of fake success.
+- RESET-010 cleans ghost duplicate work by preferring the best record per duplicate key and hiding stale draft/in-progress copies when a completed/synced row exists.
+- RESET-010 makes scanner mode hide the normal app header/nav shell, uses a full-screen dark camera view, keeps manual input fallback, and includes a safe flashlight unsupported message.
+- RESET-010 watermark now includes `สถานที่` with a no-address fallback; it does not fake reverse-geocoded addresses.
+- RESET-010 adds Backoffice tools for central diagnostics, pulling latest central data, retrying pending sync, and safe local cache clearing that blocks when pending sync exists.
 - Admin login asks only for `Admin PIN`.
 - Correct central PIN opens Backoffice.
 - No deviceName, ownerName, Device ID, or approval request appears in the default login modal.

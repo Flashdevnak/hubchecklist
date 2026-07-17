@@ -1,5 +1,19 @@
 ﻿# Project Specification
 
+## RESET-010 Production Sync, Scanner, Dedupe, Watermark
+
+RESET-010 hardens the existing RESET-009A app without changing the free central backend choice.
+
+- Google Sheets / Apps Script remains the central source of truth for master data and synced records.
+- App startup and manual refresh pull both bootstrap data and central `Records_All`, then merge with local pending work.
+- Local records are deduped by `date + hubCode + responsibleEmployeeCode + vehicleBarcode` unless `forceCreateNew` is explicitly used with a reason.
+- Record preference for duplicate keys favors synced/complete records over stale drafts, preventing ghost pending cards after a successful submit.
+- Frontline remains local-first for capture safety, but submit awaits Apps Script sync when configured and only marks `SYNCED` after central success.
+- Retry sync updates local record status after success.
+- The scanner route hides the normal app header/nav and presents a full-screen dark scan surface.
+- Photo watermark includes `สถานที่` with a no-address fallback. The app does not fake reverse-geocoded addresses.
+- Backoffice Settings exposes safe central diagnostics, pull-latest, retry pending sync, and cache clear tools. Cache clear blocks while pending/failed sync exists and never deletes central data.
+
 ## RESET-009A Admin Settings Save To Google Sheets
 
 RESET-009A is complete as a code/build implementation. It does not claim live Google Sheet mutation QA until the updated Apps Script is deployed and manually tested.

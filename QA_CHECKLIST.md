@@ -1,5 +1,23 @@
 ﻿# QA Checklist
 
+## RESET-010 Production Sync, Scanner, Dedupe, Watermark
+
+- [x] App startup pulls central bootstrap and central records when Apps Script is reachable
+- [x] Manual Frontline refresh pulls central data and records
+- [x] Network `online` event refreshes central data
+- [x] Local pending work is preserved while central records are merged
+- [x] Records are deduped by `date + hubCode + responsibleEmployeeCode + vehicleBarcode`
+- [x] Sync success marks local record `SYNCED`; retry success clears stale pending status
+- [x] Completed/synced work is not treated as active pending work
+- [x] Safe local cache clear blocks when pending/failed sync exists
+- [x] Backoffice Settings shows safe central diagnostics without secrets
+- [x] Scanner hides normal header and bottom nav in full-screen mode
+- [x] Watermark includes `สถานที่` and does not fake address data
+- [x] TypeScript passes
+- [x] Apps Script syntax check passes
+- [ ] Live two-device central sync QA remains manual
+- [ ] Physical Android scanner/photo QA remains manual
+
 ## RESET-009A Admin Settings Central Save
 
 - [x] Apps Script router supports `upsertHub`, `deactivateHub`, `getHubs`, `upsertResponsibleStaff`, `deactivateResponsibleStaff`, `getResponsibleStaff`, `updateSetting`, `getSettings`, and `getBootstrapData`

@@ -12,13 +12,16 @@ import {
   addAudit,
   approveAdminDevice,
   bootstrapCentralConfig,
+  canClearLocalCache,
   capturePhotoForSlot,
+  clearSafeLocalCache,
   clearAdminSession,
   createDraftRecord,
   DEFAULT_HUB,
   DEFAULT_STAFF,
   downloadBlob,
   ensureSeedData,
+  formatDateTime,
   generateExportZip,
   getActiveContext,
   getCentralBackendStatus,
@@ -42,6 +45,7 @@ import {
   listRecords,
   listResponsibleStaff,
   normalizeVehicleBarcode,
+  pullCentralData,
   retryPendingSync,
   revokeAdminDevice,
   deactivateCentralHub,
@@ -85,22 +89,35 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeRecordId, setActiveRecordId] = useState('');
   const hiddenAdminTimerRef = useRef<number | null>(null);
+  const scannerActive = (mode === 'frontline' || !adminUnlocked) && frontlineStep === 'scan';
 
   useEffect(() => {
     ensureSeedData();
-    bootstrapCentralConfig().then((result) => {
+    pullCentralData().then((pull) => {
+      const result = pull.bootstrap;
       if (getCentralBackendStatus() === 'missing') {
-        setBootstrapMessage('ออฟไลน์');
+        setBootstrapMessage('ออฟไลน์ / ใช้ข้อมูลล่าสุดในเครื่อง');
       } else if (result.source === 'online') {
-        setBootstrapMessage('ออนไลน์');
+        setBootstrapMessage(pull.ok ? 'ดึงข้อมูลล่าสุดแล้ว' : 'ออนไลน์');
       } else {
-        setBootstrapMessage('ออฟไลน์');
+        setBootstrapMessage('ออฟไลน์ / ใช้ข้อมูลล่าสุดในเครื่อง');
       }
       setRefreshKey((value) => value + 1);
     }).catch(() => {
-      setBootstrapMessage('ออฟไลน์');
+      setBootstrapMessage('เชื่อมต่อระบบกลางไม่ได้');
       setRefreshKey((value) => value + 1);
     });
+  }, []);
+
+  useEffect(() => {
+    const refreshWhenOnline = () => {
+      pullCentralData().then(() => {
+        setBootstrapMessage('ดึงข้อมูลล่าสุดแล้ว');
+        setRefreshKey((value) => value + 1);
+      }).catch(() => setBootstrapMessage('เชื่อมต่อระบบกลางไม่ได้'));
+    };
+    window.addEventListener('online', refreshWhenOnline);
+    return () => window.removeEventListener('online', refreshWhenOnline);
   }, []);
 
   const openBackoffice = () => {
@@ -155,8 +172,8 @@ export default function App() {
   const activeRecord = activeRecordId ? getRecordById(activeRecordId) : null;
 
   return (
-    <div className="reset-app">
-      <header className="reset-topbar">
+    <div className={scannerActive ? 'reset-app scanner-mode' : 'reset-app'}>
+      {!scannerActive ? <header className="reset-topbar">
         <div>
           <strong
             onDoubleClick={hiddenAdminEntry}
@@ -176,7 +193,7 @@ export default function App() {
             <button className="icon-button neutral" aria-label="หลังบ้าน" onClick={openBackoffice} type="button"><Settings size={18} /></button>
           )}
         </div>
-      </header>
+      </header> : null}
 
       <main className="reset-main">
         {mode === 'frontline' || !adminUnlocked ? (
@@ -341,7 +358,7 @@ function FrontlineApp({ activeRecord, bootstrapMessage, onOpenRecord, onReload, 
     return <DoneScreen onMyWork={() => onStepChange('my-work')} onScanNext={() => onStepChange('scan')} />;
   }
   if (step === 'my-work') {
-    return <MyWorkScreen onOpenRecord={onOpenRecord} records={records} />;
+    return <MyWorkScreen onOpenRecord={onOpenRecord} onReload={onReload} records={records} />;
   }
   return <FrontlineHome bootstrapMessage={bootstrapMessage} onOpenRecord={onOpenRecord} onReload={onReload} onScan={() => onStepChange('scan')} records={records} />;
 }
@@ -364,7 +381,8 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
   const todayRecords = records.filter((record) => record.date === today && record.responsibleEmployeeCode === employeeCode);
   const pending = todayRecords.filter(isActiveFrontlineRecord).sort((a, b) => getWorkSortRank(a) - getWorkSortRank(b) || b.updatedAt.localeCompare(a.updatedAt));
   const refreshData = async () => {
-    await bootstrapCentralConfig();
+    const result = await pullCentralData();
+    setHubCode(getActiveContext()?.hubCode || result.bootstrap.hubs[0]?.hubCode || hubCode);
     onReload();
   };
 
@@ -605,6 +623,7 @@ function ScanScreen({ activeHub, activeStaff, onClose, onCreated }: {
       </article>
       <div className="scan-control-panel">
         <button className="primary-action" onClick={startCamera} type="button"><Camera size={20} /> สแกนใหม่</button>
+        <button className="secondary-action" onClick={() => setMessage('ไฟฉายยังไม่รองรับบนอุปกรณ์นี้')} type="button">เปิดไฟฉาย</button>
         <label>
           <span>กรอกบาร์รถ</span>
           <input value={barcode} onChange={(event) => setBarcode(normalizeVehicleBarcode(event.target.value))} placeholder="NAK..." />
@@ -718,7 +737,7 @@ function DoneScreen({ onMyWork, onScanNext }: { onMyWork: () => void; onScanNext
   );
 }
 
-function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: string) => void; records: ProofRecord[] }) {
+function MyWorkScreen({ onOpenRecord, onReload, records }: { onOpenRecord: (recordId: string) => void; onReload: () => void; records: ProofRecord[] }) {
   const activeContext = getActiveContext();
   const today = getLocalDateString();
   const [showCompleted, setShowCompleted] = useState(false);
@@ -733,6 +752,10 @@ function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: stri
   const openItems = mine.filter(isActiveFrontlineRecord);
   const completedItems = mine.filter((record) => !isActiveFrontlineRecord(record));
   const visibleItems = showCompleted ? mine : openItems;
+  const refreshData = async () => {
+    await pullCentralData();
+    onReload();
+  };
   return (
     <section className="frontline-stack">
       <article className="hero-card compact">
@@ -743,6 +766,7 @@ function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: stri
         <button className={showCompleted ? 'secondary-action' : 'primary-action'} onClick={() => setShowCompleted(false)} type="button">ซ่อนงานที่ส่งแล้ว</button>
         <button className={showCompleted ? 'primary-action' : 'secondary-action'} onClick={() => setShowCompleted(true)} type="button">ดูงานที่ส่งแล้ว</button>
       </div>
+      <button className="secondary-action" onClick={() => { void refreshData(); }} type="button"><RefreshCcw size={18} /> รีเฟรชข้อมูล</button>
       <article className="admin-detail-card">
         <strong>{showCompleted ? 'ประวัติวันนี้' : 'งานที่ต้องทำต่อ'}</strong>
         <span>{showCompleted ? `ทั้งหมด ${mine.length} งาน / ส่งแล้ว ${completedItems.length} งาน` : `ค้างอยู่ ${openItems.length} งาน`}</span>
@@ -1073,6 +1097,7 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   const [deviceApprovalPin, setDeviceApprovalPin] = useState('');
   const [deviceApprovalMessage, setDeviceApprovalMessage] = useState('');
   const [repairMessage, setRepairMessage] = useState('');
+  const [centralInfo, setCentralInfo] = useState<{ version?: string; serverTime?: string; pulledAt?: string; recordsPulled?: number }>({});
   const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
   const save = async () => {
     setSyncMessage('กำลังบันทึก');
@@ -1106,6 +1131,39 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
     const result = await retryPendingSync();
     setSyncMessage(result.message);
     setPendingSyncCount(getPendingSyncCount());
+    onReload();
+  };
+  const checkCentral = async () => {
+    setSyncMessage('กำลังตรวจระบบกลาง');
+    const result = await testGoogleConnection();
+    setSyncMessage(result.ok ? 'สถานะระบบกลาง: พร้อมใช้งาน' : 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่');
+    const response = result.response as { version?: string; serverTimeBangkok?: string } | undefined;
+    setCentralInfo((info) => ({
+      ...info,
+      version: response?.version,
+      serverTime: response?.serverTimeBangkok,
+    }));
+  };
+  const pullLatest = async () => {
+    setSyncMessage('กำลังดึงข้อมูลล่าสุด');
+    const result = await pullCentralData();
+    setCentralInfo({
+      version: result.bootstrap.appSettings?.APP_VERSION ? String(result.bootstrap.appSettings.APP_VERSION) : centralInfo.version,
+      serverTime: result.bootstrap.serverTime,
+      pulledAt: new Date().toISOString(),
+      recordsPulled: result.recordsPulled,
+    });
+    setSyncMessage(result.ok ? 'ดึงข้อมูลล่าสุดแล้ว' : 'รีโหลดไม่สำเร็จ กรุณาลองใหม่');
+    onReload();
+  };
+  const clearCache = async () => {
+    if (!canClearLocalCache()) {
+      setSyncMessage('ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้');
+      return;
+    }
+    if (!window.confirm('ล้างแคชเฉพาะเครื่องนี้ ข้อมูลในระบบกลางจะไม่ถูกลบ ต้องการดำเนินการต่อหรือไม่?')) return;
+    const result = await clearSafeLocalCache();
+    setSyncMessage(result.message);
     onReload();
   };
   const saveNewPin = async () => {
@@ -1217,10 +1275,21 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
           <StatusPill tone={settings.googleSyncMode === 'google_sheets' ? 'success' : 'warning'} text={getCentralBackendUrl() ? 'ระบบกลาง' : settings.googleSyncMode === 'google_sheets' ? 'ซิงก์ Google Sheets' : 'บันทึกในเครื่อง'} />
           <span>รอซิงก์: {pendingSyncCount}</span>
         </div>
+        <div className="device-id-box">
+          <strong>ระบบกลาง</strong>
+          <span>สถานะระบบกลาง: {isCentralSaveReady(settings) ? 'พร้อมใช้งาน' : 'ยังไม่ได้ตั้งค่าระบบกลาง'}</span>
+          <span>เวอร์ชัน API: {centralInfo.version || '-'}</span>
+          <span>เวลาระบบกลาง: {centralInfo.serverTime || '-'}</span>
+          <span>ดึงข้อมูลล่าสุดเมื่อ: {centralInfo.pulledAt ? formatDateTime(centralInfo.pulledAt) : '-'}</span>
+          <span>งานรอซิงก์ในเครื่อง: {pendingSyncCount}</span>
+          <span>รูปที่รอซิงก์ในเครื่อง: {getPendingSyncCount()}</span>
+        </div>
         <p>ระบบจะบันทึกลง Records_All และแยกชีทตามฮับให้อัตโนมัติ</p>
         <div className="admin-form">
-          <button className="secondary-action" onClick={testConnection} type="button"><RefreshCcw size={18} /> ทดสอบการเชื่อมต่อ</button>
+          <button className="secondary-action" onClick={() => { void checkCentral(); }} type="button"><RefreshCcw size={18} /> ตรวจระบบกลาง</button>
+          <button className="secondary-action" onClick={() => { void pullLatest(); }} type="button"><RefreshCcw size={18} /> ดึงข้อมูลล่าสุดจากระบบกลาง</button>
           <button className="secondary-action" disabled={pendingSyncCount === 0} onClick={retrySync} type="button"><RefreshCcw size={18} /> ซิงก์อีกครั้ง</button>
+          <button className="secondary-action" onClick={() => { void clearCache(); }} type="button">ล้างแคชเครื่องนี้</button>
         </div>
         {syncMessage ? <p className="simple-message">{syncMessage}</p> : null}
       </article>
