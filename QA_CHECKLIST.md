@@ -3,6 +3,7 @@
 ## RESET-009A Admin Settings Central Save
 
 - [x] Apps Script router supports `upsertHub`, `deactivateHub`, `getHubs`, `upsertResponsibleStaff`, `deactivateResponsibleStaff`, `getResponsibleStaff`, `updateSetting`, `getSettings`, and `getBootstrapData`
+- [x] Apps Script router supports `updateSettingsBatch`, `getPhotos`, `getHistory`, and `getRecordsByDateRange`
 - [x] `Hubs` uses `hubCode | hubName | active | note`
 - [x] Hub add/edit updates by `hubCode`
 - [x] Hub deactivate is soft delete only and sets `active = FALSE`
@@ -16,8 +17,16 @@
 - [x] Admin changes write audit actions `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update`
 - [x] UI only shows `บันทึกลงระบบกลางแล้ว` after the Apps Script call succeeds
 - [x] UI shows `บันทึกไม่สำเร็จ กรุณาลองใหม่` when the Apps Script call fails
+- [x] Admin Hubs/Responsible Staff saves are blocked when central config is unavailable
+- [x] Frontline has a manual `รีเฟรชข้อมูล` path for central bootstrap refresh
+- [x] Frontline active work hides completed/synced records by default
+- [x] Frontline can show `ประวัติวันนี้` / sent work without deleting central records
+- [x] Backoffice history filters by date range, hub, responsible, barcode, and status
+- [x] Backoffice filtered history can be exported
+- [x] UI polish pass improves spacing, safe-area bottom nav, sticky submit, cards, focus states, and mobile admin menu behavior
 - [x] TypeScript passes
 - [x] Apps Script syntax check passes
+- [x] `git diff --check` passes
 - [ ] Live Apps Script deployment and real Google Sheet row verification remain manual
 - [ ] Physical Android device QA remains manual
 

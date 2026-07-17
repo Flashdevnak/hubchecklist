@@ -17,6 +17,12 @@
 - Confirm `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not shown or editable in UI settings.
 - Disconnect or break Apps Script temporarily and confirm the UI shows `บันทึกไม่สำเร็จ กรุณาลองใหม่` instead of pretending success.
 - Confirm `Audit` receives `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update` rows with Bangkok `createdAt`.
+- Confirm Backoffice refuses Hubs/Responsible Staff saves when the central backend is unavailable and shows `ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้`.
+- Submit Frontline work and confirm local capture is fast, then status moves through pending/synced when Google sync is available.
+- Open `งานของฉัน` and confirm completed/synced records are hidden by default.
+- Tap `ดูงานที่ส่งแล้ว` and confirm today completed work appears without deleting anything from Google Sheets.
+- Open Backoffice `ประวัติ`, filter by date range, hub, responsible person, barcode, and status, then export the filtered ZIP.
+- Check mobile, tablet, and desktop layouts for non-overlapping menus, bottom nav, sticky submit button, photo cards, and modals.
 
 ## RESET-009 Final Polish Checks
 

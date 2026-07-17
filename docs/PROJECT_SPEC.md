@@ -16,6 +16,12 @@ RESET-009A is complete as a code/build implementation. It does not claim live Go
 - `ADMIN_PIN_HASH`, `ADMIN_SETUP_TOKEN`, and `APP_SHARED_SECRET` are not exposed as editable app settings.
 - Admin mutations write Audit actions `hub_upsert`, `hub_deactivate`, `responsible_upsert`, `responsible_deactivate`, and `setting_update` with actor, message/detail JSON, and Bangkok `createdAt`.
 - The UI shows `บันทึกลงระบบกลางแล้ว` only after Apps Script success and `บันทึกไม่สำเร็จ กรุณาลองใหม่` on failure.
+- Admin master-data saves are central-only; if the central backend is unavailable, the app shows `ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้` and does not write local-only master data.
+- Frontline remains local-first only for work records/photos/pending sync. It can capture quickly, queue sync, and continue work without waiting for Drive upload.
+- Frontline active work hides completed/synced rows by default. Sent work remains available under today history and is never deleted from central Sheets by clearing the active view.
+- Backoffice `ประวัติ` shows all local records and filters by date range, hub, responsible person, barcode, and status; filtered history can be exported.
+- Apps Script supports safe history/action aliases: `updateSettingsBatch`, `getPhotos`, `getHistory`, and `getRecordsByDateRange`.
+- RESET-009A includes UI polish for safe-area bottom navigation, sticky submit spacing, compact Backoffice menu behavior, focus states, card hierarchy, and mobile/tablet/desktop balance.
 
 ## RESET-009 Final Production Polish
 

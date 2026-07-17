@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 
 export type AppMode = 'frontline' | 'admin';
-export type ProofStatus = 'DRAFT' | 'COMPLETE' | 'NEED_REVIEW' | 'VOIDED';
+export type ProofStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETE' | 'NEED_REVIEW' | 'VOIDED';
 export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
 export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2' | 'DROP_REAR_EXTRA';
 export type GoogleSyncMode = 'local_only' | 'google_sheets';
@@ -148,6 +148,8 @@ export interface RetrySyncResult {
   message: string;
 }
 
+export type WorkViewStatus = ProofStatus | RecordSyncStatus;
+
 const HUBS_KEY = 'reset003.hubs';
 const STAFF_KEY = 'reset003.responsibleStaff';
 const ACTIVE_CONTEXT_KEY = 'reset003.activeContext';
@@ -255,6 +257,14 @@ export function getCentralBackendUrl(): string {
   return CENTRAL_BACKEND_URL;
 }
 
+export function isCentralSaveReady(settings = getSettings()): boolean {
+  return Boolean(CENTRAL_BACKEND_URL || (
+    settings.googleSyncMode === 'google_sheets'
+    && settings.googleAppsScriptUrl.trim()
+    && settings.googleSharedSecret.trim()
+  ));
+}
+
 export function isCentralClientMode(): boolean {
   return CENTRAL_CLIENT_MODE === 'central' || Boolean(CENTRAL_BACKEND_URL);
 }
@@ -337,6 +347,25 @@ export function upsertRecord(record: ProofRecord): void {
   const records = listRecords().filter((item) => item.id !== record.id);
   records.push(record);
   saveRecords(records);
+}
+
+export function getWorkSortRank(record: ProofRecord): number {
+  if (record.syncStatus === 'SYNC_FAILED') return 1;
+  if (record.syncStatus === 'PENDING_SYNC') return 2;
+  if (record.status === 'NEED_REVIEW') return 3;
+  if (record.status === 'IN_PROGRESS') return 4;
+  if (record.status === 'DRAFT') return 5;
+  if (record.status === 'COMPLETE') return 6;
+  if (record.syncStatus === 'SYNCED') return 7;
+  if (record.status === 'VOIDED') return 8;
+  return 9;
+}
+
+export function isActiveFrontlineRecord(record: ProofRecord): boolean {
+  if (record.status === 'VOIDED') return false;
+  if (record.syncStatus === 'SYNC_FAILED' || record.syncStatus === 'PENDING_SYNC') return true;
+  if (record.status === 'DRAFT' || record.status === 'IN_PROGRESS' || record.status === 'NEED_REVIEW') return true;
+  return getMissingPhotoSlots(record).length > 0;
 }
 
 export function getRecordById(recordId: string): ProofRecord | null {
@@ -529,7 +558,7 @@ export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
   }
 
   try {
-    const data = await callAppsScript('bootstrap', {
+    const data = await callAppsScript('getBootstrapData', {
       deviceId: getDeviceId(),
       appVersion: '0.1.0',
     }, { allowWithoutSecret: true }) as Partial<BootstrapCache>;
@@ -565,7 +594,7 @@ export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
 }
 
 export async function upsertCentralHub(hub: Hub): Promise<CentralAdminSaveResult> {
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
   try {
     const data = await callAppsScript('upsertHub', {
       ...hub,
@@ -581,7 +610,7 @@ export async function upsertCentralHub(hub: Hub): Promise<CentralAdminSaveResult
 }
 
 export async function deactivateCentralHub(hubCode: string): Promise<CentralAdminSaveResult> {
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
   try {
     const data = await callAppsScript('deactivateHub', {
       hubCode,
@@ -597,7 +626,7 @@ export async function deactivateCentralHub(hubCode: string): Promise<CentralAdmi
 }
 
 export async function upsertCentralResponsibleStaff(staff: ResponsibleStaff): Promise<CentralAdminSaveResult> {
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
   try {
     const data = await callAppsScript('upsertResponsibleStaff', {
       ...staff,
@@ -614,7 +643,7 @@ export async function upsertCentralResponsibleStaff(staff: ResponsibleStaff): Pr
 }
 
 export async function deactivateCentralResponsibleStaff(employeeCode: string, hubCode: string): Promise<CentralAdminSaveResult> {
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
   try {
     const data = await callAppsScript('deactivateResponsibleStaff', {
       employeeCode,
@@ -631,7 +660,7 @@ export async function deactivateCentralResponsibleStaff(employeeCode: string, hu
 }
 
 export async function updateCentralSetting(key: 'GPS_REQUIRED' | 'GPS_MANDATORY' | 'WATERMARK_ENABLED' | 'REQUIRE_ADMIN_DEVICE_APPROVAL' | 'MINIMUM_APP_VERSION', value: boolean | string): Promise<CentralAdminSaveResult> {
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
   try {
     const data = await callAppsScript('updateSetting', {
       key,

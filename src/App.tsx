@@ -24,8 +24,11 @@ import {
   getCentralBackendStatus,
   getCentralBackendUrl,
   getLocalDateString,
+  getWorkSortRank,
   findCentralRecordByKey,
   initOrRepairCentralStorage,
+  isActiveFrontlineRecord,
+  isCentralSaveReady,
   getMissingPhotoSlots,
   getRecordById,
   getSettings,
@@ -114,15 +117,11 @@ export default function App() {
   };
 
   const hiddenAdminEntry = () => {
-    if (getCentralBackendUrl()) {
-      setAdminPinPanel('central-unlock');
+    if (getCentralBackendStatus() === 'missing') {
+      setAdminPinPanel('backend-missing');
       return;
     }
-    if (hasAdminPin()) {
-      setAdminPinPanel('unlock');
-      return;
-    }
-    if (!employeeMode) setAdminPinPanel('setup-token');
+    setAdminPinPanel('central-unlock');
   };
 
   const startHiddenAdminPress = () => {
@@ -363,7 +362,11 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
   const selectedStaff = visibleStaff.find((item) => item.employeeCode === employeeCode);
   const today = getLocalDateString();
   const todayRecords = records.filter((record) => record.date === today && record.responsibleEmployeeCode === employeeCode);
-  const pending = todayRecords.filter((record) => record.status !== 'COMPLETE' && record.status !== 'VOIDED');
+  const pending = todayRecords.filter(isActiveFrontlineRecord).sort((a, b) => getWorkSortRank(a) - getWorkSortRank(b) || b.updatedAt.localeCompare(a.updatedAt));
+  const refreshData = async () => {
+    await bootstrapCentralConfig();
+    onReload();
+  };
 
   useEffect(() => {
     if (visibleStaff.length === 1) setEmployeeCode(visibleStaff[0].employeeCode);
@@ -399,6 +402,7 @@ function FrontlineHome({ bootstrapMessage, onOpenRecord, onReload, onScan, recor
             </select>
           </label>
           <button className="primary-action" onClick={saveContext} type="button">บันทึกและเริ่มงาน</button>
+          <button className="secondary-action" onClick={() => { void refreshData(); }} type="button"><RefreshCcw size={18} /> รีเฟรชข้อมูล</button>
         </div>
         {selectedHub && selectedStaff ? (
           <div className="active-context">
@@ -717,6 +721,7 @@ function DoneScreen({ onMyWork, onScanNext }: { onMyWork: () => void; onScanNext
 function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: string) => void; records: ProofRecord[] }) {
   const activeContext = getActiveContext();
   const today = getLocalDateString();
+  const [showCompleted, setShowCompleted] = useState(false);
   const mine = records
     .filter((record) => (
       record.status !== 'VOIDED'
@@ -724,15 +729,25 @@ function MyWorkScreen({ onOpenRecord, records }: { onOpenRecord: (recordId: stri
       && (!activeContext?.employeeCode || record.responsibleEmployeeCode === activeContext.employeeCode)
       && (!activeContext?.hubCode || record.hubCode === activeContext.hubCode)
     ))
-    .sort((a, b) => a.vehicleBarcode.localeCompare(b.vehicleBarcode));
-  const openItems = mine.filter((record) => record.status !== 'COMPLETE' || record.syncStatus === 'PENDING_SYNC' || getMissingPhotoSlots(record).length > 0);
+    .sort((a, b) => getWorkSortRank(a) - getWorkSortRank(b) || b.updatedAt.localeCompare(a.updatedAt));
+  const openItems = mine.filter(isActiveFrontlineRecord);
+  const completedItems = mine.filter((record) => !isActiveFrontlineRecord(record));
+  const visibleItems = showCompleted ? mine : openItems;
   return (
     <section className="frontline-stack">
       <article className="hero-card compact">
         <h1>งานค้างถ่ายรูปของฉัน</h1>
         <p>{activeContext ? `${activeContext.hubCode} · ${activeContext.employeeCode}` : 'เลือกผู้รับผิดชอบก่อนเริ่มงาน'}</p>
       </article>
-      <RecordList records={openItems} onOpenRecord={onOpenRecord} actionLabel="ถ่ายรูปต่อ" />
+      <div className="frontline-actions two-column">
+        <button className={showCompleted ? 'secondary-action' : 'primary-action'} onClick={() => setShowCompleted(false)} type="button">ซ่อนงานที่ส่งแล้ว</button>
+        <button className={showCompleted ? 'primary-action' : 'secondary-action'} onClick={() => setShowCompleted(true)} type="button">ดูงานที่ส่งแล้ว</button>
+      </div>
+      <article className="admin-detail-card">
+        <strong>{showCompleted ? 'ประวัติวันนี้' : 'งานที่ต้องทำต่อ'}</strong>
+        <span>{showCompleted ? `ทั้งหมด ${mine.length} งาน / ส่งแล้ว ${completedItems.length} งาน` : `ค้างอยู่ ${openItems.length} งาน`}</span>
+      </article>
+      <RecordList records={visibleItems} onOpenRecord={onOpenRecord} actionLabel="ถ่ายรูปต่อ" />
     </section>
   );
 }
@@ -811,48 +826,36 @@ function HubManager({ onReload }: { onReload: () => void }) {
     if (!cleanedCode || !cleanedName) return;
     setSaving(true);
     setMessage('');
-    const currentSettings = getSettings();
-    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
-    if (centralReady) {
-      const result = await upsertCentralHub({ hubCode: cleanedCode, hubName: cleanedName, active: true });
-      if (result.ok) {
-        await refreshCentral();
-        setMessage('บันทึกลงระบบกลางแล้ว');
-      } else {
-        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
-      }
+    if (!isCentralSaveReady()) {
+      setMessage('ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้');
       setSaving(false);
       return;
     }
-    const next = [...hubs.filter((hub) => hub.hubCode !== cleanedCode), { hubCode: cleanedCode, hubName: cleanedName, active: true }];
-    saveHubs(next);
-    setHubs(next);
-    setMessage('บันทึกในเครื่องแล้ว');
+    const result = await upsertCentralHub({ hubCode: cleanedCode, hubName: cleanedName, active: true });
+    if (result.ok) {
+      await refreshCentral();
+      setMessage('บันทึกลงระบบกลางแล้ว');
+    } else {
+      setMessage(result.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    }
     setSaving(false);
-    onReload();
   };
   const remove = async (code: string) => {
     setSaving(true);
     setMessage('');
-    const currentSettings = getSettings();
-    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
-    if (centralReady) {
-      const result = await deactivateCentralHub(code);
-      if (result.ok) {
-        await refreshCentral();
-        setMessage('บันทึกลงระบบกลางแล้ว');
-      } else {
-        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
-      }
+    if (!isCentralSaveReady()) {
+      setMessage('ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้');
       setSaving(false);
       return;
     }
-    const next = hubs.map((hub) => hub.hubCode === code ? { ...hub, active: false } : hub);
-    saveHubs(next);
-    setHubs(next);
-    setMessage('ปิดใช้งานฮับแล้ว');
+    const result = await deactivateCentralHub(code);
+    if (result.ok) {
+      await refreshCentral();
+      setMessage('บันทึกลงระบบกลางแล้ว');
+    } else {
+      setMessage(result.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    }
     setSaving(false);
-    onReload();
   };
   return (
     <section className="admin-stack">
@@ -888,48 +891,36 @@ function StaffManager({ onReload }: { onReload: () => void }) {
     if (!cleanedCode || !cleanedName || !hubCode) return;
     setSaving(true);
     setMessage('');
-    const currentSettings = getSettings();
-    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
-    if (centralReady) {
-      const result = await upsertCentralResponsibleStaff({ employeeCode: cleanedCode, displayName: cleanedName, hubCode, active: true });
-      if (result.ok) {
-        await refreshCentral();
-        setMessage('บันทึกลงระบบกลางแล้ว');
-      } else {
-        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
-      }
+    if (!isCentralSaveReady()) {
+      setMessage('ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้');
       setSaving(false);
       return;
     }
-    const next = [...staff.filter((item) => !(item.employeeCode === cleanedCode && item.hubCode === hubCode)), { employeeCode: cleanedCode, displayName: cleanedName, hubCode, active: true }];
-    saveResponsibleStaff(next);
-    setStaff(next);
-    setMessage('บันทึกในเครื่องแล้ว');
+    const result = await upsertCentralResponsibleStaff({ employeeCode: cleanedCode, displayName: cleanedName, hubCode, active: true });
+    if (result.ok) {
+      await refreshCentral();
+      setMessage('บันทึกลงระบบกลางแล้ว');
+    } else {
+      setMessage(result.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    }
     setSaving(false);
-    onReload();
   };
   const remove = async (code: string, targetHubCode: string) => {
     setSaving(true);
     setMessage('');
-    const currentSettings = getSettings();
-    const centralReady = Boolean(getCentralBackendUrl() || (currentSettings.googleSyncMode === 'google_sheets' && currentSettings.googleAppsScriptUrl.trim() && currentSettings.googleSharedSecret.trim()));
-    if (centralReady) {
-      const result = await deactivateCentralResponsibleStaff(code, targetHubCode);
-      if (result.ok) {
-        await refreshCentral();
-        setMessage('บันทึกลงระบบกลางแล้ว');
-      } else {
-        setMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
-      }
+    if (!isCentralSaveReady()) {
+      setMessage('ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้');
       setSaving(false);
       return;
     }
-    const next = staff.map((item) => item.employeeCode === code && item.hubCode === targetHubCode ? { ...item, active: false } : item);
-    saveResponsibleStaff(next);
-    setStaff(next);
-    setMessage('ปิดใช้งานผู้รับผิดชอบแล้ว');
+    const result = await deactivateCentralResponsibleStaff(code, targetHubCode);
+    if (result.ok) {
+      await refreshCentral();
+      setMessage('บันทึกลงระบบกลางแล้ว');
+    } else {
+      setMessage(result.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    }
     setSaving(false);
-    onReload();
   };
   return (
     <section className="admin-stack">
@@ -952,7 +943,26 @@ function StaffManager({ onReload }: { onReload: () => void }) {
 function AdminRecords({ activeRecord, onOpenRecord, onReload, records }: { activeRecord: ProofRecord | null; onOpenRecord: (recordId: string) => void; onReload: () => void; records: ProofRecord[] }) {
   const [editDate, setEditDate] = useState(activeRecord?.date ?? '');
   const [voidReason, setVoidReason] = useState('');
+  const [dateFrom, setDateFrom] = useState(getLocalDateString());
+  const [dateTo, setDateTo] = useState(getLocalDateString());
+  const [hubCode, setHubCode] = useState('');
+  const [employeeCode, setEmployeeCode] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [status, setStatus] = useState('');
   useEffect(() => setEditDate(activeRecord?.date ?? ''), [activeRecord?.id]);
+  const filteredRecords = records.filter((record) => (
+    (!dateFrom || record.date >= dateFrom)
+    && (!dateTo || record.date <= dateTo)
+    && (!hubCode || record.hubCode === hubCode)
+    && (!employeeCode || record.responsibleEmployeeCode === employeeCode)
+    && (!barcode || record.vehicleBarcode.includes(normalizeVehicleBarcode(barcode)))
+    && (!status || record.status === status || record.syncStatus === status)
+  ));
+  const exportFiltered = async () => {
+    const blob = await generateExportZip(filteredRecords);
+    downloadBlob(blob, `hub-history-${dateFrom || 'all'}-${dateTo || 'all'}.zip`);
+    addAudit({ action: 'history_filter_used', detail: `${filteredRecords.length} records exported`, actor: 'admin' });
+  };
   const saveDate = () => {
     if (!activeRecord || !editDate) return;
     const updated = { ...activeRecord, date: editDate, updatedAt: new Date().toISOString() };
@@ -969,8 +979,20 @@ function AdminRecords({ activeRecord, onOpenRecord, onReload, records }: { activ
   };
   return (
     <section className="admin-stack">
-      <h1>รายการ</h1>
-      <RecordList records={records} onOpenRecord={onOpenRecord} />
+      <h1>ประวัติ</h1>
+      <article className="admin-detail-card">
+        <div className="admin-form">
+          <label><span>วันที่เริ่ม</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+          <label><span>วันที่สิ้นสุด</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
+          <label><span>ฮับ</span><select value={hubCode} onChange={(event) => setHubCode(event.target.value)}><option value="">ทั้งหมด</option>{listHubs().map((hub) => <option key={hub.hubCode} value={hub.hubCode}>{hub.hubCode}-{hub.hubName}</option>)}</select></label>
+          <label><span>ผู้รับผิดชอบ</span><select value={employeeCode} onChange={(event) => setEmployeeCode(event.target.value)}><option value="">ทั้งหมด</option>{listResponsibleStaff().map((staff) => <option key={`${staff.employeeCode}-${staff.hubCode}`} value={staff.employeeCode}>{staff.employeeCode} {staff.displayName}</option>)}</select></label>
+          <label><span>บาร์รถ</span><input value={barcode} onChange={(event) => setBarcode(event.target.value.toUpperCase())} placeholder="NAK..." /></label>
+          <label><span>สถานะ</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">ทั้งหมด</option><option value="DRAFT">ยังไม่ส่ง</option><option value="IN_PROGRESS">กำลังถ่าย</option><option value="NEED_REVIEW">รูปไม่ครบ</option><option value="COMPLETE">ส่งครบแล้ว</option><option value="PENDING_SYNC">รอซิงก์</option><option value="SYNCED">ซิงก์แล้ว</option><option value="VOIDED">ยกเลิก</option></select></label>
+          <button className="secondary-action" onClick={exportFiltered} type="button"><Download size={18} /> ส่งออกตามตัวกรอง</button>
+        </div>
+        <p>พบ {filteredRecords.length} รายการ</p>
+      </article>
+      <RecordList records={filteredRecords} onOpenRecord={onOpenRecord} />
       {activeRecord ? (
         <article className="admin-detail-card">
           <h2>{activeRecord.vehicleBarcode}</h2>
@@ -1054,23 +1076,19 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
   const save = async () => {
     setSyncMessage('กำลังบันทึก');
-    const centralReady = Boolean(getCentralBackendUrl() || (settings.googleSyncMode === 'google_sheets' && settings.googleAppsScriptUrl.trim() && settings.googleSharedSecret.trim()));
-    if (centralReady) {
-      saveSettings(settings);
-      const result = await saveCentralSafeSettings(settings);
-      if (!result.ok) {
-        setSyncMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่');
-        return;
-      }
-      saveSettings(settings);
-      await bootstrapCentralConfig();
-      setSyncMessage('บันทึกลงระบบกลางแล้ว');
-      setPendingSyncCount(getPendingSyncCount());
-      onReload();
+    saveSettings(settings);
+    if (!isCentralSaveReady(settings)) {
+      setSyncMessage('ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้');
       return;
     }
+    const result = await saveCentralSafeSettings(settings);
+    if (!result.ok) {
+      setSyncMessage(result.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      return;
+    }
+    await bootstrapCentralConfig();
+    setSyncMessage('บันทึกลงระบบกลางแล้ว');
     saveSettings(settings);
-    setSyncMessage('บันทึกในเครื่องแล้ว');
     setPendingSyncCount(getPendingSyncCount());
     onReload();
   };
@@ -1254,7 +1272,7 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
 function AuditPanel() {
   return (
     <section className="admin-stack">
-      <h1>Audit</h1>
+      <h1>ประวัติ</h1>
       {listAudit().map((entry) => (
         <article className="admin-row" key={entry.id}>
           <strong>{entry.action}</strong>
@@ -1303,7 +1321,7 @@ function AdminDevicesPanel() {
 
   return (
     <section className="admin-stack">
-      <h1>AdminDevices</h1>
+      <h1>อุปกรณ์แอดมิน</h1>
       <article className="admin-detail-card">
         <p>อุปกรณ์ต้องอยู่สถานะ APPROVED และ role OWNER/ADMIN จึงเข้า Backoffice ได้ พนักงานไม่สามารถอนุมัติตัวเองได้</p>
         <div className="admin-form">
@@ -1322,8 +1340,8 @@ function AdminDevicesPanel() {
             <small>{device.deviceId}</small>
           </div>
           <div className="row-actions">
-            <button className="secondary-action compact-action" disabled={device.status === 'APPROVED'} onClick={() => { void approve(device); }} type="button">Approve</button>
-            <button className="danger-action compact-action" disabled={device.status === 'REVOKED'} onClick={() => { void revoke(device); }} type="button">Revoke</button>
+            <button className="secondary-action compact-action" disabled={device.status === 'APPROVED'} onClick={() => { void approve(device); }} type="button">อนุมัติ</button>
+            <button className="danger-action compact-action" disabled={device.status === 'REVOKED'} onClick={() => { void revoke(device); }} type="button">ยกเลิกสิทธิ์</button>
           </div>
         </article>
       ))}
@@ -1371,10 +1389,12 @@ function StatusPill({ text, tone }: { text: string; tone: 'success' | 'warning' 
 }
 
 function statusText(status: ProofRecord['status']): string {
+  if (status === 'DRAFT') return 'ยังไม่ส่ง';
+  if (status === 'IN_PROGRESS') return 'กำลังถ่าย';
   if (status === 'COMPLETE') return 'ส่งครบแล้ว';
   if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
   if (status === 'VOIDED') return 'ยกเลิก';
-  return 'เริ่มทำแต่ยังไม่ส่ง';
+  return 'ยังไม่ส่ง';
 }
 
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {

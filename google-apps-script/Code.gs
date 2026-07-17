@@ -69,8 +69,8 @@ const HEADERS = {
   ],
   Hubs: ['hubCode', 'hubName', 'active', 'note'],
   ResponsibleStaff: ['employeeCode', 'employeeName', 'hubCode', 'active', 'note'],
-  Audit: ['id', 'recordId', 'action', 'message', 'detail', 'detailJson', 'actor', 'createdAt'],
-  Settings: ['key', 'value', 'note', 'updatedAt'],
+  Audit: ['auditId', 'id', 'recordId', 'action', 'message', 'detail', 'detailJson', 'actor', 'createdAt'],
+  Settings: ['key', 'value', 'updatedAt', 'note'],
   AdminDevices: ['deviceId', 'deviceName', 'ownerName', 'role', 'status', 'approvedAt', 'revokedAt', 'lastLoginAt', 'note'],
   ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
 };
@@ -99,7 +99,7 @@ function doPost(e) {
       case 'healthCheck':
         return json_({ ok: true, appName: 'Hub Photo Proof', version: APP_VERSION, serverTimeBangkok: formatBangkokDateTime_(new Date()), message: 'API พร้อมใช้งาน' });
       case 'initOrRepairStorage':
-        return json_(ensureStorageReady());
+        return json_(repairStorageWithAudit_(request.payload));
       case 'bootstrap':
       case 'getBootstrapData':
         return json_(bootstrap_(request.payload));
@@ -108,6 +108,8 @@ function doPost(e) {
         return json_({ ok: true, appSettings: safeSettings_() });
       case 'updateSetting':
         return json_(updateSettingFromAdmin_(request.payload));
+      case 'updateSettingsBatch':
+        return json_(updateSettingsBatchFromAdmin_(request.payload));
       case 'findRecordByKey':
         return json_(findRecordByKey_(request.payload));
       case 'upsertRecordByKey':
@@ -137,6 +139,11 @@ function doPost(e) {
         return json_(deactivateResponsibleStaff_(request.payload));
       case 'getRecords':
         return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
+      case 'getPhotos':
+        return json_({ ok: true, photos: readRows_(SHEETS.PHOTOS) });
+      case 'getHistory':
+      case 'getRecordsByDateRange':
+        return json_(getHistory_(request.payload));
       case 'appendAudit':
       case 'logAudit':
         return json_({ ok: true, result: appendAudit_(request.payload) });
@@ -192,6 +199,18 @@ function ensureStorageReady() {
   return result;
 }
 
+function repairStorageWithAudit_(payload) {
+  const result = ensureStorageReady();
+  appendAudit_({
+    action: 'storage_repair',
+    message: 'ตรวจสอบและซ่อมชีท',
+    detailJson: JSON.stringify({ sheetsCreated: result.sheetsCreated, headersRepaired: result.headersRepaired }),
+    actor: payload && payload.actor ? payload.actor : 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return result;
+}
+
 function ensureHeaders_(sheet, headers) {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
@@ -223,7 +242,12 @@ function ensureDefaultSettings_(result) {
 function upsertSettingDefault_(sheet, key, value, result) {
   const rowIndex = findRowByValue_(sheet, 1, key);
   if (rowIndex > 0) return;
-  sheet.appendRow([key, value, '', formatBangkokDateTime_(new Date())]);
+  sheet.appendRow(rowForHeaders_(getSheetHeaders_(sheet), {
+    key: key,
+    value: value,
+    updatedAt: formatBangkokDateTime_(new Date()),
+    note: '',
+  }));
   if (result) result.settingsUpdated.push(key);
 }
 
@@ -231,7 +255,12 @@ function upsertSetting_(key, value) {
   const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
   ensureHeaders_(sheet, HEADERS.Settings);
   const rowIndex = findRowByValue_(sheet, 1, key);
-  const row = [key, value, '', formatBangkokDateTime_(new Date())];
+  const row = rowForHeaders_(getSheetHeaders_(sheet), {
+    key: key,
+    value: value,
+    updatedAt: formatBangkokDateTime_(new Date()),
+    note: '',
+  });
   if (rowIndex > 0) {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   } else {
@@ -290,6 +319,18 @@ function updateSettingFromAdmin_(payload) {
     detailJson: JSON.stringify({ key: key, value: value }),
     actor: payload.actor || payload.deviceId || 'admin',
     createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: safeSettings_() };
+}
+
+function updateSettingsBatchFromAdmin_(payload) {
+  const items = payload && payload.settings ? payload.settings : [];
+  if (!Array.isArray(items)) throw new Error('Missing settings list');
+  items.forEach(function (item) {
+    updateSettingFromAdmin_(Object.assign({}, item, {
+      actor: payload.actor || payload.deviceId || 'admin',
+      deviceId: payload.deviceId || '',
+    }));
   });
   return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: safeSettings_() };
 }
@@ -828,6 +869,35 @@ function getMyWork_(payload) {
   };
 }
 
+function getHistory_(payload) {
+  const rows = readRows_(SHEETS.RECORDS_ALL);
+  const dateFrom = payload && payload.dateFrom ? String(payload.dateFrom) : '';
+  const dateTo = payload && payload.dateTo ? String(payload.dateTo) : '';
+  const hubCode = payload && payload.hubCode ? String(payload.hubCode) : '';
+  const employeeCode = payload && payload.responsibleEmployeeCode ? String(payload.responsibleEmployeeCode) : '';
+  const barcode = payload && payload.vehicleBarcode ? String(payload.vehicleBarcode).toUpperCase() : '';
+  const status = payload && payload.status ? String(payload.status) : '';
+  const records = rows.filter(function (row) {
+    const rowDate = String(row['วันที่'] || row.date || '');
+    const rowBarcode = String(row['บาร์โค้ดรถ'] || row.vehicleBarcode || '').toUpperCase();
+    const rowStatus = String(row.statusInternal || row.syncStatus || row['สถานะ'] || '');
+    return (!dateFrom || rowDate >= dateFrom)
+      && (!dateTo || rowDate <= dateTo)
+      && (!hubCode || row.hubCode === hubCode || String(row['ฮับ'] || '').indexOf(hubCode) === 0)
+      && (!employeeCode || row.responsibleEmployeeCode === employeeCode || String(row['ผู้รับผิดชอบ'] || '').indexOf(employeeCode) === 0)
+      && (!barcode || rowBarcode.indexOf(barcode) >= 0)
+      && (!status || rowStatus === status || String(row['สถานะ'] || '') === status);
+  });
+  appendAudit_({
+    action: 'history_filter_used',
+    message: 'เปิดดูประวัติ',
+    detailJson: JSON.stringify(payload || {}),
+    actor: payload && payload.actor ? payload.actor : 'admin',
+    createdAt: formatBangkokDateTime_(new Date()),
+  });
+  return { ok: true, records: records };
+}
+
 function syncBatch_(payload) {
   const records = payload && payload.records ? payload.records : [];
   const results = records.map(function (item) {
@@ -997,8 +1067,10 @@ function getOrCreateFolder_(parent, name) {
 function appendAudit_(entry) {
   const sheet = getOrCreateSheet_(SHEETS.AUDIT);
   ensureHeaders_(sheet, HEADERS.Audit);
+  const auditId = entry.auditId || entry.id || Utilities.getUuid();
   const next = {
-    id: entry.id || Utilities.getUuid(),
+    auditId: auditId,
+    id: auditId,
     recordId: entry.recordId || '',
     action: entry.action || '',
     message: entry.message || entry.detail || '',

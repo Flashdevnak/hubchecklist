@@ -71,8 +71,12 @@ Supported actions:
 - `deactivateResponsibleStaff`
 - `getSettings`
 - `updateSetting`
+- `updateSettingsBatch`
 - `getBootstrapData`
 - `getRecords`
+- `getPhotos`
+- `getHistory`
+- `getRecordsByDateRange`
 - `appendAudit`
 - `healthCheck`
 
