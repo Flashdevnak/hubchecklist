@@ -1,1171 +1,848 @@
-import ExcelJS from 'exceljs';
-import JSZip from 'jszip';
+export type ProofStatus =
+  | 'DRAFT'
+  | 'IN_PROGRESS'
+  | 'NEED_REVIEW'
+  | 'COMPLETE'
+  | 'PENDING_SYNC'
+  | 'SYNCING'
+  | 'SYNCED'
+  | 'SYNC_FAILED'
+  | 'VOIDED';
 
-export type AppMode = 'frontline' | 'admin';
-export type ProofStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETE' | 'NEED_REVIEW' | 'VOIDED';
-export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
+export type DropType = 'NO_DROP' | 'DROP';
 export type SlotType = 'REAR_MAIN' | 'FRONT_DROP' | 'DROP_REAR_1' | 'DROP_REAR_2' | 'DROP_REAR_EXTRA';
-export type GoogleSyncMode = 'local_only' | 'google_sheets';
-export type GoogleSyncAction = 'createRecord' | 'uploadPhotoMetadata' | 'syncRecord' | 'appendAudit';
-export type RecordSyncStatus = 'LOCAL_ONLY' | 'PENDING_SYNC' | 'SYNCED' | 'SYNC_FAILED';
-export type AdminDeviceStatus = 'PENDING' | 'APPROVED' | 'REVOKED';
-export type AdminDeviceRole = 'OWNER' | 'ADMIN' | 'VIEWER';
+export type GpsStatus = 'granted' | 'denied' | 'unavailable' | 'unknown';
 
 export interface Hub {
   hubCode: string;
   hubName: string;
   active: boolean;
+  note?: string;
+  updatedAt?: string;
 }
 
 export interface ResponsibleStaff {
   employeeCode: string;
-  displayName: string;
+  employeeName: string;
   hubCode: string;
   active: boolean;
+  note?: string;
+  updatedAt?: string;
 }
 
-export interface ActiveWorkContext {
+export interface ActiveContext {
   hubCode: string;
   employeeCode: string;
 }
 
-export interface ProofPhotoSlot {
+export interface PhotoSlot {
   slotId: string;
   slotType: SlotType;
-  labelThai: string;
+  label: string;
   required: boolean;
   captured: boolean;
-  imageLocalData?: string;
   fileName?: string;
+  imageLocalData?: string;
+  driveUrl?: string;
+  driveFileId?: string;
   capturedAt?: string;
-  displayTimestamp?: string;
-  gpsLat?: number;
-  gpsLng?: number;
-  gpsAccuracy?: number;
-  gpsStatus: GpsStatus;
-  locationPermissionStatus: GpsStatus;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  addressText?: string;
   watermarkText?: string;
-  retakeCount: number;
+  gpsStatus: GpsStatus;
 }
 
 export interface ProofRecord {
-  id: string;
+  recordId: string;
+  duplicateKey: string;
+  date: string;
   hubCode: string;
   hubName: string;
   responsibleEmployeeCode: string;
   responsibleName: string;
-  date: string;
   vehicleBarcode: string;
-  hasDropTransfer: boolean;
+  dropType: DropType;
   dropCount: number;
-  photoSlots: ProofPhotoSlot[];
   status: ProofStatus;
-  missingPhotoWarnings: string[];
-  missingPhotoConfirmed: boolean;
-  missingPhotoConfirmedAt?: string;
+  photoSlots: PhotoSlot[];
+  missingPhotoLabels: string[];
   submittedAt?: string;
+  syncedAt?: string;
   createdAt: string;
   updatedAt: string;
-  syncStatus?: RecordSyncStatus;
-  duplicateKey?: string;
   duplicateOfRecordId?: string;
   duplicateReason?: string;
-  forceCreateNew?: boolean;
-  voidReason?: string;
-  notes?: string;
-}
-
-export interface AuditEntry {
-  id: string;
-  recordId?: string;
-  action: string;
-  detail: string;
-  createdAt: string;
-  actor: string;
-}
-
-export interface AppSettings {
-  gpsMandatory: boolean;
-  watermarkEnabled: boolean;
-  googleSyncMode: GoogleSyncMode;
-  googleAppsScriptUrl: string;
-  googleSharedSecret: string;
-}
-
-export interface AdminDevice {
-  deviceId: string;
-  deviceName: string;
-  ownerName: string;
-  role: AdminDeviceRole;
-  status: AdminDeviceStatus;
-  approvedAt?: string;
-  revokedAt?: string;
-  lastLoginAt?: string;
   note?: string;
 }
 
-export interface BootstrapCache {
+export interface AppSettings {
+  GPS_REQUIRED: string;
+  GPS_MANDATORY: string;
+  WATERMARK_ENABLED: string;
+  REQUIRE_ADMIN_DEVICE_APPROVAL: string;
+  MINIMUM_APP_VERSION: string;
+  ADMIN_PIN_ENABLED?: string;
+  ADMIN_PIN_SET?: string;
+}
+
+export interface BootstrapData {
   ok: boolean;
+  source: 'central' | 'cache' | 'local';
+  message: string;
   serverTime?: string;
-  appSettings?: Partial<AppSettings> & Record<string, unknown>;
+  apiVersion?: string;
   hubs: Hub[];
   responsibleStaff: ResponsibleStaff[];
-  adminAuthEnabled: boolean;
-  minimumAppVersion?: string;
-  cachedAt: string;
-  source: 'online' | 'cache' | 'local';
+  settings: AppSettings;
+  pulledAt: string;
 }
 
-export interface SyncQueueItem {
-  id: string;
-  action: GoogleSyncAction;
-  payload: unknown;
-  createdAt: string;
-  attempts: number;
-  lastAttemptAt?: string;
-  error?: string;
-}
-
-export interface SyncResult {
-  ok: boolean;
-  queued: boolean;
-  message: string;
-  response?: unknown;
-}
-
-export interface CentralAdminSaveResult {
+export interface CentralPullResult {
   ok: boolean;
   message: string;
-  hubs?: Hub[];
-  responsibleStaff?: ResponsibleStaff[];
-  appSettings?: Partial<AppSettings> & Record<string, unknown>;
+  recordsPulled: number;
+  bootstrap: BootstrapData;
 }
 
-export interface RetrySyncResult {
+export interface ApiResult<T = unknown> {
+  ok: boolean;
+  message: string;
+  data?: T;
+}
+
+export interface SyncReport {
   attempted: number;
   synced: number;
   failed: number;
   message: string;
 }
 
-export type WorkViewStatus = ProofStatus | RecordSyncStatus;
-
-export interface CentralPullResult {
-  ok: boolean;
-  message: string;
-  recordsPulled: number;
-  bootstrap: BootstrapCache;
-}
-
-const HUBS_KEY = 'reset003.hubs';
-const STAFF_KEY = 'reset003.responsibleStaff';
-const ACTIVE_CONTEXT_KEY = 'reset003.activeContext';
-const RECORDS_KEY = 'reset003.records';
-const AUDIT_KEY = 'reset003.audit';
-const SETTINGS_KEY = 'reset003.settings';
-const SYNC_QUEUE_KEY = 'reset003.googleSyncQueue';
-const ADMIN_PIN_KEY = 'reset003.adminPin';
-const EMPLOYEE_DEVICE_MODE_KEY = 'reset003.employeeDeviceMode';
-const DEVICE_ID_KEY = 'reset003.deviceId';
-const BOOTSTRAP_CACHE_KEY = 'reset003.bootstrapCache';
-const ADMIN_SESSION_KEY = 'reset003.adminSession';
 const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
-const CENTRAL_BACKEND_URL = (import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL as string | undefined)?.trim() ?? '';
-const CENTRAL_CLIENT_MODE = (import.meta.env.VITE_APP_CLIENT_MODE as string | undefined)?.trim() ?? '';
+const API_URL = (import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL as string | undefined)?.trim() ?? '';
+const APP_VERSION = 'RESET-011';
 
-const DEFAULT_SETTINGS: AppSettings = {
-  gpsMandatory: false,
-  watermarkEnabled: true,
-  googleSyncMode: 'local_only',
-  googleAppsScriptUrl: '',
-  googleSharedSecret: '',
+const KEYS = {
+  hubs: 'reset011.hubs',
+  staff: 'reset011.responsibleStaff',
+  records: 'reset011.records',
+  activeContext: 'reset011.activeContext',
+  bootstrap: 'reset011.bootstrap',
+  pending: 'reset011.pendingRecords',
+  deviceId: 'reset011.deviceId',
+  showSubmitted: 'reset011.showSubmitted',
 };
 
-export const DEFAULT_HUB: Hub = {
+export const FALLBACK_HUB: Hub = {
   hubCode: '26NAK_BHUB',
   hubName: 'นครราชสีมา',
   active: true,
 };
 
-export const DEFAULT_STAFF: ResponsibleStaff = {
+export const FALLBACK_STAFF: ResponsibleStaff = {
   employeeCode: '25845',
-  displayName: 'TUI',
-  hubCode: DEFAULT_HUB.hubCode,
+  employeeName: 'Tui',
+  hubCode: FALLBACK_HUB.hubCode,
   active: true,
 };
 
-export const EXPORT_HEADERS = [
-  'วันที่',
-  'ฮับ',
-  'ผู้รับผิดชอบ',
-  'บาร์โค้ดรถ',
-  'พ่วงดรอปหรือไม่',
-  'จำนวนดรอป',
-  'สถานะ',
-  'รูปหลังรถ',
-  'รูปหน้าดรอป',
-  'รูปหลังรถพ่วงที่ 1',
-  'รูปหลังรถพ่วงที่ 2',
-  'รูปหลังรถพ่วงเพิ่มเติม',
-  'รายการรูปที่ขาด',
-  'เวลาส่งข้อมูล',
-  'หมายเหตุ',
-];
+const DEFAULT_SETTINGS: AppSettings = {
+  GPS_REQUIRED: 'false',
+  GPS_MANDATORY: 'false',
+  WATERMARK_ENABLED: 'true',
+  REQUIRE_ADMIN_DEVICE_APPROVAL: 'false',
+  MINIMUM_APP_VERSION: '0.1.0',
+  ADMIN_PIN_ENABLED: 'false',
+  ADMIN_PIN_SET: 'false',
+};
 
-export function ensureSeedData(): void {
-  if (readJson<Hub[]>(HUBS_KEY, []).length === 0) writeJson(HUBS_KEY, [DEFAULT_HUB]);
-  if (readJson<ResponsibleStaff[]>(STAFF_KEY, []).length === 0) writeJson(STAFF_KEY, [DEFAULT_STAFF]);
+export function isCentralConfigured(): boolean {
+  return API_URL.length > 0;
 }
 
-export function listHubs(): Hub[] {
-  ensureSeedData();
-  return readJson<Hub[]>(HUBS_KEY, []);
-}
-
-export function saveHubs(hubs: Hub[]): void {
-  writeJson(HUBS_KEY, hubs);
-}
-
-export function listResponsibleStaff(): ResponsibleStaff[] {
-  ensureSeedData();
-  return readJson<ResponsibleStaff[]>(STAFF_KEY, []);
-}
-
-export function saveResponsibleStaff(staff: ResponsibleStaff[]): void {
-  writeJson(STAFF_KEY, staff);
-}
-
-export function getActiveContext(): ActiveWorkContext | null {
-  return readJson<ActiveWorkContext | null>(ACTIVE_CONTEXT_KEY, null);
-}
-
-export function saveActiveContext(context: ActiveWorkContext): void {
-  writeJson(ACTIVE_CONTEXT_KEY, context);
-}
-
-export function getSettings(): AppSettings {
-  const saved = readJson<Partial<AppSettings>>(SETTINGS_KEY, {});
-  return {
-    ...DEFAULT_SETTINGS,
-    ...saved,
-    googleSyncMode: CENTRAL_BACKEND_URL ? 'google_sheets' : (saved.googleSyncMode ?? DEFAULT_SETTINGS.googleSyncMode),
-    googleAppsScriptUrl: CENTRAL_BACKEND_URL || saved.googleAppsScriptUrl || '',
-  };
-}
-
-export function saveSettings(settings: AppSettings): void {
-  writeJson(SETTINGS_KEY, {
-    ...settings,
-    googleAppsScriptUrl: CENTRAL_BACKEND_URL || settings.googleAppsScriptUrl,
-  });
-}
-
-export function getCentralBackendUrl(): string {
-  return CENTRAL_BACKEND_URL;
-}
-
-export function isCentralSaveReady(settings = getSettings()): boolean {
-  return Boolean(CENTRAL_BACKEND_URL || (
-    settings.googleSyncMode === 'google_sheets'
-    && settings.googleAppsScriptUrl.trim()
-    && settings.googleSharedSecret.trim()
-  ));
-}
-
-export function isCentralClientMode(): boolean {
-  return CENTRAL_CLIENT_MODE === 'central' || Boolean(CENTRAL_BACKEND_URL);
-}
-
-export function getCentralBackendStatus(): 'configured' | 'missing' {
-  return CENTRAL_BACKEND_URL ? 'configured' : 'missing';
+export function getCentralUrlStatus(): 'configured' | 'missing' {
+  return isCentralConfigured() ? 'configured' : 'missing';
 }
 
 export function getDeviceId(): string {
-  const current = window.localStorage.getItem(DEVICE_ID_KEY);
-  if (current) return current;
-  const next = createId();
-  window.localStorage.setItem(DEVICE_ID_KEY, next);
+  const saved = localStorage.getItem(KEYS.deviceId);
+  if (saved) return saved;
+  const next = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(KEYS.deviceId, next);
   return next;
 }
 
-export function getCachedBootstrap(): BootstrapCache | null {
-  return readJson<BootstrapCache | null>(BOOTSTRAP_CACHE_KEY, null);
+export async function bootstrapCentralData(): Promise<BootstrapData> {
+  seedFallbackData();
+  if (!isCentralConfigured()) {
+    const local = localBootstrap('ยังไม่ได้ตั้งค่าระบบกลาง');
+    writeJson(KEYS.bootstrap, local);
+    return local;
+  }
+
+  try {
+    const response = await callCentral<{
+      hubs?: unknown;
+      responsibleStaff?: unknown;
+      settings?: unknown;
+      appSettings?: unknown;
+      serverTime?: string;
+      apiVersion?: string;
+      version?: string;
+    }>('getBootstrapData', { deviceId: getDeviceId(), appVersion: APP_VERSION }, true);
+    const data = response.data ?? {};
+    const hubs = normalizeHubs(data.hubs);
+    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
+    if (hubs.length) saveHubs(hubs);
+    if (responsibleStaff.length) saveResponsibleStaff(responsibleStaff);
+    const bootstrap: BootstrapData = {
+      ok: true,
+      source: 'central',
+      message: response.message || 'ดึงข้อมูลล่าสุดแล้ว',
+      serverTime: data.serverTime,
+      apiVersion: data.apiVersion || data.version,
+      hubs: hubs.length ? hubs : listHubs(),
+      responsibleStaff: responsibleStaff.length ? responsibleStaff : listResponsibleStaff(),
+      settings: normalizeSettings(data.settings ?? data.appSettings),
+      pulledAt: new Date().toISOString(),
+    };
+    writeJson(KEYS.bootstrap, bootstrap);
+    return bootstrap;
+  } catch (error) {
+    const cached = readJson<BootstrapData | null>(KEYS.bootstrap, null);
+    if (cached) return { ...cached, ok: false, source: 'cache', message: errorMessage(error) };
+    return localBootstrap(errorMessage(error));
+  }
 }
 
-export function hasAuthorizedAdminSession(): boolean {
-  const session = readJson<{ deviceId: string; role: AdminDeviceRole; expiresAt: string } | null>(ADMIN_SESSION_KEY, null);
-  return Boolean(session && session.deviceId === getDeviceId() && new Date(session.expiresAt).getTime() > Date.now());
+export async function pullCentralData(): Promise<CentralPullResult> {
+  const bootstrap = await bootstrapCentralData();
+  if (!isCentralConfigured()) {
+    return { ok: false, message: bootstrap.message, recordsPulled: 0, bootstrap };
+  }
+  try {
+    const response = await callCentral<{ records?: unknown }>('getRecords', {}, true);
+    const centralRecords = normalizeRecords(response.data?.records);
+    saveRecords(mergeRecords(listRecords(), centralRecords));
+    return {
+      ok: true,
+      message: response.message || 'ดึงข้อมูลล่าสุดแล้ว',
+      recordsPulled: centralRecords.length,
+      bootstrap,
+    };
+  } catch (error) {
+    return { ok: false, message: errorMessage(error), recordsPulled: 0, bootstrap };
+  }
 }
 
-export function clearAdminSession(): void {
-  window.localStorage.removeItem(ADMIN_SESSION_KEY);
+export function listHubs(): Hub[] {
+  seedFallbackData();
+  return readJson<Hub[]>(KEYS.hubs, []).filter((hub) => hub.active);
 }
 
-export function hasAdminPin(): boolean {
-  return Boolean(window.localStorage.getItem(ADMIN_PIN_KEY));
+export function saveHubs(hubs: Hub[]): void {
+  writeJson(KEYS.hubs, dedupeBy(hubs, (hub) => hub.hubCode.toUpperCase()));
 }
 
-export function isEmployeeDeviceMode(): boolean {
-  return window.localStorage.getItem(EMPLOYEE_DEVICE_MODE_KEY) === 'true';
+export function listResponsibleStaff(): ResponsibleStaff[] {
+  seedFallbackData();
+  return readJson<ResponsibleStaff[]>(KEYS.staff, []).filter((staff) => staff.active);
 }
 
-export function setEmployeeDeviceMode(enabled: boolean): void {
-  window.localStorage.setItem(EMPLOYEE_DEVICE_MODE_KEY, enabled ? 'true' : 'false');
-  addAudit({
-    action: enabled ? 'employee_device_mode_enabled' : 'employee_device_mode_disabled',
-    detail: enabled ? 'This device was locked to Frontline employee mode' : 'This device was unlocked from employee mode',
-    actor: 'admin',
-  });
+export function saveResponsibleStaff(staff: ResponsibleStaff[]): void {
+  writeJson(KEYS.staff, dedupeBy(staff, (item) => `${item.employeeCode}|${item.hubCode}`.toUpperCase()));
 }
 
-export function setAdminPin(pin: string): boolean {
-  const cleaned = pin.trim();
-  if (cleaned.length < 4) return false;
-  window.localStorage.setItem(ADMIN_PIN_KEY, cleaned);
-  addAudit({ action: 'admin_pin_set', detail: 'Local admin PIN was set on this device', actor: 'admin' });
-  return true;
+export function getActiveContext(): ActiveContext | null {
+  return readJson<ActiveContext | null>(KEYS.activeContext, null);
 }
 
-export function verifyAdminPin(pin: string): boolean {
-  const saved = window.localStorage.getItem(ADMIN_PIN_KEY);
-  return Boolean(saved && pin === saved);
-}
-
-export function changeAdminPin(currentPin: string, nextPin: string): boolean {
-  if (!verifyAdminPin(currentPin)) return false;
-  return setAdminPin(nextPin);
-}
-
-export function resetLocalTestData(): void {
-  window.localStorage.removeItem(RECORDS_KEY);
-  window.localStorage.removeItem(AUDIT_KEY);
-  window.localStorage.removeItem(SYNC_QUEUE_KEY);
+export function saveActiveContext(context: ActiveContext): void {
+  writeJson(KEYS.activeContext, context);
 }
 
 export function listRecords(): ProofRecord[] {
-  return dedupeRecords(readJson<ProofRecord[]>(RECORDS_KEY, [])).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return mergeRecords(readJson<ProofRecord[]>(KEYS.records, []), []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function saveRecords(records: ProofRecord[]): void {
-  writeJson(RECORDS_KEY, dedupeRecords(records));
+  writeJson(KEYS.records, mergeRecords(records, []));
 }
 
-export function upsertRecord(record: ProofRecord): void {
-  const keyed = ensureDuplicateKey(record);
-  const records = listRecords().filter((item) => (
-    item.id !== keyed.id
-    && (keyed.forceCreateNew || duplicateKeyForRecord(item) !== duplicateKeyForRecord(keyed))
-  ));
-  records.push(keyed);
+export function getRecord(recordId: string): ProofRecord | null {
+  return listRecords().find((record) => record.recordId === recordId) ?? null;
+}
+
+export function getRecordByDuplicateKey(duplicateKey: string): ProofRecord | null {
+  return listRecords().find((record) => record.duplicateKey === duplicateKey) ?? null;
+}
+
+export function upsertLocalRecord(record: ProofRecord): ProofRecord {
+  const normalized = normalizeRecord(record);
+  const records = listRecords().filter((item) => item.recordId !== normalized.recordId && item.duplicateKey !== normalized.duplicateKey);
+  records.push(normalized);
   saveRecords(records);
+  return normalized;
 }
 
-export function getWorkSortRank(record: ProofRecord): number {
-  if (record.syncStatus === 'SYNC_FAILED') return 1;
-  if (record.syncStatus === 'PENDING_SYNC') return 2;
-  if (record.status === 'NEED_REVIEW') return 3;
-  if (record.status === 'IN_PROGRESS') return 4;
-  if (record.status === 'DRAFT') return 5;
-  if (record.status === 'COMPLETE') return 6;
-  if (record.syncStatus === 'SYNCED') return 7;
-  if (record.status === 'VOIDED') return 8;
-  return 9;
-}
-
-export function isActiveFrontlineRecord(record: ProofRecord): boolean {
-  if (record.status === 'VOIDED') return false;
-  if (record.syncStatus === 'SYNC_FAILED' || record.syncStatus === 'PENDING_SYNC') return true;
-  if (record.status === 'DRAFT' || record.status === 'IN_PROGRESS' || record.status === 'NEED_REVIEW') return true;
-  return false;
-}
-
-export function getRecordById(recordId: string): ProofRecord | null {
-  return listRecords().find((record) => record.id === recordId) ?? null;
-}
-
-export function listAudit(): AuditEntry[] {
-  return readJson<AuditEntry[]>(AUDIT_KEY, []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function addAudit(entry: Omit<AuditEntry, 'id' | 'createdAt'>): void {
-  const next: AuditEntry = {
-    ...entry,
-    id: createId(),
-    createdAt: new Date().toISOString(),
-  };
-  writeJson(AUDIT_KEY, [next, ...listAudit()]);
-}
-
-export function getLocalDateString(date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: BANGKOK_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${pick('year')}-${pick('month')}-${pick('day')}`;
-}
-
-export function formatDateTime(iso?: string): string {
-  if (!iso) return '-';
-  return `${formatDatePart(iso)} ${formatTimePart(iso)}`;
-}
-
-export function formatDatePart(iso?: string): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: BANGKOK_TIME_ZONE });
-}
-
-export function formatTimePart(iso?: string): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleTimeString('th-TH', { timeZone: BANGKOK_TIME_ZONE, hour12: false });
-}
-
-export function normalizeVehicleBarcode(input: string): string {
-  const flashMatch = input.match(/\/proof\/go\/([A-Z0-9-]+)/i);
-  const value = flashMatch?.[1] ?? input;
-  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-}
-
-export function createPhotoSlots(hasDropTransfer: boolean, dropCount: number): ProofPhotoSlot[] {
-  if (!hasDropTransfer) {
-    return [
-      createSlot('REAR_MAIN', 'รูปหลังรถ'),
-      createSlot('FRONT_DROP', 'รูปหน้าดรอป'),
-    ];
+export async function findExistingWork(values: {
+  date?: string;
+  hubCode: string;
+  responsibleEmployeeCode: string;
+  vehicleBarcode: string;
+}): Promise<ProofRecord | null> {
+  const duplicateKey = buildDuplicateKey(values.date ?? todayBangkok(), values.hubCode, values.responsibleEmployeeCode, values.vehicleBarcode);
+  const local = getRecordByDuplicateKey(duplicateKey);
+  if (local) return local;
+  if (!isCentralConfigured()) return null;
+  try {
+    const response = await callCentral<{ found?: boolean; record?: unknown }>('findRecordByKey', {
+      date: values.date ?? todayBangkok(),
+      hubCode: values.hubCode,
+      responsibleEmployeeCode: values.responsibleEmployeeCode,
+      vehicleBarcode: normalizeVehicleBarcode(values.vehicleBarcode),
+    }, true);
+    const record = response.data?.record ? normalizeRecordFromAny(response.data.record) : null;
+    if (record) {
+      upsertLocalRecord(record);
+      return record;
+    }
+  } catch {
+    return null;
   }
-
-  const trailerSlots = Array.from({ length: Math.max(2, dropCount) }, (_, index) => createSlot(
-    index < 2 ? (`DROP_REAR_${index + 1}` as SlotType) : 'DROP_REAR_EXTRA',
-    `รูปหลังรถพ่วงที่ ${index + 1}`,
-  ));
-  return [
-    createSlot('REAR_MAIN', 'รูปหลังรถหลัก'),
-    ...trailerSlots,
-  ];
-}
-
-export function updatePhotoSlotsForDropCount(record: ProofRecord, dropCount: number): ProofRecord {
-  const nextSlots = createPhotoSlots(true, dropCount).map((slot) => {
-    const existing = record.photoSlots.find((item) => item.slotType === slot.slotType && item.labelThai === slot.labelThai)
-      ?? record.photoSlots.find((item) => item.slotType === slot.slotType && item.slotType !== 'DROP_REAR_EXTRA');
-    return existing ?? slot;
-  });
-  return {
-    ...record,
-    hasDropTransfer: true,
-    dropCount,
-    photoSlots: nextSlots,
-    updatedAt: new Date().toISOString(),
-  };
+  return null;
 }
 
 export function createDraftRecord(values: {
   hub: Hub;
   responsible: ResponsibleStaff;
   vehicleBarcode: string;
-  hasDropTransfer: boolean;
+  dropType: DropType;
+  dropCount?: number;
 }): ProofRecord {
   const now = new Date().toISOString();
-  const dropCount = values.hasDropTransfer ? 2 : 0;
-  return {
-    id: createId(),
+  const barcode = normalizeVehicleBarcode(values.vehicleBarcode);
+  const dropCount = values.dropType === 'DROP' ? Math.max(2, values.dropCount ?? 2) : 0;
+  const date = todayBangkok();
+  const record: ProofRecord = {
+    recordId: crypto.randomUUID?.() ?? `${Date.now()}`,
+    duplicateKey: buildDuplicateKey(date, values.hub.hubCode, values.responsible.employeeCode, barcode),
+    date,
     hubCode: values.hub.hubCode,
     hubName: values.hub.hubName,
     responsibleEmployeeCode: values.responsible.employeeCode,
-    responsibleName: values.responsible.displayName,
-    date: getLocalDateString(),
-    vehicleBarcode: normalizeVehicleBarcode(values.vehicleBarcode),
-    hasDropTransfer: values.hasDropTransfer,
+    responsibleName: values.responsible.employeeName,
+    vehicleBarcode: barcode,
+    dropType: values.dropType,
     dropCount,
-    photoSlots: createPhotoSlots(values.hasDropTransfer, dropCount),
     status: 'DRAFT',
-    missingPhotoWarnings: [],
-    missingPhotoConfirmed: false,
-    duplicateKey: duplicateKeyFromParts(getLocalDateString(), values.hub.hubCode, values.responsible.employeeCode, normalizeVehicleBarcode(values.vehicleBarcode)),
+    photoSlots: createPhotoSlots(values.dropType, dropCount),
+    missingPhotoLabels: [],
     createdAt: now,
     updatedAt: now,
   };
+  return upsertLocalRecord(record);
 }
 
-export function getMissingPhotoSlots(record: ProofRecord): ProofPhotoSlot[] {
-  return record.photoSlots.filter((slot) => slot.required && !slot.captured);
-}
-
-export function submitRecord(record: ProofRecord, confirmMissing: boolean): ProofRecord {
-  const missing = getMissingPhotoSlots(record);
-  const now = new Date().toISOString();
-  const submitted: ProofRecord = {
+export function changeDropType(record: ProofRecord, dropType: DropType, dropCount?: number): ProofRecord {
+  const nextDropCount = dropType === 'DROP' ? Math.max(2, dropCount ?? (record.dropCount || 2)) : 0;
+  return upsertLocalRecord({
     ...record,
-    status: missing.length === 0 ? 'COMPLETE' : 'NEED_REVIEW',
-    missingPhotoWarnings: missing.map((slot) => slot.labelThai),
-    missingPhotoConfirmed: missing.length > 0 ? confirmMissing : false,
-    missingPhotoConfirmedAt: missing.length > 0 && confirmMissing ? now : undefined,
-    submittedAt: now,
-    updatedAt: now,
-    syncStatus: isGoogleSyncConfigured() ? 'PENDING_SYNC' : 'LOCAL_ONLY',
-  };
-  upsertRecord(submitted);
-  addAudit({
-    recordId: submitted.id,
-    action: 'record_submitted',
-    detail: missing.length ? `submitted with missing photos: ${missing.map((slot) => slot.labelThai).join(', ')}` : 'submitted complete',
-    actor: submitted.responsibleEmployeeCode,
+    dropType,
+    dropCount: nextDropCount,
+    photoSlots: carryExistingPhotos(record.photoSlots, createPhotoSlots(dropType, nextDropCount)),
+    status: record.status === 'DRAFT' ? 'IN_PROGRESS' : record.status,
+    updatedAt: new Date().toISOString(),
   });
-  return submitted;
 }
 
-export async function submitRecordWithGoogleSync(record: ProofRecord, confirmMissing: boolean): Promise<{ record: ProofRecord; sync: SyncResult }> {
-  const submitted = submitRecord(record, confirmMissing);
-  if (!isGoogleSyncConfigured()) {
-    return { record: submitted, sync: { ok: true, queued: false, message: 'บันทึกข้อมูลแล้ว' } };
-  }
-  const sync = await syncRecordToGoogle(submitted);
-  const syncedRecord = getRecordById(submitted.id) ?? submitted;
-  return { record: syncedRecord, sync };
-}
-
-export function getPendingSyncCount(): number {
-  return getSyncQueue().length;
-}
-
-export function getSyncQueue(): SyncQueueItem[] {
-  return readJson<SyncQueueItem[]>(SYNC_QUEUE_KEY, []);
-}
-
-export async function testGoogleConnection(): Promise<SyncResult> {
-  const settings = getSettings();
-  if (!isGoogleSyncConfigured(settings)) {
-    return {
-      ok: false,
-      queued: false,
-      message: 'ยังไม่ได้ตั้งค่า Google Apps Script URL หรือ shared secret',
-    };
-  }
-  try {
-    const response = await callAppsScript('healthCheck', { checkedAt: new Date().toISOString() });
-    return { ok: true, queued: false, message: 'เชื่อมต่อ Google Sheets ได้', response };
-  } catch (error) {
-    return {
-      ok: false,
-      queued: false,
-      message: error instanceof Error ? error.message : 'เชื่อมต่อ Google Sheets ไม่สำเร็จ',
-    };
-  }
-}
-
-export async function bootstrapCentralConfig(): Promise<BootstrapCache> {
-  ensureSeedData();
-  if (!CENTRAL_BACKEND_URL && !isGoogleSyncConfigured()) {
-    const local: BootstrapCache = {
-      ok: false,
-      hubs: listHubs(),
-      responsibleStaff: listResponsibleStaff(),
-      adminAuthEnabled: false,
-      cachedAt: new Date().toISOString(),
-      source: 'local',
-    };
-    writeJson(BOOTSTRAP_CACHE_KEY, local);
-    return local;
-  }
-
-  try {
-    const data = await callAppsScript('getBootstrapData', {
-      deviceId: getDeviceId(),
-      appVersion: '0.1.0',
-    }, { allowWithoutSecret: true }) as Partial<BootstrapCache>;
-    const hubs = normalizeHubs(data.hubs);
-    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
-    if (hubs.length > 0) saveHubs(hubs);
-    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
-    const cache: BootstrapCache = {
-      ok: data.ok !== false,
-      serverTime: data.serverTime,
-      appSettings: data.appSettings,
-      hubs: hubs.length > 0 ? hubs : listHubs(),
-      responsibleStaff: responsibleStaff.length > 0 ? responsibleStaff : listResponsibleStaff(),
-      adminAuthEnabled: data.adminAuthEnabled !== false,
-      minimumAppVersion: data.minimumAppVersion,
-      cachedAt: new Date().toISOString(),
-      source: 'online',
-    };
-    writeJson(BOOTSTRAP_CACHE_KEY, cache);
-    return cache;
-  } catch {
-    const cached = getCachedBootstrap();
-    if (cached) return { ...cached, source: 'cache' };
-    return {
-      ok: false,
-      hubs: listHubs(),
-      responsibleStaff: listResponsibleStaff(),
-      adminAuthEnabled: true,
-      cachedAt: new Date().toISOString(),
-      source: 'local',
-    };
-  }
-}
-
-export async function pullCentralData(): Promise<CentralPullResult> {
-  const bootstrap = await bootstrapCentralConfig();
-  if (bootstrap.source !== 'online') {
-    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้', recordsPulled: 0, bootstrap };
-  }
-  const records = await fetchCentralRecords();
-  saveRecords(mergeRecords(listRecords(), records));
-  return {
-    ok: true,
-    message: 'ดึงข้อมูลล่าสุดแล้ว',
-    recordsPulled: records.length,
-    bootstrap,
-  };
-}
-
-export async function upsertCentralHub(hub: Hub): Promise<CentralAdminSaveResult> {
-  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
-  try {
-    const data = await callAppsScript('upsertHub', {
-      ...hub,
-      deviceId: getDeviceId(),
-      actor: 'admin',
-    }) as { ok?: boolean; message?: string; hubs?: unknown };
-    const hubs = normalizeHubs(data.hubs);
-    if (hubs.length > 0) saveHubs(hubs);
-    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', hubs };
-  } catch {
-    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function deactivateCentralHub(hubCode: string): Promise<CentralAdminSaveResult> {
-  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
-  try {
-    const data = await callAppsScript('deactivateHub', {
-      hubCode,
-      deviceId: getDeviceId(),
-      actor: 'admin',
-    }) as { ok?: boolean; message?: string; hubs?: unknown };
-    const hubs = normalizeHubs(data.hubs);
-    if (hubs.length > 0) saveHubs(hubs);
-    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', hubs };
-  } catch {
-    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function upsertCentralResponsibleStaff(staff: ResponsibleStaff): Promise<CentralAdminSaveResult> {
-  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
-  try {
-    const data = await callAppsScript('upsertResponsibleStaff', {
-      ...staff,
-      employeeName: staff.displayName,
-      deviceId: getDeviceId(),
-      actor: 'admin',
-    }) as { ok?: boolean; message?: string; responsibleStaff?: unknown };
-    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
-    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
-    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', responsibleStaff };
-  } catch {
-    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function deactivateCentralResponsibleStaff(employeeCode: string, hubCode: string): Promise<CentralAdminSaveResult> {
-  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
-  try {
-    const data = await callAppsScript('deactivateResponsibleStaff', {
-      employeeCode,
-      hubCode,
-      deviceId: getDeviceId(),
-      actor: 'admin',
-    }) as { ok?: boolean; message?: string; responsibleStaff?: unknown };
-    const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
-    if (responsibleStaff.length > 0) saveResponsibleStaff(responsibleStaff);
-    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', responsibleStaff };
-  } catch {
-    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function updateCentralSetting(key: 'GPS_REQUIRED' | 'GPS_MANDATORY' | 'WATERMARK_ENABLED' | 'REQUIRE_ADMIN_DEVICE_APPROVAL' | 'MINIMUM_APP_VERSION', value: boolean | string): Promise<CentralAdminSaveResult> {
-  if (!isCentralSaveReady()) return { ok: false, message: 'ต้องเชื่อมต่อระบบกลางก่อนจึงจะบันทึกได้' };
-  try {
-    const data = await callAppsScript('updateSetting', {
-      key,
-      value,
-      deviceId: getDeviceId(),
-      actor: 'admin',
-    }) as { ok?: boolean; message?: string; appSettings?: Partial<AppSettings> & Record<string, unknown> };
-    return { ok: data.ok !== false, message: data.message || 'บันทึกลงระบบกลางแล้ว', appSettings: data.appSettings };
-  } catch {
-    return { ok: false, message: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
-  }
-}
-
-export async function saveCentralSafeSettings(settings: Pick<AppSettings, 'gpsMandatory' | 'watermarkEnabled'>): Promise<CentralAdminSaveResult> {
-  const gps = await updateCentralSetting('GPS_MANDATORY', settings.gpsMandatory);
-  if (!gps.ok) return gps;
-  const watermark = await updateCentralSetting('WATERMARK_ENABLED', settings.watermarkEnabled);
-  if (!watermark.ok) return watermark;
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: { ...gps.appSettings, ...watermark.appSettings } };
-}
-
-export async function requestAdminAccess(deviceName: string, ownerName: string): Promise<{ ok: boolean; message: string; device?: AdminDevice }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
-  try {
-    const data = await callAppsScript('requestAdminAccess', {
-      deviceId: getDeviceId(),
-      deviceName,
-      ownerName,
-    }, { allowWithoutSecret: true }) as { ok?: boolean; device?: AdminDevice; message?: string };
-    return { ok: data.ok !== false, message: data.message || 'ส่งคำขออนุมัติแล้ว', device: data.device };
-  } catch {
-    return { ok: false, message: 'ส่งคำขอไม่สำเร็จ กรุณาติดต่อผู้ดูแล' };
-  }
-}
-
-export async function verifyCentralAdminAccess(pin: string): Promise<{ ok: boolean; message: string; role?: AdminDeviceRole; device?: AdminDevice }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
-  try {
-    const data = await callAppsScript('verifyAdminAccess', {
-      deviceId: getDeviceId(),
-      adminPin: pin,
-    }, { allowWithoutSecret: true }) as { ok?: boolean; message?: string; role?: AdminDeviceRole; device?: AdminDevice; sessionExpiresAt?: string };
-    if (data.ok) {
-      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-      writeJson(ADMIN_SESSION_KEY, { deviceId: getDeviceId(), role: data.role ?? 'ADMIN', expiresAt: data.sessionExpiresAt || expiresAt });
-      return { ok: true, message: data.message || 'อนุมัติหลังบ้านแล้ว', role: data.role, device: data.device };
-    }
-    return { ok: false, message: data.message || 'PIN ไม่ถูกต้อง', role: data.role, device: data.device };
-  } catch {
-    if (hasAuthorizedAdminSession() && verifyAdminPin(pin)) {
-      return { ok: true, message: 'ออฟไลน์: ใช้ session ผู้ดูแลเดิมบนเครื่องนี้', role: 'ADMIN' };
-    }
-    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
-  }
-}
-
-export async function setCentralAdminPin(values: { currentPin?: string; setupToken?: string; newPin: string }): Promise<{ ok: boolean; message: string }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
-  try {
-    const data = await callAppsScript('setAdminPin', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
-    return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึก PIN หลังบ้านแล้ว' : 'บันทึก PIN ไม่สำเร็จ') };
-  } catch {
-    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
-  }
-}
-
-export async function setCentralAdminDeviceApprovalRequired(values: { adminPin: string; enabled: boolean }): Promise<{ ok: boolean; message: string }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
-  try {
-    const data = await callAppsScript('setAdminDeviceApprovalRequired', values, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
-    return { ok: data.ok === true, message: data.message || (data.ok ? 'บันทึกการจำกัดเครื่องแอดมินแล้ว' : 'บันทึกไม่สำเร็จ') };
-  } catch {
-    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
-  }
-}
-
-export async function initOrRepairCentralStorage(): Promise<{ ok: boolean; message: string }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
-  try {
-    const data = await callAppsScript('initOrRepairStorage', {}, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
-    return { ok: data.ok === true, message: data.message || 'ตรวจสอบและซ่อมโครงสร้างชีทเรียบร้อย' };
-  } catch {
-    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
-  }
-}
-
-export async function findCentralRecordByKey(values: {
-  date: string;
-  hubCode: string;
-  responsibleEmployeeCode: string;
-  vehicleBarcode: string;
-}): Promise<{ ok: boolean; found: boolean; message: string; recordId?: string; status?: ProofStatus; statusText?: string; record?: Record<string, unknown> }> {
-  if (!CENTRAL_BACKEND_URL) return { ok: false, found: false, message: 'ยังไม่ได้ตรวจสอบข้อมูลซ้ำจากระบบกลาง' };
-  try {
-    const data = await callAppsScript('findRecordByKey', values, { allowWithoutSecret: true }) as {
-      ok?: boolean;
-      found?: boolean;
-      message?: string;
-      recordId?: string;
-      status?: ProofStatus;
-      statusText?: string;
-      record?: Record<string, unknown>;
-    };
-    return {
-      ok: data.ok !== false,
-      found: data.found === true,
-      message: data.message || (data.found ? 'พบงานเดิม' : 'ไม่พบงานเดิม'),
-      recordId: data.recordId,
-      status: data.status,
-      statusText: data.statusText,
-      record: data.record,
-    };
-  } catch {
-    return { ok: false, found: false, message: 'ยังไม่ได้ตรวจสอบข้อมูลซ้ำจากระบบกลาง' };
-  }
-}
-
-export async function listAdminDevices(pin: string): Promise<AdminDevice[]> {
-  const data = await callAppsScript('listAdminDevices', { deviceId: getDeviceId(), pin }, { allowWithoutSecret: true }) as { devices?: AdminDevice[] };
-  return data.devices ?? [];
-}
-
-export async function approveAdminDevice(targetDeviceId: string, role: AdminDeviceRole, pin: string): Promise<unknown> {
-  return callAppsScript('approveAdminDevice', { deviceId: getDeviceId(), targetDeviceId, role, pin }, { allowWithoutSecret: true });
-}
-
-export async function revokeAdminDevice(targetDeviceId: string, pin: string): Promise<unknown> {
-  return callAppsScript('revokeAdminDevice', { deviceId: getDeviceId(), targetDeviceId, pin }, { allowWithoutSecret: true });
-}
-
-export async function syncRecordToGoogle(record: ProofRecord): Promise<SyncResult> {
-  const settings = getSettings();
-  if (!isGoogleSyncConfigured(settings)) {
-    return {
-      ok: true,
-      queued: false,
-      message: 'บันทึกในเครื่องแล้ว',
-    };
-  }
-
-  const payload = {
-    record,
-    photoMetadata: record.photoSlots.map((slot) => ({
-      recordId: record.id,
-      vehicleBarcode: record.vehicleBarcode,
-      slotId: slot.slotId,
-      slotType: slot.slotType,
-      labelThai: slot.labelThai,
-      captured: slot.captured,
-      fileName: slot.fileName,
-      capturedAt: slot.capturedAt,
-      gpsLat: slot.gpsLat,
-      gpsLng: slot.gpsLng,
-      gpsAccuracy: slot.gpsAccuracy,
-      gpsStatus: slot.gpsStatus,
-      watermarkText: slot.watermarkText,
-      hub: `${record.hubCode}-${record.hubName}`,
-      responsible: responsibleText(record),
-      imageLocalData: slot.imageLocalData,
-    })),
-  };
-
-  try {
-    const response = await callAppsScript('syncRecord', payload);
-    upsertRecord({ ...ensureDuplicateKey(record), syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
-    return { ok: true, queued: false, message: 'บันทึกและซิงก์แล้ว', response };
-  } catch (error) {
-    queueSync('syncRecord', payload, error instanceof Error ? error.message : 'Sync failed');
-    upsertRecord({ ...ensureDuplicateKey(record), syncStatus: 'PENDING_SYNC', updatedAt: new Date().toISOString() });
-    return {
-      ok: false,
-      queued: true,
-      message: 'บันทึกแล้ว ระบบจะซิงก์ให้อัตโนมัติเมื่อออนไลน์',
-    };
-  }
-}
-
-export async function retryPendingSync(): Promise<RetrySyncResult> {
-  const queue = getSyncQueue();
-  if (queue.length === 0) {
-    return { attempted: 0, synced: 0, failed: 0, message: 'ไม่มีรายการรอซิงก์' };
-  }
-
-  let synced = 0;
-  const failedItems: SyncQueueItem[] = [];
-
-  for (const item of queue) {
-    try {
-      await callAppsScript(item.action, item.payload);
-      const payload = item.payload as { record?: ProofRecord };
-      if ((item.action === 'syncRecord' || item.action === 'createRecord') && payload.record) {
-        upsertRecord({ ...payload.record, syncStatus: 'SYNCED', updatedAt: new Date().toISOString() });
-      }
-      synced += 1;
-    } catch (error) {
-      failedItems.push({
-        ...item,
-        attempts: item.attempts + 1,
-        lastAttemptAt: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Sync failed',
-      });
-    }
-  }
-
-  saveSyncQueue(failedItems);
-  const failed = failedItems.length;
-  return {
-    attempted: queue.length,
-    synced,
-    failed,
-    message: failed === 0 ? `ซิงก์สำเร็จ ${synced} รายการ` : `ซิงก์สำเร็จ ${synced} รายการ, ยังไม่สำเร็จ ${failed} รายการ`,
-  };
-}
-
-export function canClearLocalCache(): boolean {
-  return getSyncQueue().length === 0
-    && listRecords().every((record) => record.syncStatus !== 'PENDING_SYNC' && record.syncStatus !== 'SYNC_FAILED');
-}
-
-export async function clearSafeLocalCache(): Promise<{ ok: boolean; message: string }> {
-  if (!canClearLocalCache()) {
-    return { ok: false, message: 'ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้' };
-  }
-  window.localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
-  window.localStorage.removeItem(ACTIVE_CONTEXT_KEY);
-  addAudit({ action: 'clear_local_cache', detail: 'Local cache cleared; central data untouched', actor: 'admin' });
-  const result = await pullCentralData();
-  return { ok: result.ok, message: result.ok ? 'ล้างแคชเครื่องนี้แล้ว' : result.message };
-}
-
-export async function capturePhotoForSlot(record: ProofRecord, slotId: string, file: File): Promise<ProofRecord> {
-  const location = await requestLocation();
+export async function capturePhoto(record: ProofRecord, slotId: string, file: File): Promise<ProofRecord> {
   const capturedAt = new Date().toISOString();
+  const location = await requestLocation();
   const slot = record.photoSlots.find((item) => item.slotId === slotId);
   if (!slot) return record;
-  const watermarkText = buildWatermarkText(record, slot.labelThai, capturedAt, location);
-  const imageLocalData = await renderWatermarkedImage(file, getSettings().watermarkEnabled ? watermarkText : '');
+  const watermarkText = buildWatermarkText(record, slot.label, capturedAt, location);
+  const imageLocalData = await renderWatermarkedImage(file, watermarkText);
   const nextSlots = record.photoSlots.map((item) => item.slotId === slotId ? {
     ...item,
     captured: true,
     imageLocalData,
-    fileName: buildPhotoFileName(record, item),
+    fileName: `${record.date}_${record.vehicleBarcode}_${item.slotType.toLowerCase()}.jpg`,
     capturedAt,
-    displayTimestamp: formatDateTime(capturedAt),
-    gpsLat: location.lat,
-    gpsLng: location.lng,
-    gpsAccuracy: location.accuracy,
-    gpsStatus: location.status,
-    locationPermissionStatus: location.status,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    accuracy: location.accuracy,
+    addressText: location.addressText,
     watermarkText,
-    retakeCount: item.captured ? item.retakeCount + 1 : item.retakeCount,
+    gpsStatus: location.status,
   } : item);
-  const updated = { ...record, status: record.status === 'DRAFT' ? 'IN_PROGRESS' as const : record.status, photoSlots: nextSlots, updatedAt: new Date().toISOString() };
-  upsertRecord(updated);
-  addAudit({
-    recordId: record.id,
-    action: slot.captured ? 'photo_retaken' : 'photo_captured',
-    detail: `${slot.labelThai}; GPS ${location.status}`,
-    actor: record.responsibleEmployeeCode,
+  return upsertLocalRecord({
+    ...record,
+    photoSlots: nextSlots,
+    status: 'IN_PROGRESS',
+    updatedAt: capturedAt,
   });
-  return updated;
 }
 
-export async function generateExportZip(records = listRecords()): Promise<Blob> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Records');
-  sheet.addRow(EXPORT_HEADERS);
-  records.forEach((record) => {
-    const row = sheet.addRow(buildExportRow(record));
-    applyPhotoHyperlinks(row, record);
+export async function submitRecord(record: ProofRecord, allowMissing: boolean): Promise<{ record: ProofRecord; message: string }> {
+  const missing = getMissingPhotoSlots(record);
+  if (missing.length && !allowMissing) {
+    return { record, message: 'ยังมีรูปที่ต้องถ่าย กรุณาตรวจสอบก่อนส่ง' };
+  }
+  const now = new Date().toISOString();
+  const localStatus: ProofStatus = missing.length ? 'NEED_REVIEW' : 'COMPLETE';
+  const prepared = upsertLocalRecord({
+    ...record,
+    status: isCentralConfigured() ? 'SYNCING' : 'PENDING_SYNC',
+    missingPhotoLabels: missing.map((slot) => slot.label),
+    submittedAt: now,
+    updatedAt: now,
   });
-  sheet.getRow(1).font = { bold: true };
-  sheet.columns.forEach((column) => {
-    column.width = 22;
-    column.alignment = { wrapText: true, vertical: 'middle' };
-  });
+  if (!isCentralConfigured()) {
+    queuePending({ ...prepared, status: localStatus, updatedAt: now });
+    return { record: upsertLocalRecord({ ...prepared, status: 'PENDING_SYNC' }), message: 'รอซิงก์' };
+  }
+  return syncOneRecord({ ...prepared, status: localStatus, updatedAt: now });
+}
 
-  const zip = new JSZip();
-  zip.file('workbook.xlsx', await workbook.xlsx.writeBuffer());
-  records.forEach((record) => {
-    record.photoSlots.forEach((slot) => {
-      if (!slot.imageLocalData) return;
-      zip.file(photoZipPath(record, slot), dataUrlToUint8Array(slot.imageLocalData));
+export async function syncOneRecord(record: ProofRecord): Promise<{ record: ProofRecord; message: string }> {
+  try {
+    const response = await callCentral<{ record?: unknown }>('syncRecord', {
+      record: toCentralRecord(record),
+      photoMetadata: record.photoSlots.map((slot) => toCentralPhoto(record, slot)),
     });
-  });
-  zip.file('manifest.json', JSON.stringify({
-    exportedAt: new Date().toISOString(),
-    recordCount: records.length,
-    photoCount: records.flatMap((record) => record.photoSlots).filter((slot) => slot.imageLocalData).length,
-    records: records.map((record) => ({
-      id: record.id,
-      date: record.date,
-      hubCode: record.hubCode,
-      hubName: record.hubName,
-      responsible: responsibleText(record),
-      vehicleBarcode: record.vehicleBarcode,
-      hasDropTransfer: record.hasDropTransfer,
-      dropCount: record.dropCount,
-      status: record.status,
-      submittedAt: record.submittedAt,
-      syncStatus: record.syncStatus ?? 'LOCAL_ONLY',
-      missingPhotoWarnings: record.missingPhotoWarnings,
-      photos: record.photoSlots.map((slot) => ({
-        slotId: slot.slotId,
-        slotType: slot.slotType,
-        slotLabel: slot.labelThai,
-        required: slot.required,
-        captured: slot.captured,
-        fileName: slot.fileName,
-        capturedAt: slot.capturedAt,
-        gpsLat: slot.gpsLat,
-        gpsLng: slot.gpsLng,
-        gpsAccuracy: slot.gpsAccuracy,
-        gpsStatus: slot.gpsStatus,
-        locationPermissionStatus: slot.locationPermissionStatus,
-        watermarkText: slot.watermarkText,
-        vehicleBarcode: record.vehicleBarcode,
-        hub: `${record.hubCode}-${record.hubName}`,
-        responsible: responsibleText(record),
-      })),
-    })),
-  }, null, 2));
-  return zip.generateAsync({ type: 'blob' });
+    const synced = upsertLocalRecord({
+      ...record,
+      status: 'SYNCED',
+      syncedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    removePending(record.recordId);
+    return { record: synced, message: response.message || 'ซิงก์แล้ว' };
+  } catch (error) {
+    const failed = upsertLocalRecord({ ...record, status: 'SYNC_FAILED', updatedAt: new Date().toISOString() });
+    queuePending(failed);
+    return { record: failed, message: errorMessage(error) || 'ซิงก์ไม่สำเร็จ' };
+  }
 }
 
-export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function createSlot(slotType: SlotType, labelThai: string): ProofPhotoSlot {
+export async function retryPendingSync(): Promise<SyncReport> {
+  const pending = getPendingRecords();
+  let synced = 0;
+  let failed = 0;
+  for (const record of pending) {
+    const result = await syncOneRecord(record);
+    if (result.record.status === 'SYNCED') synced += 1;
+    else failed += 1;
+  }
   return {
-    slotId: createId(),
+    attempted: pending.length,
+    synced,
+    failed,
+    message: failed ? 'ยังมีงานซิงก์ไม่สำเร็จ' : 'ซิงก์งานค้างเรียบร้อย',
+  };
+}
+
+export function getPendingRecords(): ProofRecord[] {
+  return readJson<ProofRecord[]>(KEYS.pending, []);
+}
+
+export function getPendingSyncCount(): number {
+  return getPendingRecords().length;
+}
+
+export function getPendingPhotoCount(): number {
+  return getPendingRecords().reduce((sum, record) => sum + record.photoSlots.filter((slot) => slot.captured && !slot.driveUrl).length, 0);
+}
+
+export function canClearLocalCache(): { ok: boolean; message: string } {
+  if (getPendingSyncCount() > 0) {
+    return { ok: false, message: 'ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้' };
+  }
+  return { ok: true, message: 'ล้างแคชได้' };
+}
+
+export async function clearSafeLocalCache(): Promise<{ ok: boolean; message: string }> {
+  const allowed = canClearLocalCache();
+  if (!allowed.ok) return allowed;
+  localStorage.removeItem(KEYS.bootstrap);
+  localStorage.removeItem(KEYS.activeContext);
+  localStorage.removeItem(KEYS.showSubmitted);
+  if (isCentralConfigured()) await pullCentralData();
+  return { ok: true, message: 'ล้างแคชเครื่องนี้แล้ว' };
+}
+
+export async function testCentralHealth(): Promise<ApiResult<{ serverTime?: string; apiVersion?: string }>> {
+  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  return callCentral('health', { deviceId: getDeviceId() }, true);
+}
+
+export async function verifyAdminPin(pin: string): Promise<ApiResult> {
+  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' };
+  return callCentral('verifyAdminAccess', { pin, deviceId: getDeviceId() }, true);
+}
+
+export async function setCentralAdminPin(pin: string, currentPin?: string): Promise<ApiResult> {
+  return callCentral('setAdminPin', { pin, currentPin, deviceId: getDeviceId() });
+}
+
+export async function getAdminAuthStatus(): Promise<ApiResult<{ adminPinSet?: boolean; adminPinEnabled?: boolean }>> {
+  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
+  return callCentral('getAdminAuthStatus', { deviceId: getDeviceId() }, true);
+}
+
+export async function upsertHubCentral(hub: Hub): Promise<ApiResult<{ hubs: Hub[] }>> {
+  const response = await callCentral<{ hubs?: unknown }>('upsertHub', { ...hub, actor: getDeviceId() });
+  const hubs = normalizeHubs(response.data?.hubs);
+  if (hubs.length) saveHubs(hubs);
+  return { ok: response.ok, message: response.message, data: { hubs } };
+}
+
+export async function deactivateHubCentral(hubCode: string): Promise<ApiResult<{ hubs: Hub[] }>> {
+  const response = await callCentral<{ hubs?: unknown }>('deactivateHub', { hubCode, actor: getDeviceId() });
+  const hubs = normalizeHubs(response.data?.hubs);
+  if (hubs.length) saveHubs(hubs);
+  return { ok: response.ok, message: response.message, data: { hubs } };
+}
+
+export async function upsertResponsibleCentral(staff: ResponsibleStaff): Promise<ApiResult<{ responsibleStaff: ResponsibleStaff[] }>> {
+  const response = await callCentral<{ responsibleStaff?: unknown }>('upsertResponsibleStaff', { ...staff, actor: getDeviceId() });
+  const responsibleStaff = normalizeResponsibleStaff(response.data?.responsibleStaff);
+  if (responsibleStaff.length) saveResponsibleStaff(responsibleStaff);
+  return { ok: response.ok, message: response.message, data: { responsibleStaff } };
+}
+
+export async function deactivateResponsibleCentral(employeeCode: string, hubCode: string): Promise<ApiResult<{ responsibleStaff: ResponsibleStaff[] }>> {
+  const response = await callCentral<{ responsibleStaff?: unknown }>('deactivateResponsibleStaff', { employeeCode, hubCode, actor: getDeviceId() });
+  const responsibleStaff = normalizeResponsibleStaff(response.data?.responsibleStaff);
+  if (responsibleStaff.length) saveResponsibleStaff(responsibleStaff);
+  return { ok: response.ok, message: response.message, data: { responsibleStaff } };
+}
+
+export async function updateSettingsCentral(settings: Partial<AppSettings>): Promise<ApiResult<{ settings: AppSettings }>> {
+  const allowed = ['GPS_REQUIRED', 'GPS_MANDATORY', 'WATERMARK_ENABLED', 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'MINIMUM_APP_VERSION'] as const;
+  const payload = allowed
+    .filter((key) => settings[key] !== undefined)
+    .map((key) => ({ key, value: settings[key] }));
+  const response = await callCentral<{ settings?: unknown; appSettings?: unknown }>('updateSettingsBatch', {
+    settings: payload,
+    actor: getDeviceId(),
+  });
+  return { ok: response.ok, message: response.message, data: { settings: normalizeSettings(response.data?.settings ?? response.data?.appSettings) } };
+}
+
+export async function getHistory(filters: {
+  dateFrom?: string;
+  dateTo?: string;
+  hubCode?: string;
+  responsibleEmployeeCode?: string;
+  vehicleBarcode?: string;
+  status?: string;
+}): Promise<ProofRecord[]> {
+  if (!isCentralConfigured()) return listRecords();
+  const response = await callCentral<{ records?: unknown }>('getHistory', filters, true);
+  return normalizeRecords(response.data?.records);
+}
+
+export function todayBangkok(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BANGKOK_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  return `${part(parts, 'year')}-${part(parts, 'month')}-${part(parts, 'day')}`;
+}
+
+export function formatBangkok(iso?: string): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: BANGKOK_TIME_ZONE }).format(date);
+  const time = new Intl.DateTimeFormat('th-TH', {
+    timeZone: BANGKOK_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
+  return `${day} ${time}`;
+}
+
+export function normalizeVehicleBarcode(input: string): string {
+  const fromUrl = input.match(/\/proof\/go\/([A-Za-z0-9-]+)/)?.[1] ?? input;
+  return fromUrl.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+export function buildDuplicateKey(date: string, hubCode: string, employeeCode: string, vehicleBarcode: string): string {
+  return [date, hubCode, employeeCode, normalizeVehicleBarcode(vehicleBarcode)].map((value) => value.trim().toUpperCase()).join('|');
+}
+
+export function getMissingPhotoSlots(record: ProofRecord): PhotoSlot[] {
+  return record.photoSlots.filter((slot) => slot.required && !slot.captured);
+}
+
+export function isActiveWork(record: ProofRecord): boolean {
+  return ['SYNC_FAILED', 'PENDING_SYNC', 'NEED_REVIEW', 'IN_PROGRESS', 'DRAFT', 'SYNCING'].includes(record.status);
+}
+
+export function statusText(status: ProofStatus): string {
+  const labels: Record<ProofStatus, string> = {
+    DRAFT: 'เริ่มทำ',
+    IN_PROGRESS: 'กำลังถ่ายรูป',
+    NEED_REVIEW: 'ส่งแล้วแต่รูปไม่ครบ',
+    COMPLETE: 'ส่งครบแล้ว',
+    PENDING_SYNC: 'รอซิงก์',
+    SYNCING: 'กำลังซิงก์',
+    SYNCED: 'ซิงก์แล้ว',
+    SYNC_FAILED: 'ซิงก์ไม่สำเร็จ',
+    VOIDED: 'ยกเลิก',
+  };
+  return labels[status];
+}
+
+export function statusRank(record: ProofRecord): number {
+  const ranks: Record<ProofStatus, number> = {
+    SYNCED: 90,
+    COMPLETE: 80,
+    NEED_REVIEW: 70,
+    PENDING_SYNC: 60,
+    SYNCING: 55,
+    SYNC_FAILED: 50,
+    IN_PROGRESS: 40,
+    DRAFT: 30,
+    VOIDED: 10,
+  };
+  return ranks[record.status] ?? 0;
+}
+
+function localBootstrap(message: string): BootstrapData {
+  return {
+    ok: false,
+    source: 'local',
+    message,
+    hubs: listHubs(),
+    responsibleStaff: listResponsibleStaff(),
+    settings: DEFAULT_SETTINGS,
+    pulledAt: new Date().toISOString(),
+  };
+}
+
+function seedFallbackData(): void {
+  if (readJson<Hub[]>(KEYS.hubs, []).length === 0) writeJson(KEYS.hubs, [FALLBACK_HUB]);
+  if (readJson<ResponsibleStaff[]>(KEYS.staff, []).length === 0) writeJson(KEYS.staff, [FALLBACK_STAFF]);
+}
+
+function createPhotoSlots(dropType: DropType, dropCount: number): PhotoSlot[] {
+  if (dropType === 'NO_DROP') {
+    return [
+      makeSlot('REAR_MAIN', 'รูปหลังรถ'),
+      makeSlot('FRONT_DROP', 'รูปหน้าดรอป'),
+    ];
+  }
+  const slots: PhotoSlot[] = [makeSlot('REAR_MAIN', 'รูปหลังรถหลัก')];
+  for (let index = 1; index <= Math.max(2, dropCount); index += 1) {
+    slots.push(makeSlot(index === 1 ? 'DROP_REAR_1' : index === 2 ? 'DROP_REAR_2' : 'DROP_REAR_EXTRA', `รูปหลังรถพ่วง ${index}`));
+  }
+  return slots;
+}
+
+function makeSlot(slotType: SlotType, label: string): PhotoSlot {
+  return {
+    slotId: crypto.randomUUID?.() ?? `${slotType}-${Date.now()}-${Math.random()}`,
     slotType,
-    labelThai,
+    label,
     required: true,
     captured: false,
     gpsStatus: 'unknown',
-    locationPermissionStatus: 'unknown',
-    retakeCount: 0,
   };
 }
 
-function buildExportRow(record: ProofRecord): string[] {
-  const rearMain = findSlot(record, 'REAR_MAIN');
-  const frontDrop = findSlot(record, 'FRONT_DROP');
-  const drop1 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_1');
-  const drop2 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_2');
-  const extras = record.photoSlots.filter((slot) => slot.slotType === 'DROP_REAR_EXTRA');
-  return [
-    record.date,
-    `${record.hubCode}-${record.hubName}`,
-    responsibleText(record),
-    record.vehicleBarcode,
-    record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
-    String(record.dropCount),
-    statusText(record.status),
-    photoExportValue(rearMain),
-    photoExportValue(frontDrop),
-    photoExportValue(drop1),
-    photoExportValue(drop2),
-    extras.map(photoExportValue).join('\n') || 'ยังไม่ได้ถ่าย',
-    record.missingPhotoWarnings.join(', '),
-    record.submittedAt ? formatDateTime(record.submittedAt) : '',
-    record.notes ?? '',
-  ];
+function carryExistingPhotos(existing: PhotoSlot[], next: PhotoSlot[]): PhotoSlot[] {
+  return next.map((slot) => existing.find((item) => item.slotType === slot.slotType && item.label === slot.label) ?? slot);
 }
 
-function findSlot(record: ProofRecord, slotType: SlotType): ProofPhotoSlot | undefined {
-  return record.photoSlots.find((slot) => slot.slotType === slotType);
+function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]): ProofRecord[] {
+  const groups = new Map<string, ProofRecord[]>();
+  [...localRecords, ...centralRecords].map(normalizeRecord).forEach((record) => {
+    groups.set(record.duplicateKey, [...(groups.get(record.duplicateKey) ?? []), record]);
+  });
+  return Array.from(groups.values()).map((records) => records.sort((a, b) => {
+    const rank = statusRank(b) - statusRank(a);
+    if (rank !== 0) return rank;
+    const photos = b.photoSlots.filter((slot) => slot.captured).length - a.photoSlots.filter((slot) => slot.captured).length;
+    if (photos !== 0) return photos;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  })[0]);
 }
 
-function photoExportValue(slot?: ProofPhotoSlot): string {
-  if (!slot?.captured) return 'ยังไม่ได้ถ่าย';
-  return slot.fileName ?? slot.labelThai;
-}
-
-function statusText(status: ProofStatus): string {
-  if (status === 'DRAFT') return 'เริ่มทำแต่ยังไม่ส่ง';
-  if (status === 'COMPLETE') return 'ส่งครบแล้ว';
-  if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
-  if (status === 'VOIDED') return 'ยกเลิก';
-  return 'กำลังถ่ายรูป';
-}
-
-function applyPhotoHyperlinks(row: ExcelJS.Row, record: ProofRecord): void {
-  const rearMain = findSlot(record, 'REAR_MAIN');
-  const frontDrop = findSlot(record, 'FRONT_DROP');
-  const drop1 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_1');
-  const drop2 = record.photoSlots.find((slot) => slot.slotType === 'DROP_REAR_2');
-  const extras = record.photoSlots.filter((slot) => slot.slotType === 'DROP_REAR_EXTRA' && slot.captured);
-  setPhotoHyperlink(row, 8, record, rearMain);
-  setPhotoHyperlink(row, 9, record, frontDrop);
-  setPhotoHyperlink(row, 10, record, drop1);
-  setPhotoHyperlink(row, 11, record, drop2);
-  setPhotoHyperlink(row, 12, record, extras[0]);
-}
-
-function setPhotoHyperlink(row: ExcelJS.Row, columnNumber: number, record: ProofRecord, slot?: ProofPhotoSlot): void {
-  if (!slot?.captured || !slot.imageLocalData) return;
-  const currentValue = row.getCell(columnNumber).value;
-  const text = typeof currentValue === 'string' && currentValue ? currentValue : (slot.fileName ?? slot.labelThai);
-  row.getCell(columnNumber).value = {
-    text,
-    hyperlink: photoZipPath(record, slot),
+function normalizeRecord(record: ProofRecord): ProofRecord {
+  return {
+    ...record,
+    vehicleBarcode: normalizeVehicleBarcode(record.vehicleBarcode),
+    duplicateKey: record.duplicateKey || buildDuplicateKey(record.date, record.hubCode, record.responsibleEmployeeCode, record.vehicleBarcode),
+    photoSlots: record.photoSlots ?? [],
+    missingPhotoLabels: record.missingPhotoLabels ?? [],
   };
 }
 
-function photoZipPath(record: ProofRecord, slot: ProofPhotoSlot): string {
-  return `photos/${safeFileName(record.date)}/${safeFileName(record.vehicleBarcode)}/${safeFileName(slot.fileName ?? `${slot.slotId}.jpg`)}`;
+function normalizeRecordFromAny(raw: unknown): ProofRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const date = text(row.date ?? row['วันที่']);
+  const hubCode = text(row.hubCode ?? splitCode(row['ฮับ']));
+  const responsibleEmployeeCode = text(row.responsibleEmployeeCode ?? splitCode(row['ผู้รับผิดชอบ']));
+  const vehicleBarcode = normalizeVehicleBarcode(text(row.vehicleBarcode ?? row['บาร์โค้ดรถ']));
+  if (!date || !hubCode || !responsibleEmployeeCode || !vehicleBarcode) return null;
+  const status = normalizeStatus(text(row.statusInternal ?? row.status ?? row['สถานะ']));
+  const duplicateKey = text(row.duplicateKey) || buildDuplicateKey(date, hubCode, responsibleEmployeeCode, vehicleBarcode);
+  return {
+    recordId: text(row.recordId ?? row.id) || duplicateKey,
+    duplicateKey,
+    date,
+    hubCode,
+    hubName: text(row.hubName ?? splitName(row['ฮับ'])),
+    responsibleEmployeeCode,
+    responsibleName: text(row.responsibleName ?? splitName(row['ผู้รับผิดชอบ'])),
+    vehicleBarcode,
+    dropType: text(row.dropType ?? row['พ่วงดรอปหรือไม่']).includes('พ่วง') ? 'DROP' : 'NO_DROP',
+    dropCount: Number(row.dropCount ?? row['จำนวนดรอป'] ?? 0) || 0,
+    status,
+    photoSlots: [],
+    missingPhotoLabels: text(row['รายการรูปที่ขาด']).split(',').map((item) => item.trim()).filter(Boolean),
+    submittedAt: parseCentralTime(row.submittedAt),
+    syncedAt: parseCentralTime(row.syncedAt),
+    createdAt: parseCentralTime(row.createdAt) || new Date().toISOString(),
+    updatedAt: parseCentralTime(row.updatedAt) || parseCentralTime(row.syncedAt) || new Date().toISOString(),
+    duplicateOfRecordId: text(row.duplicateOfRecordId) || undefined,
+    duplicateReason: text(row.duplicateReason) || undefined,
+    note: text(row.note ?? row['หมายเหตุ']) || undefined,
+  };
 }
 
-function gpsText(slot?: ProofPhotoSlot): string {
-  if (!slot) return '';
-  if (typeof slot.gpsLat === 'number' && typeof slot.gpsLng === 'number') {
-    return `${slot.gpsLat.toFixed(6)}, ${slot.gpsLng.toFixed(6)} (${Math.round(slot.gpsAccuracy ?? 0)}m)`;
+function normalizeRecords(raw: unknown): ProofRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeRecordFromAny).filter((record): record is ProofRecord => Boolean(record));
+}
+
+function toCentralRecord(record: ProofRecord): Record<string, unknown> {
+  return {
+    recordId: record.recordId,
+    duplicateKey: record.duplicateKey,
+    date: record.date,
+    hubCode: record.hubCode,
+    hubName: record.hubName,
+    responsibleEmployeeCode: record.responsibleEmployeeCode,
+    responsibleName: record.responsibleName,
+    vehicleBarcode: record.vehicleBarcode,
+    dropType: record.dropType,
+    dropCount: record.dropCount,
+    statusInternal: record.status,
+    photoRequiredCount: record.photoSlots.filter((slot) => slot.required).length,
+    photoDoneCount: record.photoSlots.filter((slot) => slot.captured).length,
+    missingPhotoLabels: record.missingPhotoLabels,
+    submittedAt: record.submittedAt,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    note: record.note ?? '',
+  };
+}
+
+function toCentralPhoto(record: ProofRecord, slot: PhotoSlot): Record<string, unknown> {
+  return {
+    photoId: `${record.recordId}_${slot.slotId}`,
+    recordId: record.recordId,
+    duplicateKey: record.duplicateKey,
+    date: record.date,
+    hubCode: record.hubCode,
+    responsibleEmployeeCode: record.responsibleEmployeeCode,
+    vehicleBarcode: record.vehicleBarcode,
+    photoSlot: slot.slotType,
+    photoType: slot.label,
+    fileName: slot.fileName ?? '',
+    imageLocalData: slot.imageLocalData ?? '',
+    capturedAt: slot.capturedAt ?? '',
+    latitude: slot.latitude ?? '',
+    longitude: slot.longitude ?? '',
+    accuracy: slot.accuracy ?? '',
+    addressText: slot.addressText ?? '',
+    watermarkApplied: Boolean(slot.watermarkText),
+  };
+}
+
+function queuePending(record: ProofRecord): void {
+  const pending = getPendingRecords().filter((item) => item.recordId !== record.recordId && item.duplicateKey !== record.duplicateKey);
+  pending.push(record);
+  writeJson(KEYS.pending, pending);
+}
+
+function removePending(recordId: string): void {
+  writeJson(KEYS.pending, getPendingRecords().filter((item) => item.recordId !== recordId));
+}
+
+async function callCentral<T>(action: string, payload: unknown, allowPublic = false): Promise<ApiResult<T>> {
+  if (!API_URL) throw new Error('ยังไม่ได้ตั้งค่าระบบกลาง');
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action,
+      payload,
+      allowPublic,
+      client: 'hub-photo-proof-reset011',
+      appVersion: APP_VERSION,
+      sentAt: new Date().toISOString(),
+    }),
+  });
+  const raw = await response.text();
+  let parsed: Record<string, unknown> & { ok?: boolean; message?: string; error?: string; data?: unknown };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    throw new Error('ระบบกลางตอบกลับไม่ถูกต้อง');
   }
-  return slot.gpsStatus === 'granted' ? '' : 'ไม่พบ GPS / ไม่ได้รับอนุญาตตำแหน่ง';
+  if (!response.ok || parsed.ok === false) throw new Error(text(parsed.message ?? parsed.error) || 'ระบบกลางทำงานไม่สำเร็จ');
+  return {
+    ok: true,
+    message: text(parsed.message) || 'สำเร็จ',
+    data: (parsed.data ?? parsed) as T,
+  };
 }
 
-function responsibleText(record: ProofRecord): string {
-  return `${record.responsibleEmployeeCode} ${record.responsibleName}`.trim();
-}
-
-function buildPhotoFileName(record: ProofRecord, slot: ProofPhotoSlot): string {
-  return safeFileName(`${record.date}_${record.vehicleBarcode}_${photoFileKey(record, slot)}.jpg`);
-}
-
-function photoFileKey(record: ProofRecord, slot: ProofPhotoSlot): string {
-  if (slot.slotType === 'REAR_MAIN') return 'rear_main';
-  if (slot.slotType === 'FRONT_DROP') return 'front_drop';
-  if (slot.slotType === 'DROP_REAR_1') return 'drop_rear_1';
-  if (slot.slotType === 'DROP_REAR_2') return 'drop_rear_2';
-  const sameTypeIndex = record.photoSlots
-    .filter((item) => item.slotType === 'DROP_REAR_EXTRA')
-    .findIndex((item) => item.slotId === slot.slotId);
-  return `drop_rear_${Math.max(3, sameTypeIndex + 3)}`;
-}
-
-async function requestLocation(): Promise<{ status: GpsStatus; lat?: number; lng?: number; accuracy?: number }> {
-  if (!navigator.geolocation) return { status: 'unavailable' };
+async function requestLocation(): Promise<{ status: GpsStatus; latitude?: number; longitude?: number; accuracy?: number; addressText?: string }> {
+  if (!navigator.geolocation) return { status: 'unavailable', addressText: 'ไม่พบชื่อสถานที่' };
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({
         status: 'granted',
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
+        addressText: 'ไม่พบชื่อสถานที่',
       }),
-      () => resolve({ status: 'denied' }),
+      () => resolve({ status: 'denied', addressText: 'ไม่พบชื่อสถานที่' }),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   });
 }
 
-function buildWatermarkText(record: ProofRecord, labelThai: string, capturedAt: string, location: { status: GpsStatus; lat?: number; lng?: number; accuracy?: number }): string {
-  const gps = typeof location.lat === 'number' && typeof location.lng === 'number'
-    ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
+function buildWatermarkText(record: ProofRecord, label: string, capturedAt: string, location: { status: GpsStatus; latitude?: number; longitude?: number; accuracy?: number; addressText?: string }): string {
+  const hasGps = typeof location.latitude === 'number' && typeof location.longitude === 'number';
+  const gps = hasGps
+    ? `${location.latitude?.toFixed(6)}, ${location.longitude?.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
     : 'ไม่พบตำแหน่ง';
-  const place = typeof location.lat === 'number' && typeof location.lng === 'number'
-    ? 'ไม่พบชื่อสถานที่'
+  const place = location.addressText && location.addressText !== 'ไม่พบชื่อสถานที่'
+    ? location.addressText
     : 'ไม่พบชื่อสถานที่';
   return [
-    `วันที่: ${formatDatePart(capturedAt)}`,
-    `เวลา: ${formatTimePart(capturedAt)}`,
-    `พิกัด: ${gps}`,
-    `สถานที่: ${place}`,
-    `บาร์โค้ดรถ: ${record.vehicleBarcode}`,
-    `ฮับ: ${record.hubCode}-${record.hubName}`,
-    `ผู้รับผิดชอบ: ${responsibleText(record)}`,
-    `ประเภทรูป: ${labelThai}`,
+    `วันที่ ${todayBangkok(new Date(capturedAt))} เวลา ${formatBangkok(capturedAt).split(' ')[1] ?? ''}`,
+    `พิกัด ${gps}`,
+    `สถานที่ ${place}`,
+    `บาร์โค้ดรถ ${record.vehicleBarcode}`,
+    `ฮับ ${record.hubCode}-${record.hubName}`,
+    `ผู้รับผิดชอบ ${record.responsibleEmployeeCode} ${record.responsibleName}`,
+    `ประเภทรูป ${label}`,
   ].join('\n');
 }
 
@@ -1178,39 +855,28 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
-      const context = canvas.getContext('2d');
-      if (!context) {
-        reject(new Error('ไม่สามารถประมวลผลรูปได้'));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('ประมวลผลรูปไม่สำเร็จ'));
         return;
       }
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      if (watermarkText) {
-        const fontSize = Math.max(20, Math.round(canvas.width / 46));
-        const lineHeight = Math.round(fontSize * 1.28);
-        const padding = Math.max(18, Math.round(canvas.width / 58));
-        const boxWidth = Math.min(canvas.width - padding * 2, Math.max(canvas.width * 0.52, 560));
-        context.font = `700 ${fontSize}px "Segoe UI", sans-serif`;
-        const wrappedLines = watermarkText.split('\n').flatMap((line) => wrapCanvasText(context, line, boxWidth));
-        const maxLines = Math.max(5, Math.floor((canvas.height * 0.38 - padding * 2) / lineHeight));
-        const lines = wrappedLines.length > maxLines ? [...wrappedLines.slice(0, maxLines - 1), `${wrappedLines[maxLines - 1].slice(0, 80)}...`] : wrappedLines;
-        const x = padding;
-        const y = canvas.height - padding - (lines.length * lineHeight);
-        context.textBaseline = 'top';
-        context.lineJoin = 'round';
-        context.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        context.shadowBlur = Math.max(3, Math.round(fontSize / 5));
-        context.shadowOffsetX = 1;
-        context.shadowOffsetY = 2;
-        lines.forEach((line, index) => {
-          const lineY = y + lineHeight * index;
-          context.strokeStyle = 'rgba(0, 0, 0, 0.72)';
-          context.lineWidth = Math.max(3, Math.round(fontSize / 8));
-          context.strokeText(line, x, lineY);
-          context.fillStyle = index < 2 ? '#ffe044' : '#ffffff';
-          context.fillText(line, x, lineY);
-        });
-      }
-      resolve(canvas.toDataURL('image/jpeg', 0.78));
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const fontSize = Math.max(18, Math.round(canvas.width / 48));
+      const lineHeight = Math.round(fontSize * 1.32);
+      const padding = Math.max(18, Math.round(canvas.width / 60));
+      ctx.font = `700 ${fontSize}px "Segoe UI", Tahoma, sans-serif`;
+      ctx.textBaseline = 'top';
+      const lines = watermarkText.split('\n').flatMap((line) => wrapText(ctx, line, canvas.width - padding * 2));
+      const y = Math.max(padding, canvas.height - padding - lines.length * lineHeight);
+      lines.forEach((line, index) => {
+        const lineY = y + index * lineHeight;
+        ctx.lineWidth = Math.max(3, Math.round(fontSize / 7));
+        ctx.strokeStyle = 'rgba(0,0,0,.82)';
+        ctx.strokeText(line, padding, lineY);
+        ctx.fillStyle = index === 0 ? '#ffe044' : '#ffffff';
+        ctx.fillText(line, padding, lineY);
+      });
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
       URL.revokeObjectURL(image.src);
     };
     image.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
@@ -1218,37 +884,108 @@ function renderWatermarkedImage(file: File, watermarkText: string): Promise<stri
   });
 }
 
-function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(' ');
+function wrapText(ctx: CanvasRenderingContext2D, line: string, maxWidth: number): string[] {
+  const words = line.split(' ');
   const lines: string[] = [];
-  let line = '';
+  let current = '';
   words.forEach((word) => {
-    const testLine = line ? `${line} ${word}` : word;
-    if (context.measureText(testLine).width <= maxWidth) {
-      line = testLine;
-      return;
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width <= maxWidth) current = next;
+    else {
+      if (current) lines.push(current);
+      current = word;
     }
-    if (line) lines.push(line);
-    line = word;
   });
-  if (line) lines.push(line);
-  return lines.length ? lines : [text];
+  if (current) lines.push(current);
+  return lines.length ? lines : [line];
 }
 
-function dataUrlToUint8Array(dataUrl: string): Uint8Array {
-  const base64 = dataUrl.split(',')[1] ?? '';
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
+function normalizeHubs(raw: unknown): Hub[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => item as Record<string, unknown>).map((item) => ({
+    hubCode: text(item.hubCode ?? item.HubCode),
+    hubName: text(item.hubName ?? item.HubName),
+    active: item.active === undefined ? true : item.active === true || text(item.active).toLowerCase() === 'true',
+    note: text(item.note) || undefined,
+    updatedAt: text(item.updatedAt) || undefined,
+  })).filter((hub) => hub.hubCode);
 }
 
-function safeFileName(value: string): string {
-  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/\s+/g, '_');
+function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => item as Record<string, unknown>).map((item) => ({
+    employeeCode: text(item.employeeCode ?? item.EmployeeCode),
+    employeeName: text(item.employeeName ?? item.displayName ?? item.EmployeeName),
+    hubCode: text(item.hubCode ?? item.HubCode),
+    active: item.active === undefined ? true : item.active === true || text(item.active).toLowerCase() === 'true',
+    note: text(item.note) || undefined,
+    updatedAt: text(item.updatedAt) || undefined,
+  })).filter((staff) => staff.employeeCode && staff.hubCode);
+}
+
+function normalizeSettings(raw: unknown): AppSettings {
+  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    ...DEFAULT_SETTINGS,
+    GPS_REQUIRED: text(data.GPS_REQUIRED ?? data.GPS_MANDATORY ?? DEFAULT_SETTINGS.GPS_REQUIRED),
+    GPS_MANDATORY: text(data.GPS_MANDATORY ?? data.GPS_REQUIRED ?? DEFAULT_SETTINGS.GPS_MANDATORY),
+    WATERMARK_ENABLED: text(data.WATERMARK_ENABLED ?? DEFAULT_SETTINGS.WATERMARK_ENABLED),
+    REQUIRE_ADMIN_DEVICE_APPROVAL: text(data.REQUIRE_ADMIN_DEVICE_APPROVAL ?? DEFAULT_SETTINGS.REQUIRE_ADMIN_DEVICE_APPROVAL),
+    MINIMUM_APP_VERSION: text(data.MINIMUM_APP_VERSION ?? DEFAULT_SETTINGS.MINIMUM_APP_VERSION),
+    ADMIN_PIN_ENABLED: text(data.ADMIN_PIN_ENABLED ?? DEFAULT_SETTINGS.ADMIN_PIN_ENABLED),
+    ADMIN_PIN_SET: text(data.ADMIN_PIN_SET ?? DEFAULT_SETTINGS.ADMIN_PIN_SET),
+  };
+}
+
+function normalizeStatus(value: string): ProofStatus {
+  if (value === 'SYNCED' || value.includes('ซิงก์แล้ว')) return 'SYNCED';
+  if (value === 'SYNCING' || value.includes('กำลังซิงก์')) return 'SYNCING';
+  if (value === 'SYNC_FAILED' || value.includes('ซิงก์ไม่สำเร็จ')) return 'SYNC_FAILED';
+  if (value === 'PENDING_SYNC' || value.includes('รอซิงก์')) return 'PENDING_SYNC';
+  if (value === 'NEED_REVIEW' || value.includes('รูปไม่ครบ')) return 'NEED_REVIEW';
+  if (value === 'IN_PROGRESS' || value.includes('กำลังถ่าย')) return 'IN_PROGRESS';
+  if (value === 'DRAFT' || value.includes('เริ่ม')) return 'DRAFT';
+  if (value === 'VOIDED' || value.includes('ยกเลิก')) return 'VOIDED';
+  return 'COMPLETE';
+}
+
+function parseCentralTime(value: unknown): string {
+  const raw = text(value);
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+07:00`).toISOString();
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function splitCode(value: unknown): string {
+  return text(value).split(/[-\s]/)[0] ?? '';
+}
+
+function splitName(value: unknown): string {
+  const raw = text(value);
+  return raw.replace(splitCode(raw), '').replace(/^-/, '').trim();
+}
+
+function dedupeBy<T>(items: T[], keyFn: (item: T) => string): T[] {
+  const map = new Map<string, T>();
+  items.forEach((item) => map.set(keyFn(item), item));
+  return Array.from(map.values());
+}
+
+function part(parts: Intl.DateTimeFormatPart[], type: string): string {
+  return parts.find((item) => item.type === type)?.value ?? '';
+}
+
+function text(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'ดำเนินการไม่สำเร็จ';
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = window.localStorage.getItem(key);
+  const raw = localStorage.getItem(key);
   if (!raw) return fallback;
   try {
     return JSON.parse(raw) as T;
@@ -1258,232 +995,5 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T): void {
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function isGoogleSyncConfigured(settings = getSettings()): boolean {
-  if (CENTRAL_BACKEND_URL && settings.googleSyncMode === 'google_sheets') return true;
-  return settings.googleSyncMode === 'google_sheets'
-    && settings.googleAppsScriptUrl.trim().length > 0
-    && settings.googleSharedSecret.trim().length > 0;
-}
-
-function queueSync(action: GoogleSyncAction, payload: unknown, error?: string): void {
-  const item: SyncQueueItem = {
-    id: createId(),
-    action,
-    payload,
-    createdAt: new Date().toISOString(),
-    attempts: 0,
-    error,
-  };
-  saveSyncQueue([...getSyncQueue(), item]);
-}
-
-function saveSyncQueue(queue: SyncQueueItem[]): void {
-  writeJson(SYNC_QUEUE_KEY, queue);
-}
-
-async function fetchCentralRecords(): Promise<ProofRecord[]> {
-  try {
-    const data = await callAppsScript('getRecords', {}, { allowWithoutSecret: true }) as { records?: unknown };
-    return normalizeCentralRecords(data.records);
-  } catch {
-    return [];
-  }
-}
-
-function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]): ProofRecord[] {
-  return dedupeRecords([...localRecords, ...centralRecords]);
-}
-
-function dedupeRecords(records: ProofRecord[]): ProofRecord[] {
-  const grouped = new Map<string, ProofRecord[]>();
-  records.map(ensureDuplicateKey).forEach((record) => {
-    const key = record.forceCreateNew ? `${duplicateKeyForRecord(record)}|${record.id}` : duplicateKeyForRecord(record);
-    grouped.set(key, [...(grouped.get(key) ?? []), record]);
-  });
-  return Array.from(grouped.values()).map((items) => items.sort(compareRecordPreference)[0]);
-}
-
-function compareRecordPreference(a: ProofRecord, b: ProofRecord): number {
-  const rank = statusPreference(b) - statusPreference(a);
-  if (rank !== 0) return rank;
-  const photoRank = b.photoSlots.filter((slot) => slot.captured).length - a.photoSlots.filter((slot) => slot.captured).length;
-  if (photoRank !== 0) return photoRank;
-  return b.updatedAt.localeCompare(a.updatedAt);
-}
-
-function statusPreference(record: ProofRecord): number {
-  if (record.syncStatus === 'SYNCED') return 70;
-  if (record.status === 'COMPLETE') return 60;
-  if (record.status === 'NEED_REVIEW') return 50;
-  if (record.syncStatus === 'PENDING_SYNC') return 40;
-  if (record.status === 'IN_PROGRESS') return 30;
-  if (record.status === 'DRAFT') return 20;
-  if (record.status === 'VOIDED') return 10;
-  return 0;
-}
-
-function ensureDuplicateKey(record: ProofRecord): ProofRecord {
-  return {
-    ...record,
-    duplicateKey: record.duplicateKey || duplicateKeyForRecord(record),
-  };
-}
-
-function duplicateKeyForRecord(record: ProofRecord): string {
-  return duplicateKeyFromParts(record.date, record.hubCode, record.responsibleEmployeeCode, record.vehicleBarcode);
-}
-
-function duplicateKeyFromParts(date: string, hubCode: string, employeeCode: string, vehicleBarcode: string): string {
-  return [date, hubCode, employeeCode, vehicleBarcode].map((part) => String(part || '').trim().toUpperCase()).join('|');
-}
-
-function normalizeCentralRecords(raw: unknown): ProofRecord[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => centralRowToRecord(item as Record<string, unknown>)).filter((record): record is ProofRecord => Boolean(record));
-}
-
-function centralRowToRecord(row: Record<string, unknown>): ProofRecord | null {
-  const date = String(row.date ?? row['วันที่'] ?? '');
-  const hubCode = String(row.hubCode ?? extractCode(row['ฮับ']) ?? '');
-  const hubName = String(row.hubName ?? extractName(row['ฮับ']) ?? '');
-  const responsibleEmployeeCode = String(row.responsibleEmployeeCode ?? extractCode(row['ผู้รับผิดชอบ']) ?? '');
-  const responsibleName = String(row.responsibleName ?? extractName(row['ผู้รับผิดชอบ']) ?? '');
-  const vehicleBarcode = normalizeVehicleBarcode(String(row.vehicleBarcode ?? row['บาร์โค้ดรถ'] ?? ''));
-  if (!date || !hubCode || !responsibleEmployeeCode || !vehicleBarcode) return null;
-  const status = normalizeStatus(String(row.statusInternal ?? row['สถานะ'] ?? 'COMPLETE'));
-  const syncStatus = normalizeSyncStatus(String(row.syncStatus ?? (status === 'COMPLETE' ? 'SYNCED' : '')));
-  const createdAt = parseCentralDate(row.createdAt ?? row['เวลาส่งข้อมูล']) || new Date().toISOString();
-  const updatedAt = parseCentralDate(row.updatedAt ?? row['เวลาส่งข้อมูล']) || createdAt;
-  return {
-    id: String(row.recordId ?? row.id ?? duplicateKeyFromParts(date, hubCode, responsibleEmployeeCode, vehicleBarcode)),
-    hubCode,
-    hubName,
-    responsibleEmployeeCode,
-    responsibleName,
-    date,
-    vehicleBarcode,
-    hasDropTransfer: String(row['พ่วงดรอปหรือไม่'] ?? '').includes('พ่วง'),
-    dropCount: Number(row['จำนวนดรอป'] ?? 0) || 0,
-    photoSlots: buildCentralPhotoSlots(row, status),
-    status,
-    missingPhotoWarnings: String(row['รายการรูปที่ขาด'] ?? '').split(',').map((item) => item.trim()).filter(Boolean),
-    missingPhotoConfirmed: status === 'NEED_REVIEW',
-    submittedAt: parseCentralDate(row.submittedAt ?? row['เวลาส่งข้อมูล']) || undefined,
-    createdAt,
-    updatedAt,
-    syncStatus,
-    duplicateKey: String(row.duplicateKey ?? duplicateKeyFromParts(date, hubCode, responsibleEmployeeCode, vehicleBarcode)),
-    duplicateOfRecordId: String(row.duplicateOfRecordId ?? '') || undefined,
-    duplicateReason: String(row.duplicateReason ?? '') || undefined,
-    notes: String(row['หมายเหตุ'] ?? '') || undefined,
-  };
-}
-
-function buildCentralPhotoSlots(row: Record<string, unknown>, status: ProofStatus): ProofPhotoSlot[] {
-  if (status === 'COMPLETE') return [];
-  const slots = createPhotoSlots(String(row['พ่วงดรอปหรือไม่'] ?? '').includes('พ่วง'), Number(row['จำนวนดรอป'] ?? 0) || 0);
-  return slots.map((slot, index) => {
-    const value = String(row[EXPORT_HEADERS[7 + index]] ?? '');
-    return {
-      ...slot,
-      captured: Boolean(value && !value.includes('ยังไม่ได้ถ่าย')),
-      fileName: value || undefined,
-    };
-  });
-}
-
-function normalizeStatus(value: string): ProofStatus {
-  if (value === 'DRAFT' || value.includes('เริ่ม')) return 'DRAFT';
-  if (value === 'IN_PROGRESS' || value.includes('กำลัง')) return 'IN_PROGRESS';
-  if (value === 'NEED_REVIEW' || value.includes('ไม่ครบ')) return 'NEED_REVIEW';
-  if (value === 'VOIDED' || value.includes('ยกเลิก')) return 'VOIDED';
-  return 'COMPLETE';
-}
-
-function normalizeSyncStatus(value: string): RecordSyncStatus | undefined {
-  if (value === 'PENDING_SYNC') return 'PENDING_SYNC';
-  if (value === 'SYNC_FAILED') return 'SYNC_FAILED';
-  if (value === 'LOCAL_ONLY') return 'LOCAL_ONLY';
-  if (value === 'SYNCED') return 'SYNCED';
-  return undefined;
-}
-
-function parseCentralDate(value: unknown): string {
-  if (!value) return '';
-  const text = String(value);
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return new Date(`${text.replace(' ', 'T')}+07:00`).toISOString();
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
-}
-
-function extractCode(value: unknown): string {
-  return String(value || '').split(/[-\s]/)[0]?.trim() ?? '';
-}
-
-function extractName(value: unknown): string {
-  const text = String(value || '');
-  const code = extractCode(text);
-  return text.replace(code, '').replace(/^-/, '').trim();
-}
-
-function normalizeHubs(raw: unknown): Hub[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => item as Partial<Hub> & Record<string, unknown>).filter((item) => item.hubCode || item.HubCode).map((item) => ({
-    hubCode: String(item.hubCode ?? item.HubCode ?? ''),
-    hubName: String(item.hubName ?? item.HubName ?? ''),
-    active: item.active === undefined ? true : item.active === true || String(item.active).toLowerCase() === 'true',
-  })).filter((hub) => hub.hubCode);
-}
-
-function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => item as Partial<ResponsibleStaff> & Record<string, unknown>).filter((item) => item.employeeCode || item.EmployeeCode).map((item) => ({
-    employeeCode: String(item.employeeCode ?? item.EmployeeCode ?? ''),
-    displayName: String(item.displayName ?? item.employeeName ?? item.DisplayName ?? item.EmployeeName ?? ''),
-    hubCode: String(item.hubCode ?? item.HubCode ?? ''),
-    active: item.active === undefined ? true : item.active === true || String(item.active).toLowerCase() === 'true',
-  })).filter((staff) => staff.employeeCode && staff.hubCode);
-}
-
-type AppsScriptAction = 'bootstrap' | 'getBootstrapData' | 'health' | 'healthCheck' | 'initOrRepairStorage' | 'getSettings' | 'getAppSettings' | 'updateSetting' | 'getHubs' | 'upsertHub' | 'deactivateHub' | 'getResponsibleStaff' | 'upsertResponsibleStaff' | 'deactivateResponsibleStaff' | 'getRecords' | 'findRecordByKey' | 'upsertRecordByKey' | 'saveRecord' | 'savePhotoMetadata' | 'syncBatch' | 'getMyWork' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
-
-async function callAppsScript(action: AppsScriptAction, payload: unknown, options: { allowWithoutSecret?: boolean } = {}): Promise<unknown> {
-  const settings = getSettings();
-  const url = CENTRAL_BACKEND_URL || settings.googleAppsScriptUrl.trim();
-  if (!url || (!options.allowWithoutSecret && !isGoogleSyncConfigured(settings))) {
-    throw new Error('ยังไม่ได้ตั้งค่า Google Apps Script URL หรือ shared secret');
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action,
-      token: settings.googleSharedSecret || undefined,
-      payload,
-      client: 'hubchecklist-reset006-007-plus',
-      sentAt: new Date().toISOString(),
-    }),
-  });
-
-  const text = await response.text();
-  let data: { ok?: boolean; error?: string } | null = null;
-  try {
-    data = text ? JSON.parse(text) as { ok?: boolean; error?: string } : null;
-  } catch {
-    throw new Error('Apps Script response is not JSON');
-  }
-
-  if (!response.ok || data?.ok === false) {
-    throw new Error(data?.error || `Apps Script HTTP ${response.status}`);
-  }
-
-  return data;
-}
-
-function createId(): string {
-  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(key, JSON.stringify(value));
 }

@@ -418,3 +418,65 @@ Do not mark Flash live automation passed until a physical Android device has loa
 - No fake Flash extraction success.
 - Business records are not hard-deleted.
 - Cleanup only removes confirmed backed-up local photo payloads.
+
+## RESET-011 Central-First Rebuild Test Plan
+
+1. Fresh open with `VITE_APPS_SCRIPT_WEB_APP_URL` configured.
+   - Confirm the app pulls active `Hubs` and `ResponsibleStaff`.
+   - Confirm Frontline shows Thai labels only.
+
+2. Frontline context.
+   - Select hub `26NAK_BHUB`.
+   - Select responsible staff `25845 Tui`.
+   - Tap `บันทึกและเริ่มงาน`.
+
+3. Scanner.
+   - Confirm scanner fills the whole screen.
+   - Confirm header and bottom nav are hidden.
+   - Confirm yellow scan frame, close button, hub code, and instruction are visible.
+   - Use manual bottom sheet and submit barcode `NAK1R7XJ45`.
+
+4. Duplicate behavior.
+   - Repeat the same barcode on the same date/hub/responsible staff.
+   - Confirm unfinished work resumes instead of creating a ghost duplicate.
+   - Submit the work, then scan again.
+   - Confirm the app warns that the work was already submitted.
+
+5. Photos and watermark.
+   - Choose `ไม่พ่วงดรอป` and capture required photos.
+   - Confirm no bottom navigation overlap.
+   - Confirm preview fits the screen.
+   - Confirm watermark includes date, time, GPS or `พิกัด ไม่พบตำแหน่ง`, location or `สถานที่ ไม่พบชื่อสถานที่`, barcode, hub, and responsible staff.
+
+6. Submit/sync.
+   - Submit with all required photos.
+   - Confirm status becomes `ซิงก์แล้ว` only after Apps Script returns success.
+   - Disable network and submit another record.
+   - Confirm status is `รอซิงก์` or `ซิงก์ไม่สำเร็จ`, not fake success.
+   - Restore network and run `ซิงก์งานค้างตอนนี้`.
+
+7. Two-device central check.
+   - Device A submits a record.
+   - Device B presses `รีเฟรชข้อมูล`.
+   - Confirm Device B sees the same central record.
+   - This remains pending until live deployment/device testing is performed.
+
+8. Backoffice.
+   - Unlock with central Admin PIN.
+   - Add/edit/deactivate hub and confirm rows update in `Hubs`.
+   - Add/edit/deactivate responsible staff and confirm rows update in `ResponsibleStaff`.
+   - Save safe settings and confirm rows update in `Settings`.
+   - Confirm secrets such as Admin PIN hash and shared secret are not shown in Frontline.
+
+9. Cache tools.
+   - With pending sync, try `ล้างแคชเครื่องนี้`; confirm it is blocked.
+   - With no pending sync, clear cache and confirm central rows and Drive files are not deleted.
+
+10. Build gates.
+    - `npm.cmd install`
+    - `npx.cmd tsc -b`
+    - `npm.cmd run build`
+    - `npx.cmd cap sync android`
+    - `.\gradlew.bat assembleDebug` from `android`
+    - Apps Script syntax check
+    - mojibake scan

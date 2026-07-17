@@ -369,3 +369,48 @@ See:
 - Production R2 delete backend.
 - Production Supabase sync hardening.
 - Storage billing automation or real cloud usage reporting.
+
+## RESET-011 Full Rebuild Status
+
+Status: complete in code, pending live deployment and physical device QA.
+
+RESET-011 rebuilds Hub Photo Proof as a central-first app using Google Sheets, Apps Script, and Google Drive as the free source of truth. Local storage is only a temporary capture/cache layer for offline work, pending sync, and display preferences.
+
+Core product flow:
+
+- Staff selects hub and responsible staff from central bootstrap data.
+- Staff scans or manually enters vehicle barcode.
+- Staff selects drop type and captures required photos.
+- Photos receive a clean watermark with date, time, GPS/location fallback, barcode, hub, responsible staff, and photo type.
+- Submission writes to Apps Script and shows `ซิงก์แล้ว` only after central success.
+- Offline or failed submissions remain `รอซิงก์` or `ซิงก์ไม่สำเร็จ`.
+- Every device can pull the same central records after refresh once the Apps Script deployment is live.
+
+Duplicate model:
+
+- `duplicateKey = date + hubCode + responsibleEmployeeCode + vehicleBarcode`.
+- Local UI and central sync both prefer one main record per duplicate key.
+- Status priority favors synced/complete records over stale drafts.
+- Stale drafts are hidden from active `งานของฉัน` when a completed/synced record exists.
+
+Backoffice:
+
+- Admin access uses central Admin PIN verification through Apps Script.
+- Hubs, responsible staff, and safe settings are saved centrally only.
+- Staff cannot see or edit central secrets.
+- `ระบบกลาง` provides health check, pull latest, retry pending sync, and safe cache clear.
+
+Apps Script:
+
+- Required sheets: `Hubs`, `ResponsibleStaff`, `Records_All`, `Photos`, `Settings`, and `Audit`.
+- Required actions are present for health, bootstrap, hub/staff/settings management, admin PIN status/verification, record upsert, batch sync, history, photos, and audit.
+- Responses use `{ ok, message, data }`.
+- Readable times use Bangkok format `yyyy-MM-dd HH:mm:ss`.
+
+Still manual:
+
+- Deploy updated Apps Script as a Web App.
+- Configure `VITE_APPS_SCRIPT_WEB_APP_URL` for production web/APK builds.
+- Run real two-device sync test.
+- Run Samsung S23 FE, Galaxy Tab A7 Lite, iPad browser fallback, and desktop browser QA.
+- Confirm real camera scanning and photo capture on physical devices.

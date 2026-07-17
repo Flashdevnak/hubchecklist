@@ -278,3 +278,27 @@ C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\de
 ## Future QA gates
 
 Every MVP must update this file before commit. If QA fails, do not mark complete.
+
+## RESET-011 Full Rebuild Checks
+
+- [x] `src/App.tsx` rebuilt as a clean central-first Hub Photo Proof app.
+- [x] `src/services/reset003.ts` rebuilt around central bootstrap, pull, submit, pending retry, dedupe, watermark, and safe cache behavior.
+- [x] `google-apps-script/Code.gs` rebuilt with required actions and `{ ok, message, data }` responses.
+- [x] Frontline tabs are only `วันนี้`, `สแกน`, `รูป`, and `งานของฉัน`.
+- [x] Frontline has no visible admin menu except hidden/locked Backoffice entry.
+- [x] Backoffice admin saves for hubs, responsible staff, and safe settings call Apps Script only.
+- [x] If central URL is missing, Backoffice PIN setup is not exposed to staff as normal setup.
+- [x] Same date + hub + responsible + vehicle barcode is merged by duplicate key.
+- [x] Completed/synced records are hidden from active My Work by default.
+- [x] Fullscreen scanner hides app header and bottom nav.
+- [x] Manual barcode bottom sheet remains available.
+- [x] Photo page has mobile-safe cards and sticky submit above bottom navigation.
+- [x] Watermark includes date/time/GPS/location/barcode/hub/responsible/photo type and does not fake address.
+- [x] Safe cache clear refuses to run with pending sync.
+- [x] Mojibake scan passed for source, docs, and Apps Script.
+- [x] TypeScript passes.
+- [x] Apps Script syntax check passes.
+- [ ] Live Apps Script deployment completed.
+- [ ] Two-device central sync test completed.
+- [ ] Physical Android scanner/photo QA completed.
+- [ ] iPad browser fallback QA completed.

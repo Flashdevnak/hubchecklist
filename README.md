@@ -144,6 +144,8 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 | RESET-005 Final PWA/admin lock/responsive/icon pass | Complete | Admin PIN, PWA docs/icons, Android icon, responsive hardening; real device QA still pending |
 | RESET-009 final production UI scan photo watermark time polish | Complete | UI/watermark/scan/photo/time polish implemented; physical device QA and live Apps Script verification still pending |
 | RESET-009A Central sync history cleanup and final UI polish | Complete | Central admin saves, clean Frontline active/history split, Backoffice filters, Apps Script history aliases, and UI polish implemented; live sheet/device QA pending |
+| RESET-010 Central sync dedupe fullscreen scanner watermark UI | Complete | Central pull/merge, duplicate hiding, fullscreen scanner shell, safe cache tools, and watermark location fallback implemented; live deployment/device QA pending |
+| RESET-011 Full rebuild central-first Hub Photo Proof | Complete | React app, central API service, Apps Script router, scanner, photo flow, Backoffice, cache tools, and docs rebuilt around Google Sheets as source of truth; live deployment/device QA pending |
 
 ## Key Docs
 
@@ -161,9 +163,24 @@ MVP-017 simplifies the staff workflow into **Home -> Scan -> Review -> Create ->
 
 ## Google Sheets Sync
 
-Default mode is `Local only`; no URL or token is required to open/build the app. To enable central free storage, deploy `google-apps-script/Code.gs` as a Google Apps Script web app, set `APP_SHARED_SECRET` in Script Properties, then enter the Web App URL and shared secret in หลังบ้าน -> Settings.
+RESET-011 is central-first. Google Sheets + Apps Script + Google Drive are the free central backend and source of truth for hubs, responsible staff, settings, submitted records, photo metadata, audit, and history.
 
-RESET-009 keeps the simplified 15-column record row. Apps Script formats submitted/captured timestamps with `Asia/Bangkok` as `yyyy-MM-dd HH:mm:ss` and preserves already formatted local values.
+Set `VITE_APPS_SCRIPT_WEB_APP_URL` at build/deploy time so every device talks to the same Apps Script `/exec` URL. Staff devices must not enter or see `APP_SHARED_SECRET`, Admin PIN hash, or script secrets in the frontend.
+
+If the URL is missing or the network is offline, Frontline still opens for capture safety and clearly marks submitted work as `รอซิงก์` or `ซิงก์ไม่สำเร็จ`. The app only shows `ซิงก์แล้ว` after Apps Script returns `ok=true`.
+
+Apps Script formats readable Sheet times with `Asia/Bangkok` as `yyyy-MM-dd HH:mm:ss`.
+
+## RESET-011 Rebuild
+
+- Replaced the main React flow with four Frontline tabs only: `วันนี้`, `สแกน`, `รูป`, and `งานของฉัน`.
+- Rebuilt Backoffice with `ภาพรวม`, `ฮับ`, `ผู้รับผิดชอบ`, `รายการ`, `รูปภาพ`, `ประวัติ`, `ส่งออก`, `ตั้งค่า`, and `ระบบกลาง`.
+- Rebuilt `src/services/reset003.ts` as a central-first API service with bootstrap, central pull, record upsert, pending retry, duplicate merge, safe cache clear, and watermark helpers.
+- Rebuilt `google-apps-script/Code.gs` with the required actions and `{ ok, message, data }` response envelope.
+- Duplicate key is `date + hubCode + responsibleEmployeeCode + vehicleBarcode`; central sync upserts by this key and the UI hides stale local drafts behind the most complete/latest record.
+- Scanner is fullscreen with dark overlay, yellow scan frame, close button, manual input bottom sheet, and no normal app chrome.
+- Watermark draws direct text with shadow/stroke and includes date, time, GPS, location fallback, barcode, hub, responsible staff, and photo type. It does not fake an address.
+- Safe cache clear only removes local display/cache preferences and refuses to run while pending sync exists. It never deletes Google Sheet rows or Drive files.
 
 ## RESET-009 Polish
 

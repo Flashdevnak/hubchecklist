@@ -1,1093 +1,528 @@
+const APP_VERSION = 'RESET-011';
+const TIME_ZONE = 'Asia/Bangkok';
+
 const SHEETS = {
-  RECORDS_ALL: 'Records_All',
-  PHOTOS: 'Photos',
   HUBS: 'Hubs',
   RESPONSIBLE_STAFF: 'ResponsibleStaff',
-  AUDIT: 'Audit',
+  RECORDS: 'Records_All',
+  PHOTOS: 'Photos',
   SETTINGS: 'Settings',
-  ADMIN_DEVICES: 'AdminDevices',
+  AUDIT: 'Audit',
   EXPORT_LOGS: 'ExportLogs',
+  ADMIN_DEVICES: 'AdminDevices',
 };
 
-const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
-const APP_VERSION = 'RESET-009A';
-const MISSING_PHOTO_TEXT = 'ยังไม่ได้ถ่าย';
-
-const SIMPLE_RECORD_HEADERS = [
-  'วันที่',
-  'ฮับ',
-  'ผู้รับผิดชอบ',
-  'บาร์โค้ดรถ',
-  'พ่วงดรอปหรือไม่',
-  'จำนวนดรอป',
-  'สถานะ',
-  'รูปหลังรถ',
-  'รูปหน้าดรอป',
-  'รูปหลังรถพ่วงที่ 1',
-  'รูปหลังรถพ่วงที่ 2',
-  'รูปหลังรถพ่วงเพิ่มเติม',
-  'รายการรูปที่ขาด',
-  'เวลาส่งข้อมูล',
-  'หมายเหตุ',
-];
-
 const HEADERS = {
-  Records_All: SIMPLE_RECORD_HEADERS.concat([
+  Hubs: ['hubCode', 'hubName', 'active', 'note', 'updatedAt'],
+  ResponsibleStaff: ['employeeCode', 'employeeName', 'hubCode', 'active', 'note', 'updatedAt'],
+  Records_All: [
     'recordId',
+    'duplicateKey',
+    'date',
+    'วันที่',
     'hubCode',
+    'ฮับ',
     'responsibleEmployeeCode',
     'responsibleName',
+    'ผู้รับผิดชอบ',
+    'vehicleBarcode',
+    'บาร์โค้ดรถ',
+    'dropType',
+    'พ่วงดรอปหรือไม่',
+    'dropCount',
+    'จำนวนดรอป',
     'statusInternal',
-    'duplicateKey',
-    'duplicateOfRecordId',
-    'duplicateReason',
-    'syncStatus',
+    'สถานะ',
+    'photoRequiredCount',
+    'photoDoneCount',
+    'รายการรูปที่ขาด',
+    'submittedAt',
+    'syncedAt',
     'createdAt',
     'updatedAt',
-  ]),
+    'duplicateOfRecordId',
+    'duplicateReason',
+    'note',
+  ],
   Photos: [
-    'id',
+    'photoId',
     'recordId',
+    'duplicateKey',
+    'date',
+    'hubCode',
+    'responsibleEmployeeCode',
     'vehicleBarcode',
-    'slotId',
-    'slotType',
-    'labelThai',
-    'captured',
+    'photoSlot',
+    'ประเภทรูป',
     'fileName',
-    'capturedAt',
-    'gpsLat',
-    'gpsLng',
-    'gpsAccuracy',
-    'gpsStatus',
-    'watermarkText',
-    'hub',
-    'responsible',
     'driveFileId',
     'driveUrl',
-    'localOnly',
+    'capturedAt',
+    'latitude',
+    'longitude',
+    'accuracy',
+    'addressText',
+    'watermarkApplied',
     'createdAt',
   ],
-  Hubs: ['hubCode', 'hubName', 'active', 'note'],
-  ResponsibleStaff: ['employeeCode', 'employeeName', 'hubCode', 'active', 'note'],
-  Audit: ['auditId', 'id', 'recordId', 'action', 'message', 'detail', 'detailJson', 'actor', 'createdAt'],
   Settings: ['key', 'value', 'updatedAt', 'note'],
+  Audit: ['auditId', 'action', 'message', 'recordId', 'actor', 'detailJson', 'createdAt'],
+  ExportLogs: ['logId', 'action', 'message', 'actor', 'detailJson', 'createdAt'],
   AdminDevices: ['deviceId', 'deviceName', 'ownerName', 'role', 'status', 'approvedAt', 'revokedAt', 'lastLoginAt', 'note'],
-  ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
 };
 
 function doGet() {
-  const repair = ensureStorageReady();
-  const settings = readSettingsMap_();
-  return json_({
-    ok: true,
+  const repair = initOrRepairStorage_();
+  return respond_(true, 'API พร้อมใช้งาน', {
     appName: 'Hub Photo Proof',
-    version: APP_VERSION,
-    serverTimeBangkok: formatBangkokDateTime_(new Date()),
-    requiredSheetsReady: repair.ok === true,
-    adminPinSet: String(settings.ADMIN_PIN_SET).toLowerCase() === 'true' || Boolean(settings.ADMIN_PIN_HASH),
-    message: 'API พร้อมใช้งาน',
+    apiVersion: APP_VERSION,
+    serverTime: bangkokNow_(),
+    storageReady: repair.ok,
   });
 }
 
 function doPost(e) {
   try {
     const request = parseRequest_(e);
-    ensureStorageReady();
-
-    switch (request.action) {
+    initOrRepairStorage_();
+    const action = String(request.action || '');
+    const payload = request.payload || {};
+    switch (action) {
       case 'health':
       case 'healthCheck':
-        return json_({ ok: true, appName: 'Hub Photo Proof', version: APP_VERSION, serverTimeBangkok: formatBangkokDateTime_(new Date()), message: 'API พร้อมใช้งาน' });
+        return respond_(true, 'ระบบกลางพร้อมใช้งาน', health_());
       case 'initOrRepairStorage':
-        return json_(repairStorageWithAudit_(request.payload));
-      case 'bootstrap':
+        return respond_(true, 'ตรวจสอบและซ่อมชีทเรียบร้อย', initOrRepairStorage_());
       case 'getBootstrapData':
-        return json_(bootstrap_(request.payload));
+      case 'bootstrap':
+        return respond_(true, 'ดึงข้อมูลล่าสุดแล้ว', getBootstrapData_());
+      case 'getHubs':
+        return respond_(true, 'ดึงฮับแล้ว', { hubs: activeRows_(SHEETS.HUBS) });
+      case 'upsertHub':
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', upsertHub_(payload));
+      case 'deactivateHub':
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', deactivateHub_(payload));
+      case 'getResponsibleStaff':
+        return respond_(true, 'ดึงผู้รับผิดชอบแล้ว', { responsibleStaff: activeRows_(SHEETS.RESPONSIBLE_STAFF) });
+      case 'upsertResponsibleStaff':
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', upsertResponsibleStaff_(payload));
+      case 'deactivateResponsibleStaff':
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', deactivateResponsibleStaff_(payload));
       case 'getSettings':
-      case 'getAppSettings':
-        return json_({ ok: true, appSettings: safeSettings_() });
+        return respond_(true, 'ดึงตั้งค่าแล้ว', { settings: safeSettings_() });
       case 'updateSetting':
-        return json_(updateSettingFromAdmin_(request.payload));
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', updateSetting_(payload));
       case 'updateSettingsBatch':
-        return json_(updateSettingsBatchFromAdmin_(request.payload));
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', updateSettingsBatch_(payload));
+      case 'verifyAdminAccess':
+        return respond_(true, 'ยืนยันผู้ดูแลแล้ว', verifyAdminAccess_(payload));
+      case 'setAdminPin':
+        return respond_(true, 'บันทึกลงระบบกลางแล้ว', setAdminPin_(payload));
+      case 'getAdminAuthStatus':
+        return respond_(true, 'ดึงสถานะผู้ดูแลแล้ว', getAdminAuthStatus_());
       case 'findRecordByKey':
-        return json_(findRecordByKey_(request.payload));
+        return respond_(true, 'ตรวจรายการซ้ำแล้ว', findRecordByKey_(payload));
       case 'upsertRecordByKey':
-      case 'saveRecord':
-        return json_({ ok: true, result: syncRecord_(request.payload.record || request.payload, request.payload.photoMetadata || []) });
-      case 'createRecord':
       case 'syncRecord':
-        return json_({ ok: true, result: syncRecord_(request.payload.record, request.payload.photoMetadata || []) });
+      case 'createRecord':
+      case 'saveRecord':
+        return respond_(true, 'ซิงก์แล้ว', syncRecord_(payload.record || payload, payload.photoMetadata || []));
+      case 'syncBatch':
+        return respond_(true, 'ซิงก์ชุดข้อมูลแล้ว', syncBatch_(payload));
       case 'savePhotoMetadata':
       case 'uploadPhotoMetadata':
-        return json_({ ok: true, result: upsertPhoto_(request.payload) });
-      case 'syncBatch':
-        return json_(syncBatch_(request.payload));
+        return respond_(true, 'บันทึกรูปแล้ว', { photo: savePhotoMetadata_(payload) });
       case 'getMyWork':
-        return json_(getMyWork_(request.payload));
-      case 'getHubs':
-        return json_({ ok: true, hubs: readActiveHubs_() });
-      case 'upsertHub':
-        return json_(upsertHub_(request.payload));
-      case 'deactivateHub':
-        return json_(deactivateHub_(request.payload));
-      case 'getResponsibleStaff':
-        return json_({ ok: true, responsibleStaff: readActiveResponsibleStaff_() });
-      case 'upsertResponsibleStaff':
-        return json_(upsertResponsibleStaff_(request.payload));
-      case 'deactivateResponsibleStaff':
-        return json_(deactivateResponsibleStaff_(request.payload));
+        return respond_(true, 'ดึงงานของฉันแล้ว', { records: filterRecords_(payload) });
       case 'getRecords':
-        return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
-      case 'getPhotos':
-        return json_({ ok: true, photos: readRows_(SHEETS.PHOTOS) });
+        return respond_(true, 'ดึงรายการแล้ว', { records: rows_(SHEETS.RECORDS) });
       case 'getHistory':
       case 'getRecordsByDateRange':
-        return json_(getHistory_(request.payload));
-      case 'appendAudit':
+        return respond_(true, 'ดึงประวัติแล้ว', { records: filterRecords_(payload) });
+      case 'getPhotos':
+        return respond_(true, 'ดึงรูปภาพแล้ว', { photos: rows_(SHEETS.PHOTOS) });
       case 'logAudit':
-        return json_({ ok: true, result: appendAudit_(request.payload) });
-      case 'requestAdminAccess':
-        return json_(requestAdminAccess_(request.payload));
-      case 'verifyAdminAccess':
-        return json_(verifyAdminAccess_(request.payload));
-      case 'setAdminPin':
-        return json_(setAdminPin_(request.payload));
-      case 'setAdminDeviceApprovalRequired':
-        return json_(setAdminDeviceApprovalRequired_(request.payload));
-      case 'listAdminDevices':
-        return json_({ ok: true, devices: listAdminDevices_(request.payload) });
-      case 'approveAdminDevice':
-        return json_(approveAdminDevice_(request.payload));
-      case 'revokeAdminDevice':
-        return json_(revokeAdminDevice_(request.payload));
-      case 'getAdminAuthStatus':
-        return json_(getAdminAuthStatus_(request.payload));
+      case 'appendAudit':
+        return respond_(true, 'บันทึกประวัติแล้ว', { audit: logAudit_(payload) });
       default:
-        return json_({ ok: false, message: 'ไม่พบคำสั่งนี้', errorCode: 'UNKNOWN_ACTION' });
+        return respond_(false, 'ไม่พบคำสั่งนี้', { action: action });
     }
   } catch (error) {
-    return json_({ ok: false, message: 'ดำเนินการไม่สำเร็จ', errorCode: error && error.message ? String(error.message).slice(0, 80) : 'UNKNOWN_ERROR' });
+    return respond_(false, 'ดำเนินการไม่สำเร็จ', { errorCode: String(error && error.message ? error.message : error).slice(0, 120) });
   }
 }
 
-function parseRequest_(e) {
-  if (!e || !e.postData || !e.postData.contents) throw new Error('Missing POST body');
-  return JSON.parse(e.postData.contents);
-}
-
-function validateToken_(token) {
-  const expected = PropertiesService.getScriptProperties().getProperty('APP_SHARED_SECRET');
-  if (!expected) throw new Error('APP_SHARED_SECRET is not set in Script Properties');
-  if (!token || token !== expected) throw new Error('Unauthorized');
-}
-
-function ensureStorageReady() {
-  const result = {
-    ok: true,
-    message: 'ตรวจสอบและซ่อมโครงสร้างชีทเรียบร้อย',
-    sheetsCreated: [],
-    headersRepaired: [],
-    settingsUpdated: [],
+function health_() {
+  return {
+    appName: 'Hub Photo Proof',
+    apiVersion: APP_VERSION,
+    serverTime: bangkokNow_(),
+    requiredSheets: Object.keys(SHEETS).map(function (key) { return SHEETS[key]; }),
   };
-  Object.keys(HEADERS).forEach(function (sheetName) {
-    const sheet = getOrCreateSheet_(sheetName, result);
-    const repaired = ensureHeaders_(sheet, HEADERS[sheetName]);
-    if (repaired) result.headersRepaired.push(sheetName);
+}
+
+function getBootstrapData_() {
+  return {
+    apiVersion: APP_VERSION,
+    serverTime: bangkokNow_(),
+    hubs: activeRows_(SHEETS.HUBS),
+    responsibleStaff: activeRows_(SHEETS.RESPONSIBLE_STAFF),
+    settings: safeSettings_(),
+  };
+}
+
+function initOrRepairStorage_() {
+  const result = { ok: true, sheetsCreated: [], headersRepaired: [], settingsUpdated: [] };
+  Object.keys(SHEETS).forEach(function (key) {
+    const name = SHEETS[key];
+    const sheet = getOrCreateSheet_(name, result);
+    if (ensureHeaders_(sheet, HEADERS[name])) result.headersRepaired.push(name);
   });
   ensureDefaultSettings_(result);
+  seedDefaultRows_();
   return result;
-}
-
-function repairStorageWithAudit_(payload) {
-  const result = ensureStorageReady();
-  appendAudit_({
-    action: 'storage_repair',
-    message: 'ตรวจสอบและซ่อมชีท',
-    detailJson: JSON.stringify({ sheetsCreated: result.sheetsCreated, headersRepaired: result.headersRepaired }),
-    actor: payload && payload.actor ? payload.actor : 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return result;
-}
-
-function ensureHeaders_(sheet, headers) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-    return true;
-  }
-  const lastColumn = Math.max(sheet.getLastColumn(), 1);
-  const firstRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String);
-  const missing = headers.filter(function (header) { return firstRow.indexOf(header) < 0; });
-  if (missing.length > 0) {
-    sheet.getRange(1, firstRow.length + 1, 1, missing.length).setValues([missing]);
-    return true;
-  }
-  return false;
-}
-
-function ensureDefaultSettings_(result) {
-  const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
-  ensureHeaders_(sheet, HEADERS.Settings);
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false', result);
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '', result);
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_SET', 'false', result);
-  upsertSettingDefault_(sheet, 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'false', result);
-  upsertSettingDefault_(sheet, 'APP_VERSION', APP_VERSION, result);
-  upsertSettingDefault_(sheet, 'MINIMUM_APP_VERSION', '0.1.0', result);
-  upsertSettingDefault_(sheet, 'GPS_MANDATORY', 'false', result);
-  upsertSettingDefault_(sheet, 'WATERMARK_ENABLED', 'true', result);
-}
-
-function upsertSettingDefault_(sheet, key, value, result) {
-  const rowIndex = findRowByValue_(sheet, 1, key);
-  if (rowIndex > 0) return;
-  sheet.appendRow(rowForHeaders_(getSheetHeaders_(sheet), {
-    key: key,
-    value: value,
-    updatedAt: formatBangkokDateTime_(new Date()),
-    note: '',
-  }));
-  if (result) result.settingsUpdated.push(key);
-}
-
-function upsertSetting_(key, value) {
-  const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
-  ensureHeaders_(sheet, HEADERS.Settings);
-  const rowIndex = findRowByValue_(sheet, 1, key);
-  const row = rowForHeaders_(getSheetHeaders_(sheet), {
-    key: key,
-    value: value,
-    updatedAt: formatBangkokDateTime_(new Date()),
-    note: '',
-  });
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-}
-
-function bootstrap_(payload) {
-  const settings = readSettingsMap_();
-  return {
-    ok: true,
-    serverTime: formatBangkokDateTime_(new Date()),
-    serverTimeBangkok: formatBangkokDateTime_(new Date()),
-    appVersion: APP_VERSION,
-    appSettings: safeSettings_(),
-    hubs: readActiveHubs_(),
-    responsibleStaff: readActiveResponsibleStaff_(),
-    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
-    minimumAppVersion: settings.MINIMUM_APP_VERSION || '0.1.0',
-    deviceId: payload && payload.deviceId ? payload.deviceId : '',
-  };
-}
-
-function safeSettings_() {
-  const settings = readSettingsMap_();
-  return {
-    ADMIN_PIN_ENABLED: settings.ADMIN_PIN_ENABLED || 'false',
-    ADMIN_PIN_SET: settings.ADMIN_PIN_SET || (settings.ADMIN_PIN_HASH ? 'true' : 'false'),
-    REQUIRE_ADMIN_DEVICE_APPROVAL: settings.REQUIRE_ADMIN_DEVICE_APPROVAL || 'false',
-    APP_VERSION: settings.APP_VERSION || APP_VERSION,
-    MINIMUM_APP_VERSION: settings.MINIMUM_APP_VERSION || '0.1.0',
-    GPS_REQUIRED: settings.GPS_REQUIRED || settings.GPS_MANDATORY || 'false',
-    GPS_MANDATORY: settings.GPS_MANDATORY || 'false',
-    WATERMARK_ENABLED: settings.WATERMARK_ENABLED || 'true',
-  };
-}
-
-function updateSettingFromAdmin_(payload) {
-  if (!payload || !payload.key) throw new Error('Missing setting key');
-  const key = String(payload.key).trim().toUpperCase();
-  const allowed = {
-    GPS_REQUIRED: true,
-    GPS_MANDATORY: true,
-    WATERMARK_ENABLED: true,
-    REQUIRE_ADMIN_DEVICE_APPROVAL: true,
-    MINIMUM_APP_VERSION: true,
-  };
-  if (!allowed[key]) throw new Error('Setting is not editable from UI');
-  const value = normalizeSettingValue_(key, payload.value);
-  upsertSetting_(key, value);
-  if (key === 'GPS_REQUIRED') upsertSetting_('GPS_MANDATORY', value);
-  if (key === 'GPS_MANDATORY') upsertSetting_('GPS_REQUIRED', value);
-  appendAudit_({
-    action: 'setting_update',
-    message: 'Admin setting updated',
-    detailJson: JSON.stringify({ key: key, value: value }),
-    actor: payload.actor || payload.deviceId || 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: safeSettings_() };
-}
-
-function updateSettingsBatchFromAdmin_(payload) {
-  const items = payload && payload.settings ? payload.settings : [];
-  if (!Array.isArray(items)) throw new Error('Missing settings list');
-  items.forEach(function (item) {
-    updateSettingFromAdmin_(Object.assign({}, item, {
-      actor: payload.actor || payload.deviceId || 'admin',
-      deviceId: payload.deviceId || '',
-    }));
-  });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', appSettings: safeSettings_() };
-}
-
-function normalizeSettingValue_(key, value) {
-  if (key === 'MINIMUM_APP_VERSION') return String(value || '').trim();
-  return value === true || String(value).toLowerCase() === 'true' ? 'true' : 'false';
-}
-
-function readActiveHubs_() {
-  return readRows_(SHEETS.HUBS).filter(function (hub) {
-    return isActive_(hub.active);
-  });
-}
-
-function readActiveResponsibleStaff_() {
-  return readRows_(SHEETS.RESPONSIBLE_STAFF).filter(function (staff) {
-    return isActive_(staff.active);
-  });
 }
 
 function upsertHub_(payload) {
-  if (!payload || !payload.hubCode) throw new Error('Missing hubCode');
-  const sheet = getOrCreateSheet_(SHEETS.HUBS);
-  ensureHeaders_(sheet, HEADERS.Hubs);
-  const hubCode = String(payload.hubCode).trim();
+  const hubCode = clean_(payload.hubCode).toUpperCase();
+  if (!hubCode) throw new Error('Missing hubCode');
   const values = {
     hubCode: hubCode,
-    hubName: String(payload.hubName || '').trim(),
-    active: payload.active === false || String(payload.active).toLowerCase() === 'false' ? 'FALSE' : 'TRUE',
-    note: payload.note || '',
+    hubName: clean_(payload.hubName),
+    active: boolText_(payload.active !== false),
+    note: clean_(payload.note),
+    updatedAt: bangkokNow_(),
   };
-  const headers = getSheetHeaders_(sheet);
-  const row = rowForHeaders_(headers, values);
-  const rowIndex = findRowByHeaderValue_(sheet, 'hubCode', hubCode);
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-  appendAudit_({
-    action: 'hub_upsert',
-    message: 'Hub saved',
-    detailJson: JSON.stringify(values),
-    actor: payload.actor || payload.deviceId || 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', hubs: readActiveHubs_() };
+  upsertByKey_(SHEETS.HUBS, 'hubCode', hubCode, values);
+  logAudit_({ action: 'hub_upsert', message: 'บันทึกฮับ', actor: actor_(payload), detailJson: JSON.stringify(values) });
+  return { hubs: activeRows_(SHEETS.HUBS) };
 }
 
 function deactivateHub_(payload) {
-  const hubCode = String(payload && payload.hubCode ? payload.hubCode : '').trim();
+  const hubCode = clean_(payload.hubCode).toUpperCase();
   if (!hubCode) throw new Error('Missing hubCode');
-  const sheet = getOrCreateSheet_(SHEETS.HUBS);
-  ensureHeaders_(sheet, HEADERS.Hubs);
-  const rowIndex = findRowByHeaderValue_(sheet, 'hubCode', hubCode);
-  if (rowIndex < 0) throw new Error('Hub not found');
-  const existing = readRowObject_(sheet, rowIndex);
-  existing.active = 'FALSE';
-  existing.note = payload.note || existing.note || '';
-  const row = rowForHeaders_(getSheetHeaders_(sheet), existing);
-  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  appendAudit_({
-    action: 'hub_deactivate',
-    message: 'Hub deactivated',
-    detailJson: JSON.stringify({ hubCode: hubCode }),
-    actor: payload.actor || payload.deviceId || 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', hubs: readActiveHubs_() };
+  const sheet = sheet_(SHEETS.HUBS);
+  const rowIndex = findRow_(sheet, 'hubCode', hubCode);
+  if (rowIndex < 2) throw new Error('Hub not found');
+  const row = rowObject_(sheet, rowIndex);
+  row.active = 'FALSE';
+  row.updatedAt = bangkokNow_();
+  writeRow_(sheet, rowIndex, row);
+  logAudit_({ action: 'hub_deactivate', message: 'ปิดใช้งานฮับ', actor: actor_(payload), detailJson: JSON.stringify({ hubCode: hubCode }) });
+  return { hubs: activeRows_(SHEETS.HUBS) };
 }
 
 function upsertResponsibleStaff_(payload) {
-  if (!payload || !payload.employeeCode || !payload.hubCode) throw new Error('Missing employeeCode or hubCode');
-  const sheet = getOrCreateSheet_(SHEETS.RESPONSIBLE_STAFF);
-  ensureHeaders_(sheet, HEADERS.ResponsibleStaff);
+  const employeeCode = clean_(payload.employeeCode);
+  const hubCode = clean_(payload.hubCode).toUpperCase();
+  if (!employeeCode || !hubCode) throw new Error('Missing employeeCode or hubCode');
   const values = {
-    employeeCode: String(payload.employeeCode).trim(),
-    employeeName: String(payload.employeeName || payload.displayName || '').trim(),
-    hubCode: String(payload.hubCode).trim(),
-    active: payload.active === false || String(payload.active).toLowerCase() === 'false' ? 'FALSE' : 'TRUE',
-    note: payload.note || '',
+    employeeCode: employeeCode,
+    employeeName: clean_(payload.employeeName || payload.displayName),
+    hubCode: hubCode,
+    active: boolText_(payload.active !== false),
+    note: clean_(payload.note),
+    updatedAt: bangkokNow_(),
   };
-  const headers = getSheetHeaders_(sheet);
-  const row = rowForHeaders_(headers, values);
-  const rowIndex = findResponsibleStaffRow_(sheet, values.employeeCode, values.hubCode);
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-  appendAudit_({
-    action: 'responsible_upsert',
-    message: 'Responsible staff saved',
-    detailJson: JSON.stringify(values),
-    actor: payload.actor || payload.deviceId || 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', responsibleStaff: readActiveResponsibleStaff_() };
+  const sheet = sheet_(SHEETS.RESPONSIBLE_STAFF);
+  const rowIndex = findResponsibleRow_(sheet, employeeCode, hubCode);
+  if (rowIndex > 1) writeRow_(sheet, rowIndex, values);
+  else sheet.appendRow(rowFor_(sheet, values));
+  logAudit_({ action: 'responsible_upsert', message: 'บันทึกผู้รับผิดชอบ', actor: actor_(payload), detailJson: JSON.stringify(values) });
+  return { responsibleStaff: activeRows_(SHEETS.RESPONSIBLE_STAFF) };
 }
 
 function deactivateResponsibleStaff_(payload) {
-  const employeeCode = String(payload && payload.employeeCode ? payload.employeeCode : '').trim();
-  const hubCode = String(payload && payload.hubCode ? payload.hubCode : '').trim();
+  const employeeCode = clean_(payload.employeeCode);
+  const hubCode = clean_(payload.hubCode).toUpperCase();
   if (!employeeCode || !hubCode) throw new Error('Missing employeeCode or hubCode');
-  const sheet = getOrCreateSheet_(SHEETS.RESPONSIBLE_STAFF);
-  ensureHeaders_(sheet, HEADERS.ResponsibleStaff);
-  const rowIndex = findResponsibleStaffRow_(sheet, employeeCode, hubCode);
-  if (rowIndex < 0) throw new Error('Responsible staff not found');
-  const existing = readRowObject_(sheet, rowIndex);
-  existing.active = 'FALSE';
-  existing.note = payload.note || existing.note || '';
-  const row = rowForHeaders_(getSheetHeaders_(sheet), existing);
-  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  appendAudit_({
-    action: 'responsible_deactivate',
-    message: 'Responsible staff deactivated',
-    detailJson: JSON.stringify({ employeeCode: employeeCode, hubCode: hubCode }),
-    actor: payload.actor || payload.deviceId || 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
+  const sheet = sheet_(SHEETS.RESPONSIBLE_STAFF);
+  const rowIndex = findResponsibleRow_(sheet, employeeCode, hubCode);
+  if (rowIndex < 2) throw new Error('Responsible staff not found');
+  const row = rowObject_(sheet, rowIndex);
+  row.active = 'FALSE';
+  row.updatedAt = bangkokNow_();
+  writeRow_(sheet, rowIndex, row);
+  logAudit_({ action: 'responsible_deactivate', message: 'ปิดใช้งานผู้รับผิดชอบ', actor: actor_(payload), detailJson: JSON.stringify({ employeeCode: employeeCode, hubCode: hubCode }) });
+  return { responsibleStaff: activeRows_(SHEETS.RESPONSIBLE_STAFF) };
+}
+
+function updateSetting_(payload) {
+  const key = clean_(payload.key).toUpperCase();
+  if (!isEditableSetting_(key)) throw new Error('Setting is not editable');
+  const value = normalizeSettingValue_(key, payload.value);
+  upsertSetting_(key, value, clean_(payload.note));
+  if (key === 'GPS_REQUIRED') upsertSetting_('GPS_MANDATORY', value, '');
+  if (key === 'GPS_MANDATORY') upsertSetting_('GPS_REQUIRED', value, '');
+  logAudit_({ action: 'setting_update', message: 'บันทึกตั้งค่า', actor: actor_(payload), detailJson: JSON.stringify({ key: key, value: value }) });
+  return { settings: safeSettings_() };
+}
+
+function updateSettingsBatch_(payload) {
+  const settings = Array.isArray(payload.settings) ? payload.settings : [];
+  settings.forEach(function (item) {
+    updateSetting_(Object.assign({}, item, { actor: actor_(payload) }));
   });
-  return { ok: true, message: 'บันทึกลงระบบกลางแล้ว', responsibleStaff: readActiveResponsibleStaff_() };
-}
-
-function findResponsibleStaffRow_(sheet, employeeCode, hubCode) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return -1;
-  const headers = getSheetHeaders_(sheet);
-  const employeeColumn = headers.indexOf('employeeCode') + 1;
-  const hubColumn = headers.indexOf('hubCode') + 1;
-  if (employeeColumn <= 0 || hubColumn <= 0) return -1;
-  const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
-  for (let index = 0; index < values.length; index += 1) {
-    if (String(values[index][employeeColumn - 1]) === String(employeeCode)
-      && String(values[index][hubColumn - 1]) === String(hubCode)) {
-      return index + 2;
-    }
-  }
-  return -1;
-}
-
-function isActive_(value) {
-  if (value === false) return false;
-  return String(value === undefined || value === null || value === '' ? 'TRUE' : value).toLowerCase() === 'true';
-}
-
-function readSettingsMap_() {
-  const rows = readRows_(SHEETS.SETTINGS);
-  const settings = {};
-  rows.forEach(function (row) {
-    if (row.key) settings[row.key] = row.value;
-  });
-  return settings;
-}
-
-function requestAdminAccess_(payload) {
-  if (!payload || !payload.deviceId) throw new Error('Missing deviceId');
-  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
-  ensureHeaders_(sheet, HEADERS.AdminDevices);
-  const rowIndex = findRowByValue_(sheet, 1, payload.deviceId);
-  const existing = rowIndex > 0 ? readRowObject_(sheet, rowIndex) : null;
-  if (existing && existing.status === 'APPROVED') {
-    return { ok: true, message: 'อุปกรณ์นี้ได้รับอนุมัติแล้ว', device: normalizeAdminDevice_(existing) };
-  }
-  const device = {
-    deviceId: payload.deviceId,
-    deviceName: payload.deviceName || 'Unknown device',
-    ownerName: payload.ownerName || '',
-    role: existing && existing.role ? existing.role : 'VIEWER',
-    status: 'PENDING',
-    approvedAt: '',
-    revokedAt: '',
-    lastLoginAt: '',
-    note: existing && existing.note ? existing.note : 'requested from app',
-  };
-  const row = HEADERS.AdminDevices.map(function (key) { return device[key] || ''; });
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_access_requested',
-    detail: payload.deviceId,
-    actor: payload.ownerName || 'unknown',
-    createdAt: new Date().toISOString(),
-  });
-  return { ok: true, message: 'ส่งคำขออนุมัติแล้ว', device: device };
+  return { settings: safeSettings_() };
 }
 
 function verifyAdminAccess_(payload) {
-  if (!payload) throw new Error('Missing payload');
-  const settings = readSettingsMap_();
-  if (String(settings.ADMIN_PIN_ENABLED).toLowerCase() !== 'true' || !settings.ADMIN_PIN_HASH) {
-    return { ok: false, code: 'PIN_NOT_CONFIGURED', message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน' };
-  }
-  if (sha256_(payload.adminPin || payload.pin || '') !== settings.ADMIN_PIN_HASH) {
-    return { ok: false, code: 'PIN_WRONG', message: 'PIN ไม่ถูกต้อง' };
-  }
-
-  const requireDeviceApproval = String(settings.REQUIRE_ADMIN_DEVICE_APPROVAL).toLowerCase() === 'true';
-  if (!requireDeviceApproval) {
-    appendAudit_({
-      id: Utilities.getUuid(),
-      action: 'admin_login',
-      detail: 'central PIN login',
-      actor: 'admin',
-      createdAt: new Date().toISOString(),
-    });
-    return {
-      ok: true,
-      message: 'เข้าสู่หลังบ้านแล้ว',
-      role: 'ADMIN',
-      sessionExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-      deviceApprovalRequired: false,
-    };
-  }
-
-  if (!payload.deviceId) throw new Error('Missing deviceId');
-  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
-  ensureHeaders_(sheet, HEADERS.AdminDevices);
-  const rowIndex = findRowByValue_(sheet, 1, payload.deviceId);
-  if (rowIndex < 0) {
-    return { ok: false, message: 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล' };
-  }
-  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
-  if (device.status !== 'APPROVED' || (device.role !== 'OWNER' && device.role !== 'ADMIN')) {
-    return { ok: false, message: 'เครื่องนี้ยังไม่ได้รับอนุญาตให้เข้าใช้งานหลังบ้าน กรุณาติดต่อผู้ดูแล', device: device, role: device.role };
-  }
-  device.lastLoginAt = new Date().toISOString();
-  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_login',
-    detail: payload.deviceId,
-    actor: device.ownerName || device.deviceName,
-    createdAt: new Date().toISOString(),
-  });
-  return {
-    ok: true,
-    message: 'เข้าสู่หลังบ้านแล้ว',
-    device: device,
-    role: device.role,
-    sessionExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-    deviceApprovalRequired: true,
-  };
+  const settings = settingsMap_();
+  const enabled = String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true';
+  const saved = settings.ADMIN_PIN_HASH || settings.ADMIN_PIN || '';
+  if (!enabled || !saved) throw new Error('ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล');
+  if (hashPin_(clean_(payload.pin)) !== saved && clean_(payload.pin) !== saved) throw new Error('PIN ไม่ถูกต้อง');
+  logAudit_({ action: 'admin_login', message: 'ผู้ดูแลเข้าสู่ระบบ', actor: actor_(payload), detailJson: '{}' });
+  return { admin: true };
 }
 
 function setAdminPin_(payload) {
-  if (!payload || !payload.newPin) throw new Error('Missing newPin');
-  const newPin = String(payload.newPin);
-  if (newPin.length < 4) return { ok: false, message: 'PIN ใหม่ต้องมีอย่างน้อย 4 ตัว' };
-
-  const settings = readSettingsMap_();
-  const currentHash = settings.ADMIN_PIN_HASH || PropertiesService.getScriptProperties().getProperty('ADMIN_PIN_HASH') || '';
+  const settings = settingsMap_();
+  const currentHash = settings.ADMIN_PIN_HASH || settings.ADMIN_PIN || '';
   if (currentHash) {
-    if (sha256_(payload.currentPin || '') !== currentHash) {
-      return { ok: false, message: 'PIN ปัจจุบันไม่ถูกต้อง' };
-    }
-  } else {
-    const expectedSetupToken = PropertiesService.getScriptProperties().getProperty('ADMIN_SETUP_TOKEN') || '';
-    if (!expectedSetupToken || payload.setupToken !== expectedSetupToken) {
-      return { ok: false, message: 'โทเคนตั้งค่า PIN ไม่ถูกต้อง' };
-    }
+    const currentPin = clean_(payload.currentPin);
+    if (hashPin_(currentPin) !== currentHash && currentPin !== currentHash) throw new Error('PIN ปัจจุบันไม่ถูกต้อง');
   }
-
-  const hash = sha256_(newPin);
-  PropertiesService.getScriptProperties().setProperty('ADMIN_PIN_HASH', hash);
-  upsertSetting_('ADMIN_PIN_ENABLED', 'true');
-  upsertSetting_('ADMIN_PIN_HASH', hash);
-  upsertSetting_('ADMIN_PIN_SET', 'true');
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_pin_changed',
-    detail: 'Central Admin PIN hash updated',
-    actor: 'admin',
-    createdAt: new Date().toISOString(),
-  });
-  return { ok: true, message: 'บันทึก PIN หลังบ้านแล้ว' };
+  const pin = clean_(payload.pin);
+  if (pin.length < 4) throw new Error('PIN ต้องมีอย่างน้อย 4 ตัว');
+  upsertSetting_('ADMIN_PIN_HASH', hashPin_(pin), 'ตั้งค่าโดยผู้ดูแล');
+  upsertSetting_('ADMIN_PIN_ENABLED', 'true', '');
+  upsertSetting_('ADMIN_PIN_SET', 'true', '');
+  logAudit_({ action: 'admin_pin_set', message: 'ตั้งค่า PIN หลังบ้าน', actor: actor_(payload), detailJson: '{}' });
+  return { adminPinSet: true };
 }
 
-function setAdminDeviceApprovalRequired_(payload) {
-  const result = verifyAdminAccess_(payload || {});
-  if (!result.ok) return result;
-  upsertSetting_('REQUIRE_ADMIN_DEVICE_APPROVAL', payload.enabled === true ? 'true' : 'false');
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_device_approval_setting_changed',
-    detail: payload.enabled === true ? 'enabled' : 'disabled',
-    actor: 'admin',
-    createdAt: new Date().toISOString(),
-  });
+function getAdminAuthStatus_() {
+  const settings = settingsMap_();
   return {
-    ok: true,
-    message: payload.enabled === true ? 'เปิดจำกัดเครื่องแอดมินแล้ว' : 'ปิดจำกัดเครื่องแอดมินแล้ว',
-    deviceApprovalRequired: payload.enabled === true,
+    adminPinEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true',
+    adminPinSet: Boolean(settings.ADMIN_PIN_HASH || settings.ADMIN_PIN),
   };
-}
-
-function listAdminDevices_(payload) {
-  requireApprovedAdmin_(payload);
-  return readRows_(SHEETS.ADMIN_DEVICES).map(normalizeAdminDevice_);
-}
-
-function approveAdminDevice_(payload) {
-  requireApprovedAdmin_(payload);
-  if (!payload.targetDeviceId) throw new Error('Missing targetDeviceId');
-  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
-  const rowIndex = findRowByValue_(sheet, 1, payload.targetDeviceId);
-  if (rowIndex < 0) throw new Error('Device request not found');
-  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
-  device.role = payload.role === 'OWNER' ? 'OWNER' : 'ADMIN';
-  device.status = 'APPROVED';
-  device.approvedAt = new Date().toISOString();
-  device.revokedAt = '';
-  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_device_approved',
-    detail: payload.targetDeviceId,
-    actor: payload.deviceId || 'admin',
-    createdAt: new Date().toISOString(),
-  });
-  return { ok: true, device: device };
-}
-
-function revokeAdminDevice_(payload) {
-  requireApprovedAdmin_(payload);
-  if (!payload.targetDeviceId) throw new Error('Missing targetDeviceId');
-  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
-  const rowIndex = findRowByValue_(sheet, 1, payload.targetDeviceId);
-  if (rowIndex < 0) throw new Error('Device not found');
-  const device = normalizeAdminDevice_(readRowObject_(sheet, rowIndex));
-  device.status = 'REVOKED';
-  device.revokedAt = new Date().toISOString();
-  sheet.getRange(rowIndex, 1, 1, HEADERS.AdminDevices.length).setValues([HEADERS.AdminDevices.map(function (key) { return device[key] || ''; })]);
-  appendAudit_({
-    id: Utilities.getUuid(),
-    action: 'admin_device_revoked',
-    detail: payload.targetDeviceId,
-    actor: payload.deviceId || 'admin',
-    createdAt: new Date().toISOString(),
-  });
-  return { ok: true, device: device };
-}
-
-function getAdminAuthStatus_(payload) {
-  const sheet = getOrCreateSheet_(SHEETS.ADMIN_DEVICES);
-  const rowIndex = payload && payload.deviceId ? findRowByValue_(sheet, 1, payload.deviceId) : -1;
-  const device = rowIndex > 0 ? normalizeAdminDevice_(readRowObject_(sheet, rowIndex)) : null;
-  const settings = readSettingsMap_();
-  return {
-    ok: true,
-    adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
-    adminPinSet: Boolean(settings.ADMIN_PIN_HASH),
-    deviceApprovalRequired: String(settings.REQUIRE_ADMIN_DEVICE_APPROVAL).toLowerCase() === 'true',
-    device: device,
-  };
-}
-
-function requireApprovedAdmin_(payload) {
-  const result = verifyAdminAccess_(payload);
-  if (!result.ok) throw new Error(result.message || 'Unauthorized admin device');
-  return result;
-}
-
-function normalizeAdminDevice_(row) {
-  return {
-    deviceId: row.deviceId || '',
-    deviceName: row.deviceName || '',
-    ownerName: row.ownerName || '',
-    role: row.role || 'VIEWER',
-    status: row.status || 'PENDING',
-    approvedAt: row.approvedAt || '',
-    revokedAt: row.revokedAt || '',
-    lastLoginAt: row.lastLoginAt || '',
-    note: row.note || '',
-  };
-}
-
-function sha256_(value) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8);
-  return bytes.map(function (byte) {
-    const value = byte < 0 ? byte + 256 : byte;
-    return ('0' + value.toString(16)).slice(-2);
-  }).join('');
-}
-
-function syncRecord_(record, photoMetadata) {
-  if (!record || !record.id) throw new Error('Missing record.id');
-  record.duplicateKey = duplicateKey_(record);
-  const photoResults = (photoMetadata || []).map(function (photo) {
-    return upsertPhoto_(photo);
-  });
-  const row = buildSimpleRecordRow_(record, photoResults);
-  const masterResult = upsertRecordAll_(record, row);
-  const hubResult = upsertHubSheet_(record, row.slice(0, SIMPLE_RECORD_HEADERS.length));
-  appendAudit_({
-    id: Utilities.getUuid(),
-    recordId: record.id,
-    action: 'google_sync_record',
-    detail: 'Record synced to Records_All and hub sheet',
-    actor: record.responsibleEmployeeCode || 'app',
-    createdAt: new Date().toISOString(),
-  });
-  return { record: masterResult, hubSheet: hubResult, photos: photoResults };
-}
-
-function buildSimpleRecordRow_(record, photoResults) {
-  const photoMap = {};
-  (photoResults || []).forEach(function (photo) {
-    photoMap[photo.slotType] = photo;
-  });
-  const extras = (photoResults || []).filter(function (photo) {
-    return photo.slotType === 'DROP_REAR_EXTRA';
-  });
-  return [
-    record.date || '',
-    hubText_(record),
-    responsibleText_(record),
-    record.vehicleBarcode || '',
-    record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
-    record.dropCount || 0,
-    statusText_(record.status || ''),
-    photoCell_(photoMap.REAR_MAIN),
-    photoCell_(photoMap.FRONT_DROP),
-    photoCell_(photoMap.DROP_REAR_1),
-    photoCell_(photoMap.DROP_REAR_2),
-    extras.map(photoCell_).filter(Boolean).join('\n') || MISSING_PHOTO_TEXT,
-    (record.missingPhotoWarnings || []).join(', '),
-    formatBangkokDateTime_(record.submittedAt),
-    record.notes || '',
-    record.id || '',
-    record.hubCode || '',
-    record.responsibleEmployeeCode || '',
-    record.responsibleName || '',
-    record.status || '',
-    record.duplicateKey || duplicateKey_(record),
-    record.duplicateOfRecordId || '',
-    record.duplicateReason || '',
-    record.syncStatus || '',
-    formatBangkokDateTime_(record.createdAt),
-    formatBangkokDateTime_(record.updatedAt || new Date()),
-  ];
-}
-
-function upsertRecordAll_(record, simpleRow) {
-  const sheet = getOrCreateSheet_(SHEETS.RECORDS_ALL);
-  ensureHeaders_(sheet, HEADERS.Records_All);
-  const headers = getSheetHeaders_(sheet);
-  const row = rowForHeaders_(headers, simpleRowToObject_(record, simpleRow));
-  let rowIndex = findRowByHeaderValue_(sheet, 'recordId', record.id);
-  if (rowIndex < 0 && !record.forceCreateNew) rowIndex = findRowByHeaderValue_(sheet, 'duplicateKey', record.duplicateKey || duplicateKey_(record));
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-    return { id: record.id, action: 'updated', sheet: SHEETS.RECORDS_ALL };
-  }
-  if (record.forceCreateNew && !record.duplicateReason) throw new Error('Duplicate reason is required');
-  sheet.appendRow(row);
-  return { id: record.id, action: 'created', sheet: SHEETS.RECORDS_ALL };
-}
-
-function upsertHubSheet_(record, simpleRow) {
-  const sheetName = hubSheetName_(record);
-  const sheet = getOrCreateSheet_(sheetName);
-  ensureHeaders_(sheet, SIMPLE_RECORD_HEADERS);
-  const rowIndex = findRowByRecordNote_(sheet, record.id);
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, simpleRow.length).setValues([simpleRow]);
-    sheet.getRange(rowIndex, 1).setNote(record.id);
-    return { id: record.id, action: 'updated', sheet: sheetName };
-  }
-  sheet.appendRow(simpleRow);
-  const newRow = sheet.getLastRow();
-  sheet.getRange(newRow, 1).setNote(record.id);
-  return { id: record.id, action: 'created', sheet: sheetName };
-}
-
-function upsertPhoto_(photo) {
-  if (!photo || !photo.recordId || !photo.slotId) throw new Error('Missing photo recordId or slotId');
-  const sheet = getOrCreateSheet_(SHEETS.PHOTOS);
-  ensureHeaders_(sheet, HEADERS.Photos);
-  const rowIndex = findPhotoRow_(sheet, photo.recordId, photo.slotId);
-  const existing = rowIndex > 0 ? readRowObject_(sheet, rowIndex) : null;
-  const uploaded = uploadPhotoIfPresent_(photo, existing);
-  const values = photoValues_(photo, uploaded, existing);
-  const headers = getSheetHeaders_(sheet);
-  const row = rowForHeaders_(headers, values);
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-  return values;
 }
 
 function findRecordByKey_(payload) {
-  const key = duplicateKeyFromValues_(payload || {});
-  const sheet = getOrCreateSheet_(SHEETS.RECORDS_ALL);
-  ensureHeaders_(sheet, HEADERS.Records_All);
-  let rowIndex = findRowByHeaderValue_(sheet, 'duplicateKey', key);
-  if (rowIndex < 0) rowIndex = findRecordRowByParts_(sheet, payload || {});
-  if (rowIndex < 0) {
-    return { ok: true, found: false, message: 'ไม่พบงานเดิม', duplicateKey: key };
-  }
-  const row = readRowObject_(sheet, rowIndex);
-  const statusInternal = row.statusInternal || internalStatusFromThai_(row['สถานะ']);
-  return {
-    ok: true,
-    found: true,
-    message: 'พบงานเดิม',
-    recordId: row.recordId || '',
-    record: row,
-    status: statusInternal,
-    statusText: statusText_(statusInternal),
-    missingPhotoSlots: String(row['รายการรูปที่ขาด'] || '').split(',').map(function (item) { return item.trim(); }).filter(Boolean),
-    submittedAt: row['เวลาส่งข้อมูล'] || '',
-    syncStatus: row.syncStatus || '',
-    duplicateKey: key,
-  };
+  const key = duplicateKey_(payload);
+  const sheet = sheet_(SHEETS.RECORDS);
+  let rowIndex = findRow_(sheet, 'duplicateKey', key);
+  if (rowIndex < 2) rowIndex = findRecordByParts_(sheet, payload);
+  if (rowIndex < 2) return { found: false, duplicateKey: key };
+  return { found: true, duplicateKey: key, record: rowObject_(sheet, rowIndex) };
 }
 
-function getMyWork_(payload) {
-  const rows = readRows_(SHEETS.RECORDS_ALL);
-  const date = payload && payload.date ? String(payload.date) : '';
-  const hubCode = payload && payload.hubCode ? String(payload.hubCode) : '';
-  const employeeCode = payload && payload.responsibleEmployeeCode ? String(payload.responsibleEmployeeCode) : '';
-  return {
-    ok: true,
-    records: rows.filter(function (row) {
-      return (!date || row['วันที่'] === date)
-        && (!hubCode || row.hubCode === hubCode || String(row['ฮับ'] || '').indexOf(hubCode) === 0)
-        && (!employeeCode || row.responsibleEmployeeCode === employeeCode || String(row['ผู้รับผิดชอบ'] || '').indexOf(employeeCode) === 0);
-    }),
+function syncRecord_(record, photoMetadata) {
+  if (!record) throw new Error('Missing record');
+  const duplicateKey = clean_(record.duplicateKey) || duplicateKey_(record);
+  const now = bangkokNow_();
+  const values = {
+    recordId: clean_(record.recordId) || Utilities.getUuid(),
+    duplicateKey: duplicateKey,
+    date: clean_(record.date),
+    'วันที่': clean_(record.date),
+    hubCode: clean_(record.hubCode),
+    'ฮับ': [clean_(record.hubCode), clean_(record.hubName)].filter(Boolean).join('-'),
+    responsibleEmployeeCode: clean_(record.responsibleEmployeeCode),
+    responsibleName: clean_(record.responsibleName),
+    'ผู้รับผิดชอบ': [clean_(record.responsibleEmployeeCode), clean_(record.responsibleName)].filter(Boolean).join(' '),
+    vehicleBarcode: clean_(record.vehicleBarcode).toUpperCase(),
+    'บาร์โค้ดรถ': clean_(record.vehicleBarcode).toUpperCase(),
+    dropType: clean_(record.dropType),
+    'พ่วงดรอปหรือไม่': clean_(record.dropType) === 'DROP' ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
+    dropCount: Number(record.dropCount || 0),
+    'จำนวนดรอป': Number(record.dropCount || 0),
+    statusInternal: clean_(record.statusInternal || record.status),
+    'สถานะ': statusThai_(clean_(record.statusInternal || record.status)),
+    photoRequiredCount: Number(record.photoRequiredCount || 0),
+    photoDoneCount: Number(record.photoDoneCount || 0),
+    'รายการรูปที่ขาด': Array.isArray(record.missingPhotoLabels) ? record.missingPhotoLabels.join(', ') : clean_(record.missingPhotoLabels),
+    submittedAt: formatBangkok_(record.submittedAt || now),
+    syncedAt: now,
+    createdAt: formatBangkok_(record.createdAt || now),
+    updatedAt: now,
+    duplicateOfRecordId: clean_(record.duplicateOfRecordId),
+    duplicateReason: clean_(record.duplicateReason),
+    note: clean_(record.note),
   };
-}
-
-function getHistory_(payload) {
-  const rows = readRows_(SHEETS.RECORDS_ALL);
-  const dateFrom = payload && payload.dateFrom ? String(payload.dateFrom) : '';
-  const dateTo = payload && payload.dateTo ? String(payload.dateTo) : '';
-  const hubCode = payload && payload.hubCode ? String(payload.hubCode) : '';
-  const employeeCode = payload && payload.responsibleEmployeeCode ? String(payload.responsibleEmployeeCode) : '';
-  const barcode = payload && payload.vehicleBarcode ? String(payload.vehicleBarcode).toUpperCase() : '';
-  const status = payload && payload.status ? String(payload.status) : '';
-  const records = rows.filter(function (row) {
-    const rowDate = String(row['วันที่'] || row.date || '');
-    const rowBarcode = String(row['บาร์โค้ดรถ'] || row.vehicleBarcode || '').toUpperCase();
-    const rowStatus = String(row.statusInternal || row.syncStatus || row['สถานะ'] || '');
-    return (!dateFrom || rowDate >= dateFrom)
-      && (!dateTo || rowDate <= dateTo)
-      && (!hubCode || row.hubCode === hubCode || String(row['ฮับ'] || '').indexOf(hubCode) === 0)
-      && (!employeeCode || row.responsibleEmployeeCode === employeeCode || String(row['ผู้รับผิดชอบ'] || '').indexOf(employeeCode) === 0)
-      && (!barcode || rowBarcode.indexOf(barcode) >= 0)
-      && (!status || rowStatus === status || String(row['สถานะ'] || '') === status);
+  upsertByKey_(SHEETS.RECORDS, 'duplicateKey', duplicateKey, values);
+  (photoMetadata || []).forEach(function (photo) {
+    savePhotoMetadata_(photo);
   });
-  appendAudit_({
-    action: 'history_filter_used',
-    message: 'เปิดดูประวัติ',
-    detailJson: JSON.stringify(payload || {}),
-    actor: payload && payload.actor ? payload.actor : 'admin',
-    createdAt: formatBangkokDateTime_(new Date()),
-  });
-  return { ok: true, records: records };
+  logAudit_({ action: 'record_sync', message: 'ซิงก์งาน', recordId: values.recordId, actor: values.responsibleEmployeeCode, detailJson: JSON.stringify({ duplicateKey: duplicateKey }) });
+  return { record: values };
 }
 
 function syncBatch_(payload) {
-  const records = payload && payload.records ? payload.records : [];
+  const records = Array.isArray(payload.records) ? payload.records : [];
   const results = records.map(function (item) {
     return syncRecord_(item.record || item, item.photoMetadata || []);
   });
-  return { ok: true, message: 'ซิงก์ข้อมูลเรียบร้อย', results: results };
+  return { results: results };
 }
 
-function uploadPhotoIfPresent_(photo, existing) {
-  if (existing && existing.capturedAt === photo.capturedAt && existing.driveUrl) {
-    return { fileId: existing.driveFileId || '', url: existing.driveUrl || '', localOnly: existing.localOnly === true };
-  }
-  if (!photo.imageLocalData || photo.captured !== true) {
-    return { fileId: existing ? existing.driveFileId || '' : '', url: existing ? existing.driveUrl || '' : '', localOnly: true };
-  }
-  const match = String(photo.imageLocalData).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) return { fileId: '', url: '', localOnly: true };
-
-  const bytes = Utilities.base64Decode(match[2]);
-  const blob = Utilities.newBlob(bytes, match[1], safeName_(photo.fileName || `${photo.vehicleBarcode}_${photo.slotId}.jpg`));
-  const folder = getPhotoFolder_(photo);
-  const file = folder.createFile(blob);
-  return { fileId: file.getId(), url: file.getUrl(), localOnly: false };
-}
-
-function photoValues_(photo, uploaded, existing) {
-  return {
-    id: existing && existing.id ? existing.id : Utilities.getUuid(),
-    recordId: photo.recordId || '',
-    vehicleBarcode: photo.vehicleBarcode || '',
-    slotId: photo.slotId || '',
-    slotType: photo.slotType || '',
-    labelThai: photo.labelThai || '',
-    captured: photo.captured === true,
-    fileName: photo.fileName || '',
-    capturedAt: formatBangkokDateTime_(photo.capturedAt),
-    gpsLat: photo.gpsLat || '',
-    gpsLng: photo.gpsLng || '',
-    gpsAccuracy: photo.gpsAccuracy || '',
-    gpsStatus: photo.gpsStatus || '',
-    watermarkText: photo.watermarkText || '',
-    hub: photo.hub || '',
-    responsible: photo.responsible || '',
-    driveFileId: uploaded.fileId || '',
-    driveUrl: uploaded.url || '',
-    localOnly: uploaded.localOnly === true,
-    createdAt: existing && existing.createdAt ? existing.createdAt : formatBangkokDateTime_(new Date()),
+function savePhotoMetadata_(photo) {
+  if (!photo) throw new Error('Missing photo');
+  const id = clean_(photo.photoId) || [photo.recordId, photo.photoSlot || photo.slotId].filter(Boolean).join('_') || Utilities.getUuid();
+  const upload = uploadPhoto_(photo);
+  const values = {
+    photoId: id,
+    recordId: clean_(photo.recordId),
+    duplicateKey: clean_(photo.duplicateKey),
+    date: clean_(photo.date),
+    hubCode: clean_(photo.hubCode),
+    responsibleEmployeeCode: clean_(photo.responsibleEmployeeCode),
+    vehicleBarcode: clean_(photo.vehicleBarcode).toUpperCase(),
+    photoSlot: clean_(photo.photoSlot || photo.slotType || photo.slotId),
+    'ประเภทรูป': clean_(photo.photoType || photo.labelThai || photo.label),
+    fileName: clean_(photo.fileName),
+    driveFileId: upload.driveFileId,
+    driveUrl: upload.driveUrl,
+    capturedAt: formatBangkok_(photo.capturedAt),
+    latitude: clean_(photo.latitude),
+    longitude: clean_(photo.longitude),
+    accuracy: clean_(photo.accuracy),
+    addressText: clean_(photo.addressText),
+    watermarkApplied: photo.watermarkApplied === true ? 'TRUE' : 'FALSE',
+    createdAt: bangkokNow_(),
   };
-}
-
-function simpleRowToObject_(record, row) {
-  const values = {};
-  HEADERS.Records_All.forEach(function (header, index) {
-    values[header] = row[index] || '';
-  });
-  values.recordId = record.id || values.recordId || Utilities.getUuid();
-  values.hubCode = record.hubCode || values.hubCode || '';
-  values.responsibleEmployeeCode = record.responsibleEmployeeCode || values.responsibleEmployeeCode || '';
-  values.responsibleName = record.responsibleName || values.responsibleName || '';
-  values.statusInternal = record.status || values.statusInternal || '';
-  values.duplicateKey = record.duplicateKey || duplicateKey_(record);
-  values.duplicateOfRecordId = record.duplicateOfRecordId || '';
-  values.duplicateReason = record.duplicateReason || '';
-  values.syncStatus = record.syncStatus || values.syncStatus || '';
-  values.createdAt = formatBangkokDateTime_(record.createdAt);
-  values.updatedAt = formatBangkokDateTime_(record.updatedAt || new Date());
+  upsertByKey_(SHEETS.PHOTOS, 'photoId', id, values);
   return values;
 }
 
-function rowForHeaders_(headers, values) {
-  return headers.map(function (header) { return values[header] || ''; });
-}
-
-function duplicateKey_(record) {
-  return duplicateKeyFromValues_({
-    date: record.date,
-    hubCode: record.hubCode,
-    responsibleEmployeeCode: record.responsibleEmployeeCode,
-    vehicleBarcode: record.vehicleBarcode,
+function filterRecords_(payload) {
+  const rows = rows_(SHEETS.RECORDS);
+  const date = clean_(payload.date);
+  const from = clean_(payload.dateFrom);
+  const to = clean_(payload.dateTo);
+  const hubCode = clean_(payload.hubCode);
+  const employeeCode = clean_(payload.responsibleEmployeeCode);
+  const barcode = clean_(payload.vehicleBarcode).toUpperCase();
+  const status = clean_(payload.status);
+  return rows.filter(function (row) {
+    const rowDate = clean_(row.date || row['วันที่']);
+    const rowBarcode = clean_(row.vehicleBarcode || row['บาร์โค้ดรถ']).toUpperCase();
+    return (!date || rowDate === date)
+      && (!from || rowDate >= from)
+      && (!to || rowDate <= to)
+      && (!hubCode || clean_(row.hubCode) === hubCode)
+      && (!employeeCode || clean_(row.responsibleEmployeeCode) === employeeCode)
+      && (!barcode || rowBarcode.indexOf(barcode) >= 0)
+      && (!status || clean_(row.statusInternal) === status || clean_(row['สถานะ']) === status);
   });
 }
 
-function duplicateKeyFromValues_(values) {
-  return [
-    values.date || values['วันที่'] || '',
-    values.hubCode || extractHubCode_(values['ฮับ']) || '',
-    values.responsibleEmployeeCode || extractEmployeeCode_(values['ผู้รับผิดชอบ']) || '',
-    values.vehicleBarcode || values['บาร์โค้ดรถ'] || '',
-  ].map(function (part) { return String(part).trim().toUpperCase(); }).join('|');
-}
-
-function extractHubCode_(value) {
-  return String(value || '').split('-')[0].trim();
-}
-
-function extractEmployeeCode_(value) {
-  return String(value || '').trim().split(/\s+/)[0] || '';
-}
-
-function findRowByHeaderValue_(sheet, header, value) {
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
-  const columnIndex = headers.indexOf(header) + 1;
-  if (columnIndex <= 0 || !value) return -1;
-  return findRowByValue_(sheet, columnIndex, value);
-}
-
-function findRecordRowByParts_(sheet, values) {
-  const rows = readRows_(SHEETS.RECORDS_ALL);
-  const key = duplicateKeyFromValues_(values);
-  for (let index = 0; index < rows.length; index += 1) {
-    if (duplicateKeyFromValues_(rows[index]) === key) return index + 2;
-  }
-  return -1;
-}
-
-function formatBangkokDateTime_(value) {
-  if (!value) return '';
-  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
-    return Utilities.formatDate(value, BANGKOK_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
-  }
-  const text = String(value);
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return text;
-  const date = new Date(text);
-  if (!isNaN(date.getTime())) return Utilities.formatDate(date, BANGKOK_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
-  return text;
-}
-
-function statusText_(status) {
-  if (status === 'DRAFT') return 'เริ่มทำแต่ยังไม่ส่ง';
-  if (status === 'IN_PROGRESS') return 'กำลังถ่ายรูป';
-  if (status === 'COMPLETE') return 'ส่งครบแล้ว';
-  if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
-  if (status === 'PENDING_SYNC') return 'บันทึกแล้ว รอซิงก์';
-  if (status === 'SYNCED') return 'ซิงก์แล้ว';
-  if (status === 'VOIDED') return 'ยกเลิก';
-  return status || '';
-}
-
-function internalStatusFromThai_(value) {
-  const text = String(value || '');
-  if (text === 'เริ่มทำแต่ยังไม่ส่ง') return 'DRAFT';
-  if (text === 'กำลังถ่ายรูป') return 'IN_PROGRESS';
-  if (text === 'ส่งแล้วแต่รูปไม่ครบ') return 'NEED_REVIEW';
-  if (text === 'ส่งครบแล้ว' || text === 'เสร็จแล้ว') return 'COMPLETE';
-  if (text === 'ยกเลิก') return 'VOIDED';
-  return text;
-}
-
-function photoCell_(photo) {
-  if (!photo || photo.captured !== true) return MISSING_PHOTO_TEXT;
-  return photo.driveUrl || photo.fileName || MISSING_PHOTO_TEXT;
-}
-
-function getPhotoFolder_(photo) {
-  const root = getOrCreateFolder_(DriveApp.getRootFolder(), 'HubChecklist Photos');
-  const dateFolder = getOrCreateFolder_(root, new Date().toISOString().slice(0, 10));
-  const vehicleFolder = getOrCreateFolder_(dateFolder, safeName_(photo.vehicleBarcode || 'unknown-vehicle'));
-  return vehicleFolder;
-}
-
-function getOrCreateFolder_(parent, name) {
-  const folders = parent.getFoldersByName(name);
-  if (folders.hasNext()) return folders.next();
-  return parent.createFolder(name);
-}
-
-function appendAudit_(entry) {
-  const sheet = getOrCreateSheet_(SHEETS.AUDIT);
-  ensureHeaders_(sheet, HEADERS.Audit);
-  const auditId = entry.auditId || entry.id || Utilities.getUuid();
-  const next = {
-    auditId: auditId,
-    id: auditId,
-    recordId: entry.recordId || '',
-    action: entry.action || '',
-    message: entry.message || entry.detail || '',
-    detail: entry.detail || entry.message || '',
-    detailJson: entry.detailJson || '',
-    actor: entry.actor || '',
-    createdAt: entry.createdAt || formatBangkokDateTime_(new Date()),
+function safeSettings_() {
+  const map = settingsMap_();
+  return {
+    ADMIN_PIN_ENABLED: map.ADMIN_PIN_ENABLED || 'false',
+    ADMIN_PIN_SET: map.ADMIN_PIN_SET || (map.ADMIN_PIN_HASH || map.ADMIN_PIN ? 'true' : 'false'),
+    REQUIRE_ADMIN_DEVICE_APPROVAL: map.REQUIRE_ADMIN_DEVICE_APPROVAL || 'false',
+    MINIMUM_APP_VERSION: map.MINIMUM_APP_VERSION || '0.1.0',
+    GPS_REQUIRED: map.GPS_REQUIRED || map.GPS_MANDATORY || 'false',
+    GPS_MANDATORY: map.GPS_MANDATORY || map.GPS_REQUIRED || 'false',
+    WATERMARK_ENABLED: map.WATERMARK_ENABLED || 'true',
   };
-  sheet.appendRow(rowForHeaders_(getSheetHeaders_(sheet), next));
-  return next;
 }
 
-function readRows_(sheetName) {
-  const sheet = getOrCreateSheet_(sheetName);
+function ensureDefaultSettings_(result) {
+  [
+    ['ADMIN_PIN_HASH', '', 'ไม่ส่งออกไปหน้า Frontline'],
+    ['ADMIN_PIN_ENABLED', 'false', 'เปิดเมื่อผู้ดูแลตั้ง PIN แล้ว'],
+    ['ADMIN_PIN_SET', 'false', 'สถานะการตั้ง PIN'],
+    ['REQUIRE_ADMIN_DEVICE_APPROVAL', 'false', 'ตั้งค่าปลอดภัย'],
+    ['MINIMUM_APP_VERSION', '0.1.0', 'เวอร์ชันขั้นต่ำ'],
+    ['GPS_REQUIRED', 'false', 'บังคับ GPS'],
+    ['GPS_MANDATORY', 'false', 'ค่าเทียบเท่า GPS_REQUIRED'],
+    ['WATERMARK_ENABLED', 'true', 'เปิดลายน้ำ'],
+  ].forEach(function (item) {
+    const existed = findRow_(sheet_(SHEETS.SETTINGS), 'key', item[0]) > 1;
+    if (!existed) {
+      upsertSetting_(item[0], item[1], item[2]);
+      result.settingsUpdated.push(item[0]);
+    }
+  });
+}
+
+function seedDefaultRows_() {
+  if (rows_(SHEETS.HUBS).length === 0) {
+    upsertHub_({ hubCode: '26NAK_BHUB', hubName: 'นครราชสีมา', active: true, actor: 'system' });
+  }
+  if (rows_(SHEETS.RESPONSIBLE_STAFF).length === 0) {
+    upsertResponsibleStaff_({ employeeCode: '25845', employeeName: 'Tui', hubCode: '26NAK_BHUB', active: true, actor: 'system' });
+  }
+}
+
+function uploadPhoto_(photo) {
+  const data = clean_(photo.imageLocalData);
+  if (!data || data.indexOf('data:image/') !== 0) return { driveFileId: clean_(photo.driveFileId), driveUrl: clean_(photo.driveUrl) };
+  const match = data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return { driveFileId: '', driveUrl: '' };
+  const folder = photoFolder_(photo);
+  const blob = Utilities.newBlob(Utilities.base64Decode(match[2]), match[1], safeName_(photo.fileName || `${photo.vehicleBarcode}_${photo.photoSlot}.jpg`));
+  const file = folder.createFile(blob);
+  return { driveFileId: file.getId(), driveUrl: file.getUrl() };
+}
+
+function photoFolder_(photo) {
+  const root = folder_(DriveApp.getRootFolder(), 'Hub Photo Proof');
+  const dateFolder = folder_(root, clean_(photo.date) || Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd'));
+  return folder_(dateFolder, safeName_(photo.vehicleBarcode || 'unknown'));
+}
+
+function folder_(parent, name) {
+  const folders = parent.getFoldersByName(name);
+  return folders.hasNext() ? folders.next() : parent.createFolder(name);
+}
+
+function logAudit_(entry) {
+  const values = {
+    auditId: clean_(entry.auditId) || Utilities.getUuid(),
+    action: clean_(entry.action),
+    message: clean_(entry.message),
+    recordId: clean_(entry.recordId),
+    actor: clean_(entry.actor) || 'system',
+    detailJson: clean_(entry.detailJson),
+    createdAt: clean_(entry.createdAt) || bangkokNow_(),
+  };
+  sheet_(SHEETS.AUDIT).appendRow(rowFor_(sheet_(SHEETS.AUDIT), values));
+  return values;
+}
+
+function upsertSetting_(key, value, note) {
+  upsertByKey_(SHEETS.SETTINGS, 'key', key, {
+    key: key,
+    value: value,
+    updatedAt: bangkokNow_(),
+    note: note || '',
+  });
+}
+
+function settingsMap_() {
+  const map = {};
+  rows_(SHEETS.SETTINGS).forEach(function (row) {
+    map[clean_(row.key)] = clean_(row.value);
+  });
+  return map;
+}
+
+function isEditableSetting_(key) {
+  return ['GPS_REQUIRED', 'GPS_MANDATORY', 'WATERMARK_ENABLED', 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'MINIMUM_APP_VERSION'].indexOf(key) >= 0;
+}
+
+function normalizeSettingValue_(key, value) {
+  if (key === 'MINIMUM_APP_VERSION') return clean_(value);
+  return value === true || String(value).toLowerCase() === 'true' ? 'true' : 'false';
+}
+
+function activeRows_(sheetName) {
+  return rows_(sheetName).filter(function (row) {
+    return row.active === true || String(row.active).toUpperCase() === 'TRUE';
+  });
+}
+
+function rows_(sheetName) {
+  const sheet = sheet_(sheetName);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
-  const headers = values[0];
+  const headers = values[0].map(String);
   return values.slice(1).filter(function (row) {
     return row.some(function (cell) { return cell !== ''; });
   }).map(function (row) {
@@ -1099,8 +534,26 @@ function readRows_(sheetName) {
   });
 }
 
-function readRowObject_(sheet, rowIndex) {
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+function upsertByKey_(sheetName, keyHeader, keyValue, values) {
+  const sheet = sheet_(sheetName);
+  const rowIndex = findRow_(sheet, keyHeader, keyValue);
+  if (rowIndex > 1) writeRow_(sheet, rowIndex, values);
+  else sheet.appendRow(rowFor_(sheet, values));
+}
+
+function writeRow_(sheet, rowIndex, values) {
+  const row = rowFor_(sheet, values);
+  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+}
+
+function rowFor_(sheet, values) {
+  return headers_(sheet).map(function (header) {
+    return values[header] === undefined ? '' : values[header];
+  });
+}
+
+function rowObject_(sheet, rowIndex) {
+  const headers = headers_(sheet);
   const values = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
   const item = {};
   headers.forEach(function (header, index) {
@@ -1109,57 +562,57 @@ function readRowObject_(sheet, rowIndex) {
   return item;
 }
 
-function getSheetHeaders_(sheet) {
-  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
-}
-
-function findRowByValue_(sheet, columnIndex, value) {
+function findRow_(sheet, header, value) {
+  const headers = headers_(sheet);
+  const column = headers.indexOf(header) + 1;
+  if (column <= 0 || value === '') return -1;
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return -1;
-  const values = sheet.getRange(2, columnIndex, lastRow - 1, 1).getValues();
+  const values = sheet.getRange(2, column, lastRow - 1, 1).getValues();
   for (let index = 0; index < values.length; index += 1) {
     if (String(values[index][0]) === String(value)) return index + 2;
   }
   return -1;
 }
 
-function findPhotoRow_(sheet, recordId, slotId) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return -1;
-  const values = sheet.getRange(2, 2, lastRow - 1, 3).getValues();
-  for (let index = 0; index < values.length; index += 1) {
-    if (String(values[index][0]) === String(recordId) && String(values[index][2]) === String(slotId)) return index + 2;
+function findResponsibleRow_(sheet, employeeCode, hubCode) {
+  const rows = rows_(SHEETS.RESPONSIBLE_STAFF);
+  for (let index = 0; index < rows.length; index += 1) {
+    if (clean_(rows[index].employeeCode) === employeeCode && clean_(rows[index].hubCode) === hubCode) return index + 2;
   }
   return -1;
 }
 
-function findRowByRecordNote_(sheet, recordId) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return -1;
-  const notes = sheet.getRange(2, 1, lastRow - 1, 1).getNotes();
-  for (let index = 0; index < notes.length; index += 1) {
-    if (String(notes[index][0]) === String(recordId)) return index + 2;
+function findRecordByParts_(sheet, payload) {
+  const key = duplicateKey_(payload);
+  const all = rows_(SHEETS.RECORDS);
+  for (let index = 0; index < all.length; index += 1) {
+    if (duplicateKey_(all[index]) === key) return index + 2;
   }
   return -1;
 }
 
-function hubText_(record) {
-  return `${record.hubCode || ''}-${record.hubName || ''}`.replace(/-$/, '');
+function duplicateKey_(value) {
+  return [
+    clean_(value.date || value['วันที่']),
+    clean_(value.hubCode || splitCode_(value['ฮับ'])).toUpperCase(),
+    clean_(value.responsibleEmployeeCode || splitCode_(value['ผู้รับผิดชอบ'])),
+    clean_(value.vehicleBarcode || value['บาร์โค้ดรถ']).toUpperCase(),
+  ].join('|');
 }
 
-function responsibleText_(record) {
-  return `${record.responsibleEmployeeCode || ''} ${record.responsibleName || ''}`.trim();
+function splitCode_(value) {
+  return clean_(value).split(/[-\s]/)[0] || '';
 }
 
-function hubSheetName_(record) {
-  const base = hubText_(record) || 'Unknown Hub';
-  const sanitized = base.replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim();
-  return sanitized.slice(0, 90) || 'Unknown Hub';
+function sheet_(name) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet) throw new Error('Open script from a Google Sheet');
+  return getOrCreateSheet_(name);
 }
 
 function getOrCreateSheet_(name, result) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  if (!spreadsheet) throw new Error('Open this script from a Google Sheet or bind it to one');
   const existing = spreadsheet.getSheetByName(name);
   if (existing) return existing;
   const created = spreadsheet.insertSheet(name);
@@ -1167,10 +620,85 @@ function getOrCreateSheet_(name, result) {
   return created;
 }
 
-function safeName_(value) {
-  return String(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/\s+/g, '_');
+function ensureHeaders_(sheet, expected) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(expected);
+    return true;
+  }
+  const current = headers_(sheet);
+  const missing = expected.filter(function (header) { return current.indexOf(header) < 0; });
+  if (missing.length === 0) return false;
+  sheet.getRange(1, current.length + 1, 1, missing.length).setValues([missing]);
+  return true;
 }
 
-function json_(payload) {
-  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+function headers_(sheet) {
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String);
+}
+
+function parseRequest_(e) {
+  if (!e || !e.postData || !e.postData.contents) throw new Error('Missing body');
+  return JSON.parse(e.postData.contents);
+}
+
+function respond_(ok, message, data) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: ok, message: message, data: data || {} }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function bangkokNow_() {
+  return Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+}
+
+function formatBangkok_(value) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+  }
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return text;
+  const date = new Date(text);
+  if (!isNaN(date.getTime())) return Utilities.formatDate(date, TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+  return text;
+}
+
+function statusThai_(status) {
+  const labels = {
+    DRAFT: 'เริ่มทำ',
+    IN_PROGRESS: 'กำลังถ่ายรูป',
+    NEED_REVIEW: 'ส่งแล้วแต่รูปไม่ครบ',
+    COMPLETE: 'ส่งครบแล้ว',
+    PENDING_SYNC: 'รอซิงก์',
+    SYNCING: 'กำลังซิงก์',
+    SYNCED: 'ซิงก์แล้ว',
+    SYNC_FAILED: 'ซิงก์ไม่สำเร็จ',
+    VOIDED: 'ยกเลิก',
+  };
+  return labels[status] || status || '';
+}
+
+function hashPin_(pin) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pin, Utilities.Charset.UTF_8);
+  return digest.map(function (byte) {
+    const value = byte < 0 ? byte + 256 : byte;
+    return (`0${value.toString(16)}`).slice(-2);
+  }).join('');
+}
+
+function boolText_(value) {
+  return value === true || String(value).toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+}
+
+function clean_(value) {
+  return String(value === undefined || value === null ? '' : value).trim();
+}
+
+function actor_(payload) {
+  return clean_(payload.actor || payload.deviceId) || 'admin';
+}
+
+function safeName_(value) {
+  return clean_(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/\s+/g, '_');
 }
