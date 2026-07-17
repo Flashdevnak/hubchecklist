@@ -18,6 +18,7 @@ RESET-008A simplifies admin login:
 - No deviceName, ownerName, Device ID, or approval request appears in the default login modal.
 - Backoffice Settings can change the central PIN through Apps Script.
 - RESET-009 final polish removes the photo watermark background box, uses clean Thai watermark labels, opens the scanner full-screen, groups My Work by active responsible person, and writes Google Sheets time values as Bangkok `yyyy-MM-dd HH:mm:ss` strings.
+- RESET-009 one-shot backend final adds Apps Script `doGet` health, `initOrRepairStorage`, central duplicate-key lookup, and idempotent record upsert by date + hub + responsible + barcode.
 
 RESET-006-007-FINAL-PLUS hardens the app around one central free backend:
 
@@ -152,6 +153,8 @@ RESET-009 keeps the simplified 15-column record row. Apps Script formats submitt
 - Scan opens as a full-screen camera view with close action and manual barcode fallback.
 - Photo page keeps large capture/retake controls, safe bottom padding, and a sticky submit button above navigation.
 - My Work lists today’s open work for the active hub/responsible person so staff can continue missing trailer/drop photos.
+- Scanning a duplicate barcode first checks same-device records, then checks Apps Script online when configured. Existing unfinished work resumes; submitted work warns before duplicate creation and requires a reason.
+- Backoffice Settings includes `ตรวจสอบและซ่อมชีท` for `initOrRepairStorage`.
 
 The app sends submitted records and photo metadata to Apps Script. If the request fails, it queues the payload locally and staff can continue work.
 

@@ -25,6 +25,11 @@
 - [x] RESET-009 My Work filters today’s records by active hub/responsible person
 - [x] RESET-009 submit saves locally first and leaves sync as background/queued work
 - [x] RESET-009 Apps Script formats submitted/captured time in `Asia/Bangkok` as `yyyy-MM-dd HH:mm:ss`
+- [x] RESET-009 Apps Script `doGet` returns safe health JSON
+- [x] RESET-009 Apps Script `initOrRepairStorage` creates missing sheets and appends missing headers without deleting data
+- [x] RESET-009 duplicate key is date + hub + responsible + barcode
+- [x] RESET-009 retry/upsert updates existing `Records_All` rows by record id or duplicate key
+- [x] RESET-009 Backoffice Settings has storage repair action
 - [ ] Vercel deployment itself remains manual and is not claimed complete
 - [ ] Physical Android/iPhone/iPad QA remains manual and is not claimed complete
 

@@ -10,6 +10,7 @@ const SHEETS = {
 };
 
 const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
+const APP_VERSION = 'RESET-009';
 const MISSING_PHOTO_TEXT = 'ยังไม่ได้ถ่าย';
 
 const SIMPLE_RECORD_HEADERS = [
@@ -31,7 +32,19 @@ const SIMPLE_RECORD_HEADERS = [
 ];
 
 const HEADERS = {
-  Records_All: SIMPLE_RECORD_HEADERS.concat(['recordId', 'syncStatus', 'updatedAt']),
+  Records_All: SIMPLE_RECORD_HEADERS.concat([
+    'recordId',
+    'hubCode',
+    'responsibleEmployeeCode',
+    'responsibleName',
+    'statusInternal',
+    'duplicateKey',
+    'duplicateOfRecordId',
+    'duplicateReason',
+    'syncStatus',
+    'createdAt',
+    'updatedAt',
+  ]),
   Photos: [
     'id',
     'recordId',
@@ -54,42 +67,60 @@ const HEADERS = {
     'localOnly',
     'createdAt',
   ],
-  Hubs: ['hubCode', 'hubName', 'active', 'updatedAt'],
-  ResponsibleStaff: ['employeeCode', 'displayName', 'hubCode', 'active', 'updatedAt'],
+  Hubs: ['hubCode', 'hubName', 'active', 'note'],
+  ResponsibleStaff: ['employeeCode', 'displayName', 'hubCode', 'active', 'note'],
   Audit: ['id', 'recordId', 'action', 'detail', 'actor', 'createdAt'],
-  Settings: ['key', 'value', 'updatedAt'],
+  Settings: ['key', 'value', 'note', 'updatedAt'],
   AdminDevices: ['deviceId', 'deviceName', 'ownerName', 'role', 'status', 'approvedAt', 'revokedAt', 'lastLoginAt', 'note'],
   ExportLogs: ['id', 'action', 'detail', 'actor', 'createdAt'],
 };
 
 function doGet() {
+  const repair = ensureStorageReady();
+  const settings = readSettingsMap_();
   return json_({
     ok: true,
-    service: 'Hub Photo Proof API',
-    method: 'GET',
-    message: 'Apps Script Web App is running. Use POST for app actions.',
-    note: 'This /exec URL is the backend API, not the employee Web/PWA app.',
-    serverTime: new Date().toISOString(),
+    appName: 'Hub Photo Proof',
+    version: APP_VERSION,
+    serverTimeBangkok: formatBangkokDateTime_(new Date()),
+    requiredSheetsReady: repair.ok === true,
+    adminPinSet: String(settings.ADMIN_PIN_SET).toLowerCase() === 'true' || Boolean(settings.ADMIN_PIN_HASH),
+    message: 'API พร้อมใช้งาน',
   });
 }
 
 function doPost(e) {
   try {
     const request = parseRequest_(e);
-    ensureSheets_();
+    ensureStorageReady();
 
     switch (request.action) {
+      case 'health':
       case 'healthCheck':
-        return json_({ ok: true, app: 'hubchecklist', storage: 'Records_All + hub sheets', checkedAt: new Date().toISOString() });
+        return json_({ ok: true, appName: 'Hub Photo Proof', version: APP_VERSION, serverTimeBangkok: formatBangkokDateTime_(new Date()), message: 'API พร้อมใช้งาน' });
+      case 'initOrRepairStorage':
+        return json_(ensureStorageReady());
       case 'bootstrap':
+      case 'getBootstrapData':
         return json_(bootstrap_(request.payload));
+      case 'getSettings':
       case 'getAppSettings':
-        return json_({ ok: true, appSettings: readSettingsMap_() });
+        return json_({ ok: true, appSettings: safeSettings_() });
+      case 'findRecordByKey':
+        return json_(findRecordByKey_(request.payload));
+      case 'upsertRecordByKey':
+      case 'saveRecord':
+        return json_({ ok: true, result: syncRecord_(request.payload.record || request.payload, request.payload.photoMetadata || []) });
       case 'createRecord':
       case 'syncRecord':
         return json_({ ok: true, result: syncRecord_(request.payload.record, request.payload.photoMetadata || []) });
+      case 'savePhotoMetadata':
       case 'uploadPhotoMetadata':
         return json_({ ok: true, result: upsertPhoto_(request.payload) });
+      case 'syncBatch':
+        return json_(syncBatch_(request.payload));
+      case 'getMyWork':
+        return json_(getMyWork_(request.payload));
       case 'getHubs':
         return json_({ ok: true, hubs: readRows_(SHEETS.HUBS) });
       case 'getResponsibleStaff':
@@ -97,6 +128,7 @@ function doPost(e) {
       case 'getRecords':
         return json_({ ok: true, records: readRows_(SHEETS.RECORDS_ALL) });
       case 'appendAudit':
+      case 'logAudit':
         return json_({ ok: true, result: appendAudit_(request.payload) });
       case 'requestAdminAccess':
         return json_(requestAdminAccess_(request.payload));
@@ -115,10 +147,10 @@ function doPost(e) {
       case 'getAdminAuthStatus':
         return json_(getAdminAuthStatus_(request.payload));
       default:
-        return json_({ ok: false, error: 'Unknown action' });
+        return json_({ ok: false, message: 'ไม่พบคำสั่งนี้', errorCode: 'UNKNOWN_ACTION' });
     }
   } catch (error) {
-    return json_({ ok: false, error: error && error.message ? error.message : String(error) });
+    return json_({ ok: false, message: 'ดำเนินการไม่สำเร็จ', errorCode: error && error.message ? String(error.message).slice(0, 80) : 'UNKNOWN_ERROR' });
   }
 }
 
@@ -133,47 +165,63 @@ function validateToken_(token) {
   if (!token || token !== expected) throw new Error('Unauthorized');
 }
 
-function ensureSheets_() {
+function ensureStorageReady() {
+  const result = {
+    ok: true,
+    message: 'ตรวจสอบและซ่อมโครงสร้างชีทเรียบร้อย',
+    sheetsCreated: [],
+    headersRepaired: [],
+    settingsUpdated: [],
+  };
   Object.keys(HEADERS).forEach(function (sheetName) {
-    ensureHeaders_(getOrCreateSheet_(sheetName), HEADERS[sheetName]);
+    const sheet = getOrCreateSheet_(sheetName, result);
+    const repaired = ensureHeaders_(sheet, HEADERS[sheetName]);
+    if (repaired) result.headersRepaired.push(sheetName);
   });
-  ensureDefaultSettings_();
+  ensureDefaultSettings_(result);
+  return result;
 }
 
 function ensureHeaders_(sheet, headers) {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
-    return;
+    return true;
   }
-  const firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  if (firstRow.join('|') !== headers.join('|')) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  const firstRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String);
+  const missing = headers.filter(function (header) { return firstRow.indexOf(header) < 0; });
+  if (missing.length > 0) {
+    sheet.getRange(1, firstRow.length + 1, 1, missing.length).setValues([missing]);
+    return true;
   }
+  return false;
 }
 
-function ensureDefaultSettings_() {
+function ensureDefaultSettings_(result) {
   const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
   ensureHeaders_(sheet, HEADERS.Settings);
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false');
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '');
-  upsertSettingDefault_(sheet, 'ADMIN_PIN_SET', 'false');
-  upsertSettingDefault_(sheet, 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'false');
-  upsertSettingDefault_(sheet, 'MINIMUM_APP_VERSION', '0.1.0');
-  upsertSettingDefault_(sheet, 'GPS_MANDATORY', 'false');
-  upsertSettingDefault_(sheet, 'WATERMARK_ENABLED', 'true');
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_ENABLED', 'false', result);
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_HASH', '', result);
+  upsertSettingDefault_(sheet, 'ADMIN_PIN_SET', 'false', result);
+  upsertSettingDefault_(sheet, 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'false', result);
+  upsertSettingDefault_(sheet, 'APP_VERSION', APP_VERSION, result);
+  upsertSettingDefault_(sheet, 'MINIMUM_APP_VERSION', '0.1.0', result);
+  upsertSettingDefault_(sheet, 'GPS_MANDATORY', 'false', result);
+  upsertSettingDefault_(sheet, 'WATERMARK_ENABLED', 'true', result);
 }
 
-function upsertSettingDefault_(sheet, key, value) {
+function upsertSettingDefault_(sheet, key, value, result) {
   const rowIndex = findRowByValue_(sheet, 1, key);
   if (rowIndex > 0) return;
-  sheet.appendRow([key, value, new Date().toISOString()]);
+  sheet.appendRow([key, value, '', formatBangkokDateTime_(new Date())]);
+  if (result) result.settingsUpdated.push(key);
 }
 
 function upsertSetting_(key, value) {
   const sheet = getOrCreateSheet_(SHEETS.SETTINGS);
   ensureHeaders_(sheet, HEADERS.Settings);
   const rowIndex = findRowByValue_(sheet, 1, key);
-  const row = [key, value, new Date().toISOString()];
+  const row = [key, value, '', formatBangkokDateTime_(new Date())];
   if (rowIndex > 0) {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   } else {
@@ -185,13 +233,28 @@ function bootstrap_(payload) {
   const settings = readSettingsMap_();
   return {
     ok: true,
-    serverTime: new Date().toISOString(),
-    appSettings: settings,
+    serverTime: formatBangkokDateTime_(new Date()),
+    serverTimeBangkok: formatBangkokDateTime_(new Date()),
+    appVersion: APP_VERSION,
+    appSettings: safeSettings_(),
     hubs: readRows_(SHEETS.HUBS),
     responsibleStaff: readRows_(SHEETS.RESPONSIBLE_STAFF),
     adminAuthEnabled: String(settings.ADMIN_PIN_ENABLED).toLowerCase() === 'true' && Boolean(settings.ADMIN_PIN_HASH),
     minimumAppVersion: settings.MINIMUM_APP_VERSION || '0.1.0',
     deviceId: payload && payload.deviceId ? payload.deviceId : '',
+  };
+}
+
+function safeSettings_() {
+  const settings = readSettingsMap_();
+  return {
+    ADMIN_PIN_ENABLED: settings.ADMIN_PIN_ENABLED || 'false',
+    ADMIN_PIN_SET: settings.ADMIN_PIN_SET || (settings.ADMIN_PIN_HASH ? 'true' : 'false'),
+    REQUIRE_ADMIN_DEVICE_APPROVAL: settings.REQUIRE_ADMIN_DEVICE_APPROVAL || 'false',
+    APP_VERSION: settings.APP_VERSION || APP_VERSION,
+    MINIMUM_APP_VERSION: settings.MINIMUM_APP_VERSION || '0.1.0',
+    GPS_MANDATORY: settings.GPS_MANDATORY || 'false',
+    WATERMARK_ENABLED: settings.WATERMARK_ENABLED || 'true',
   };
 }
 
@@ -440,12 +503,13 @@ function sha256_(value) {
 
 function syncRecord_(record, photoMetadata) {
   if (!record || !record.id) throw new Error('Missing record.id');
+  record.duplicateKey = duplicateKey_(record);
   const photoResults = (photoMetadata || []).map(function (photo) {
     return upsertPhoto_(photo);
   });
   const row = buildSimpleRecordRow_(record, photoResults);
   const masterResult = upsertRecordAll_(record, row);
-  const hubResult = upsertHubSheet_(record, row);
+  const hubResult = upsertHubSheet_(record, row.slice(0, SIMPLE_RECORD_HEADERS.length));
   appendAudit_({
     id: Utilities.getUuid(),
     recordId: record.id,
@@ -481,18 +545,32 @@ function buildSimpleRecordRow_(record, photoResults) {
     (record.missingPhotoWarnings || []).join(', '),
     formatBangkokDateTime_(record.submittedAt),
     record.notes || '',
+    record.id || '',
+    record.hubCode || '',
+    record.responsibleEmployeeCode || '',
+    record.responsibleName || '',
+    record.status || '',
+    record.duplicateKey || duplicateKey_(record),
+    record.duplicateOfRecordId || '',
+    record.duplicateReason || '',
+    record.syncStatus || '',
+    formatBangkokDateTime_(record.createdAt),
+    formatBangkokDateTime_(record.updatedAt || new Date()),
   ];
 }
 
 function upsertRecordAll_(record, simpleRow) {
   const sheet = getOrCreateSheet_(SHEETS.RECORDS_ALL);
   ensureHeaders_(sheet, HEADERS.Records_All);
-  const row = simpleRow.concat([record.id, record.syncStatus || '', record.updatedAt || '']);
-  const rowIndex = findRowByValue_(sheet, SIMPLE_RECORD_HEADERS.length + 1, record.id);
+  const headers = getSheetHeaders_(sheet);
+  const row = rowForHeaders_(headers, simpleRowToObject_(record, simpleRow));
+  let rowIndex = findRowByHeaderValue_(sheet, 'recordId', record.id);
+  if (rowIndex < 0 && !record.forceCreateNew) rowIndex = findRowByHeaderValue_(sheet, 'duplicateKey', record.duplicateKey || duplicateKey_(record));
   if (rowIndex > 0) {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
     return { id: record.id, action: 'updated', sheet: SHEETS.RECORDS_ALL };
   }
+  if (record.forceCreateNew && !record.duplicateReason) throw new Error('Duplicate reason is required');
   sheet.appendRow(row);
   return { id: record.id, action: 'created', sheet: SHEETS.RECORDS_ALL };
 }
@@ -521,13 +599,63 @@ function upsertPhoto_(photo) {
   const existing = rowIndex > 0 ? readRowObject_(sheet, rowIndex) : null;
   const uploaded = uploadPhotoIfPresent_(photo, existing);
   const values = photoValues_(photo, uploaded, existing);
-  const row = HEADERS.Photos.map(function (key) { return values[key] || ''; });
+  const headers = getSheetHeaders_(sheet);
+  const row = rowForHeaders_(headers, values);
   if (rowIndex > 0) {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   } else {
     sheet.appendRow(row);
   }
   return values;
+}
+
+function findRecordByKey_(payload) {
+  const key = duplicateKeyFromValues_(payload || {});
+  const sheet = getOrCreateSheet_(SHEETS.RECORDS_ALL);
+  ensureHeaders_(sheet, HEADERS.Records_All);
+  let rowIndex = findRowByHeaderValue_(sheet, 'duplicateKey', key);
+  if (rowIndex < 0) rowIndex = findRecordRowByParts_(sheet, payload || {});
+  if (rowIndex < 0) {
+    return { ok: true, found: false, message: 'ไม่พบงานเดิม', duplicateKey: key };
+  }
+  const row = readRowObject_(sheet, rowIndex);
+  const statusInternal = row.statusInternal || internalStatusFromThai_(row['สถานะ']);
+  return {
+    ok: true,
+    found: true,
+    message: 'พบงานเดิม',
+    recordId: row.recordId || '',
+    record: row,
+    status: statusInternal,
+    statusText: statusText_(statusInternal),
+    missingPhotoSlots: String(row['รายการรูปที่ขาด'] || '').split(',').map(function (item) { return item.trim(); }).filter(Boolean),
+    submittedAt: row['เวลาส่งข้อมูล'] || '',
+    syncStatus: row.syncStatus || '',
+    duplicateKey: key,
+  };
+}
+
+function getMyWork_(payload) {
+  const rows = readRows_(SHEETS.RECORDS_ALL);
+  const date = payload && payload.date ? String(payload.date) : '';
+  const hubCode = payload && payload.hubCode ? String(payload.hubCode) : '';
+  const employeeCode = payload && payload.responsibleEmployeeCode ? String(payload.responsibleEmployeeCode) : '';
+  return {
+    ok: true,
+    records: rows.filter(function (row) {
+      return (!date || row['วันที่'] === date)
+        && (!hubCode || row.hubCode === hubCode || String(row['ฮับ'] || '').indexOf(hubCode) === 0)
+        && (!employeeCode || row.responsibleEmployeeCode === employeeCode || String(row['ผู้รับผิดชอบ'] || '').indexOf(employeeCode) === 0);
+    }),
+  };
+}
+
+function syncBatch_(payload) {
+  const records = payload && payload.records ? payload.records : [];
+  const results = records.map(function (item) {
+    return syncRecord_(item.record || item, item.photoMetadata || []);
+  });
+  return { ok: true, message: 'ซิงก์ข้อมูลเรียบร้อย', results: results };
 }
 
 function uploadPhotoIfPresent_(photo, existing) {
@@ -572,6 +700,71 @@ function photoValues_(photo, uploaded, existing) {
   };
 }
 
+function simpleRowToObject_(record, row) {
+  const values = {};
+  HEADERS.Records_All.forEach(function (header, index) {
+    values[header] = row[index] || '';
+  });
+  values.recordId = record.id || values.recordId || Utilities.getUuid();
+  values.hubCode = record.hubCode || values.hubCode || '';
+  values.responsibleEmployeeCode = record.responsibleEmployeeCode || values.responsibleEmployeeCode || '';
+  values.responsibleName = record.responsibleName || values.responsibleName || '';
+  values.statusInternal = record.status || values.statusInternal || '';
+  values.duplicateKey = record.duplicateKey || duplicateKey_(record);
+  values.duplicateOfRecordId = record.duplicateOfRecordId || '';
+  values.duplicateReason = record.duplicateReason || '';
+  values.syncStatus = record.syncStatus || values.syncStatus || '';
+  values.createdAt = formatBangkokDateTime_(record.createdAt);
+  values.updatedAt = formatBangkokDateTime_(record.updatedAt || new Date());
+  return values;
+}
+
+function rowForHeaders_(headers, values) {
+  return headers.map(function (header) { return values[header] || ''; });
+}
+
+function duplicateKey_(record) {
+  return duplicateKeyFromValues_({
+    date: record.date,
+    hubCode: record.hubCode,
+    responsibleEmployeeCode: record.responsibleEmployeeCode,
+    vehicleBarcode: record.vehicleBarcode,
+  });
+}
+
+function duplicateKeyFromValues_(values) {
+  return [
+    values.date || values['วันที่'] || '',
+    values.hubCode || extractHubCode_(values['ฮับ']) || '',
+    values.responsibleEmployeeCode || extractEmployeeCode_(values['ผู้รับผิดชอบ']) || '',
+    values.vehicleBarcode || values['บาร์โค้ดรถ'] || '',
+  ].map(function (part) { return String(part).trim().toUpperCase(); }).join('|');
+}
+
+function extractHubCode_(value) {
+  return String(value || '').split('-')[0].trim();
+}
+
+function extractEmployeeCode_(value) {
+  return String(value || '').trim().split(/\s+/)[0] || '';
+}
+
+function findRowByHeaderValue_(sheet, header, value) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const columnIndex = headers.indexOf(header) + 1;
+  if (columnIndex <= 0 || !value) return -1;
+  return findRowByValue_(sheet, columnIndex, value);
+}
+
+function findRecordRowByParts_(sheet, values) {
+  const rows = readRows_(SHEETS.RECORDS_ALL);
+  const key = duplicateKeyFromValues_(values);
+  for (let index = 0; index < rows.length; index += 1) {
+    if (duplicateKeyFromValues_(rows[index]) === key) return index + 2;
+  }
+  return -1;
+}
+
 function formatBangkokDateTime_(value) {
   if (!value) return '';
   if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
@@ -585,10 +778,24 @@ function formatBangkokDateTime_(value) {
 }
 
 function statusText_(status) {
-  if (status === 'COMPLETE') return 'เสร็จแล้ว';
-  if (status === 'NEED_REVIEW') return 'รอตรวจสอบ';
+  if (status === 'DRAFT') return 'เริ่มทำแต่ยังไม่ส่ง';
+  if (status === 'IN_PROGRESS') return 'กำลังถ่ายรูป';
+  if (status === 'COMPLETE') return 'ส่งครบแล้ว';
+  if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
+  if (status === 'PENDING_SYNC') return 'บันทึกแล้ว รอซิงก์';
+  if (status === 'SYNCED') return 'ซิงก์แล้ว';
   if (status === 'VOIDED') return 'ยกเลิก';
   return status || '';
+}
+
+function internalStatusFromThai_(value) {
+  const text = String(value || '');
+  if (text === 'เริ่มทำแต่ยังไม่ส่ง') return 'DRAFT';
+  if (text === 'กำลังถ่ายรูป') return 'IN_PROGRESS';
+  if (text === 'ส่งแล้วแต่รูปไม่ครบ') return 'NEED_REVIEW';
+  if (text === 'ส่งครบแล้ว' || text === 'เสร็จแล้ว') return 'COMPLETE';
+  if (text === 'ยกเลิก') return 'VOIDED';
+  return text;
 }
 
 function photoCell_(photo) {
@@ -620,7 +827,7 @@ function appendAudit_(entry) {
     actor: entry.actor || '',
     createdAt: entry.createdAt || new Date().toISOString(),
   };
-  sheet.appendRow(HEADERS.Audit.map(function (key) { return next[key]; }));
+  sheet.appendRow(rowForHeaders_(getSheetHeaders_(sheet), next));
   return next;
 }
 
@@ -648,6 +855,10 @@ function readRowObject_(sheet, rowIndex) {
     item[header] = values[index];
   });
   return item;
+}
+
+function getSheetHeaders_(sheet) {
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
 }
 
 function findRowByValue_(sheet, columnIndex, value) {
@@ -694,10 +905,14 @@ function hubSheetName_(record) {
   return sanitized.slice(0, 90) || 'Unknown Hub';
 }
 
-function getOrCreateSheet_(name) {
+function getOrCreateSheet_(name, result) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   if (!spreadsheet) throw new Error('Open this script from a Google Sheet or bind it to one');
-  return spreadsheet.getSheetByName(name) || spreadsheet.insertSheet(name);
+  const existing = spreadsheet.getSheetByName(name);
+  if (existing) return existing;
+  const created = spreadsheet.insertSheet(name);
+  if (result) result.sheetsCreated.push(name);
+  return created;
 }
 
 function safeName_(value) {

@@ -1,8 +1,8 @@
 # APK Build Result
 
-## RESET-009 Build Result
+## RESET-009 One-Shot Build Result
 
-RESET-009 must rebuild the same Android debug APK after UI/scan/photo/watermark/time polish:
+RESET-009 one-shot must rebuild the same Android debug APK after UI/scan/photo/watermark/time/backend duplicate polish:
 
 ```text
 C:\Users\myhou\Desktop\Agent Codex\hubchecklist\android\app\build\outputs\apk\debug\app-debug.apk

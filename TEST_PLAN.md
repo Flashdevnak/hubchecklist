@@ -12,6 +12,11 @@
 - Open `งานของฉัน` and confirm it lists today’s open records for the active hub/responsible person, grouped by vehicle barcode in the list.
 - Sync to Google Sheets and confirm submitted/captured values are Bangkok strings like `2026-07-17 00:34:12`, not English browser date strings.
 - Export ZIP and confirm the 15-column workbook, watermarked photos, and manifest still generate.
+- Open Apps Script `/exec` in a browser and confirm safe JSON health shows `version: RESET-009` and Thai ready message.
+- From Backoffice Settings, tap `ตรวจสอบและซ่อมชีท` and confirm the message says the sheet structure was checked/repaired.
+- Scan the same barcode on the same device and confirm unfinished work resumes.
+- With Apps Script configured, scan a barcode already in `Records_All` and confirm the app warns/resumes from the central duplicate key.
+- Submit/retry sync for the same record twice and confirm `Records_All` updates the existing row instead of appending a duplicate.
 
 ## RESET-008A Simple Admin PIN Login
 

@@ -13,6 +13,10 @@ RESET-009 is complete as an implementation/build polish pass. It does not claim 
 - Watermarked photos draw text directly on the photo with subtle shadow/stroke only. No black strip or large dark background panel is used.
 - Google Sheets record rows stay on the simplified 15-column layout. Apps Script writes submitted/captured timestamps as Bangkok `yyyy-MM-dd HH:mm:ss` strings.
 - Export ZIP continues to use watermarked photos and the simplified workbook.
+- Apps Script `doGet` returns safe health JSON for `/exec`.
+- Apps Script `initOrRepairStorage` creates required sheets and appends missing headers without deleting old data.
+- `Records_All` remains the source of truth. Its first 15 columns are the simplified user-facing report; internal columns to the right support record id, duplicate key, internal status, sync, and audit-safe retry.
+- Duplicate key is `วันที่ + hubCode + responsibleEmployeeCode + vehicleBarcode`. Online scans call `findRecordByKey`; sync writes update by `recordId` or duplicate key.
 
 ## RESET-008A Simple Admin PIN Login
 

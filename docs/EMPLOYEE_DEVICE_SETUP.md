@@ -5,6 +5,7 @@
 - Employee devices open หน้างาน by default.
 - Staff use `สแกนบาร์รถ`; the scanner opens full-screen and manual barcode entry remains available.
 - If the same barcode already exists for the same date/hub/responsible person, staff should choose to continue taking photos unless an admin intentionally needs a new trip.
+- Online devices also check central `Records_All` by date + hub + responsible + barcode before creating a new job.
 - Photo capture saves locally first. Sync status is handled separately.
 - Staff do not see backend URL/token or Admin PIN setup.
 

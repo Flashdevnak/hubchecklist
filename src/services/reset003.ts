@@ -67,6 +67,10 @@ export interface ProofRecord {
   createdAt: string;
   updatedAt: string;
   syncStatus?: RecordSyncStatus;
+  duplicateKey?: string;
+  duplicateOfRecordId?: string;
+  duplicateReason?: string;
+  forceCreateNew?: boolean;
   voidReason?: string;
   notes?: string;
 }
@@ -607,6 +611,47 @@ export async function setCentralAdminDeviceApprovalRequired(values: { adminPin: 
   }
 }
 
+export async function initOrRepairCentralStorage(): Promise<{ ok: boolean; message: string }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง กรุณาติดต่อผู้ดูแล' };
+  try {
+    const data = await callAppsScript('initOrRepairStorage', {}, { allowWithoutSecret: true }) as { ok?: boolean; message?: string };
+    return { ok: data.ok === true, message: data.message || 'ตรวจสอบและซ่อมโครงสร้างชีทเรียบร้อย' };
+  } catch {
+    return { ok: false, message: 'เชื่อมต่อระบบกลางไม่ได้ กรุณาลองใหม่' };
+  }
+}
+
+export async function findCentralRecordByKey(values: {
+  date: string;
+  hubCode: string;
+  responsibleEmployeeCode: string;
+  vehicleBarcode: string;
+}): Promise<{ ok: boolean; found: boolean; message: string; recordId?: string; status?: ProofStatus; statusText?: string; record?: Record<string, unknown> }> {
+  if (!CENTRAL_BACKEND_URL) return { ok: false, found: false, message: 'ยังไม่ได้ตรวจสอบข้อมูลซ้ำจากระบบกลาง' };
+  try {
+    const data = await callAppsScript('findRecordByKey', values, { allowWithoutSecret: true }) as {
+      ok?: boolean;
+      found?: boolean;
+      message?: string;
+      recordId?: string;
+      status?: ProofStatus;
+      statusText?: string;
+      record?: Record<string, unknown>;
+    };
+    return {
+      ok: data.ok !== false,
+      found: data.found === true,
+      message: data.message || (data.found ? 'พบงานเดิม' : 'ไม่พบงานเดิม'),
+      recordId: data.recordId,
+      status: data.status,
+      statusText: data.statusText,
+      record: data.record,
+    };
+  } catch {
+    return { ok: false, found: false, message: 'ยังไม่ได้ตรวจสอบข้อมูลซ้ำจากระบบกลาง' };
+  }
+}
+
 export async function listAdminDevices(pin: string): Promise<AdminDevice[]> {
   const data = await callAppsScript('listAdminDevices', { deviceId: getDeviceId(), pin }, { allowWithoutSecret: true }) as { devices?: AdminDevice[] };
   return data.devices ?? [];
@@ -832,7 +877,7 @@ function buildExportRow(record: ProofRecord): string[] {
     record.vehicleBarcode,
     record.hasDropTransfer ? 'พ่วงดรอป' : 'ไม่พ่วงดรอป',
     String(record.dropCount),
-    record.status,
+    statusText(record.status),
     photoExportValue(rearMain),
     photoExportValue(frontDrop),
     photoExportValue(drop1),
@@ -851,6 +896,14 @@ function findSlot(record: ProofRecord, slotType: SlotType): ProofPhotoSlot | und
 function photoExportValue(slot?: ProofPhotoSlot): string {
   if (!slot?.captured) return 'ยังไม่ได้ถ่าย';
   return slot.fileName ?? slot.labelThai;
+}
+
+function statusText(status: ProofStatus): string {
+  if (status === 'DRAFT') return 'เริ่มทำแต่ยังไม่ส่ง';
+  if (status === 'COMPLETE') return 'ส่งครบแล้ว';
+  if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
+  if (status === 'VOIDED') return 'ยกเลิก';
+  return 'กำลังถ่ายรูป';
 }
 
 function applyPhotoHyperlinks(row: ExcelJS.Row, record: ProofRecord): void {
@@ -1072,7 +1125,7 @@ function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
   })).filter((staff) => staff.employeeCode && staff.hubCode);
 }
 
-type AppsScriptAction = 'bootstrap' | 'healthCheck' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
+type AppsScriptAction = 'bootstrap' | 'getBootstrapData' | 'health' | 'healthCheck' | 'initOrRepairStorage' | 'getSettings' | 'getAppSettings' | 'getHubs' | 'getResponsibleStaff' | 'getRecords' | 'findRecordByKey' | 'upsertRecordByKey' | 'saveRecord' | 'savePhotoMetadata' | 'syncBatch' | 'getMyWork' | 'requestAdminAccess' | 'verifyAdminAccess' | 'setAdminPin' | 'setAdminDeviceApprovalRequired' | 'listAdminDevices' | 'approveAdminDevice' | 'revokeAdminDevice' | 'getAdminAuthStatus' | GoogleSyncAction;
 
 async function callAppsScript(action: AppsScriptAction, payload: unknown, options: { allowWithoutSecret?: boolean } = {}): Promise<unknown> {
   const settings = getSettings();

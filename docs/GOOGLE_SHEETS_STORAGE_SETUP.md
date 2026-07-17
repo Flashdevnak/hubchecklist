@@ -12,6 +12,27 @@ yyyy-MM-dd HH:mm:ss
 
 If the app sends an already formatted Bangkok value, Apps Script preserves it. If the app sends ISO, Apps Script formats it with `Utilities.formatDate(date, 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss')`.
 
+## RESET-009 Storage Repair And Duplicate Keys
+
+Deploy the latest `google-apps-script/Code.gs`, then open `/exec` once to confirm health JSON. The API calls `ensureStorageReady()` on health/bootstrap/save/admin actions.
+
+Use Backoffice Settings -> `ตรวจสอบและซ่อมชีท` or POST action `initOrRepairStorage` to:
+
+- create missing required sheets
+- append missing headers
+- preserve existing rows and old sheets
+- ensure safe Settings keys such as `ADMIN_PIN_ENABLED`, `ADMIN_PIN_SET`, `REQUIRE_ADMIN_DEVICE_APPROVAL`, and `APP_VERSION`
+
+`Records_All` keeps the first 15 columns as the readable report. Internal columns to the right include `recordId`, `hubCode`, `responsibleEmployeeCode`, `statusInternal`, `duplicateKey`, duplicate reason fields, sync status, and timestamps.
+
+Duplicate key:
+
+```text
+วันที่ + hubCode + responsibleEmployeeCode + vehicleBarcode
+```
+
+`findRecordByKey` checks that key before creating a new record. `syncRecord` / `saveRecord` update by `recordId` or duplicate key so retry does not append duplicate rows.
+
 ## RESET-006-007-FINAL-PLUS Central Backend
 
 Deploy `google-apps-script/Code.gs` as a Web App and set the resulting `/exec` URL in:

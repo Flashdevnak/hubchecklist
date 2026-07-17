@@ -24,6 +24,17 @@ The real PIN is never returned to the app.
 
 Backoffice Settings can change the central PIN through the `setAdminPin` action. Admins should not manually edit `ADMIN_PIN_HASH`.
 
+RESET-009 keeps the default login simple: the modal asks only for `Admin PIN`. Device approval remains an optional advanced setting inside Backoffice after unlock.
+
+Safe Apps Script actions:
+
+- `verifyAdminAccess`
+- `getAdminAuthStatus`
+- `setAdminPin`
+- `initOrRepairStorage`
+
+`ADMIN_PIN_HASH` stays in Script Properties/Settings and is never returned by safe bootstrap/settings responses.
+
 ## First Setup
 
 If no PIN exists, Backoffice shows:

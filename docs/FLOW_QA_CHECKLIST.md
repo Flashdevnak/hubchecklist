@@ -10,6 +10,9 @@
 6. Photo page fits phone width and the submit button is not hidden by bottom/system navigation.
 7. My Work shows today’s open work for the active responsible person.
 8. Google Sheets submitted/captured times use Bangkok `yyyy-MM-dd HH:mm:ss`.
+9. Apps Script `/exec` health returns safe `RESET-009` JSON.
+10. Backoffice Settings -> `ตรวจสอบและซ่อมชีท` returns the Thai repair message.
+11. Duplicate scan resumes existing work locally and checks central duplicate key when online.
 
 Use this checklist during web, PWA, and Android device testing. Record pass/fail notes per device.
 

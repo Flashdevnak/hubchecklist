@@ -8,6 +8,7 @@ The Vercel build remains a normal Vite build from `dist`. RESET-009 does not dep
 - Google Apps Script `/exec` is the backend API only.
 - Frontline scanner/photo capture require HTTPS and browser permission support.
 - The full-screen scanner and clean watermark behavior are included in the web build.
+- Set `VITE_APPS_SCRIPT_WEB_APP_URL` to the Apps Script `/exec` URL so Web/PWA devices can use central Admin PIN, bootstrap data, and duplicate barcode checks.
 
 Vercel is the Web/PWA app URL for iPhone, iPad, and desktop users.
 

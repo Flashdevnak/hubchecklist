@@ -24,6 +24,8 @@ import {
   getCentralBackendStatus,
   getCentralBackendUrl,
   getLocalDateString,
+  findCentralRecordByKey,
+  initOrRepairCentralStorage,
   getMissingPhotoSlots,
   getRecordById,
   getSettings,
@@ -494,23 +496,73 @@ function ScanScreen({ activeHub, activeStaff, onClose, onCreated }: {
     setCameraOn(false);
   };
 
-  const createRecord = () => {
+  const createRecord = async () => {
     if (!activeHub || !activeStaff || !barcode.trim()) return;
+    const normalizedBarcode = normalizeVehicleBarcode(barcode);
     const existing = listRecords().find((record) => (
       record.status !== 'VOIDED'
       && record.date === getLocalDateString()
       && record.hubCode === activeHub.hubCode
       && record.responsibleEmployeeCode === activeStaff.employeeCode
-      && record.vehicleBarcode === normalizeVehicleBarcode(barcode)
+      && record.vehicleBarcode === normalizedBarcode
     ));
     if (existing) {
-      const continueExisting = window.confirm('พบงานเดิม ต้องการถ่ายรูปต่อหรือเริ่มใหม่?\n\nกด OK เพื่อถ่ายรูปต่อ');
+      const isSubmitted = existing.status === 'COMPLETE' || existing.status === 'NEED_REVIEW';
+      const continueExisting = window.confirm(isSubmitted
+        ? 'บาร์นี้ส่งข้อมูลแล้ว ต้องการเปิดงานเดิมหรือทำซ้ำ?\n\nกด OK เพื่อเปิดงานเดิม'
+        : 'พบงานเดิม ต้องการถ่ายรูปต่อหรือเริ่มใหม่?\n\nกด OK เพื่อถ่ายรูปต่อ');
       if (continueExisting) {
         onCreated(existing);
         return;
       }
+      const reason = window.prompt('กรุณาระบุเหตุผลที่ต้องทำซ้ำ');
+      if (!reason?.trim()) return;
+      const duplicate = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: normalizedBarcode, hasDropTransfer });
+      const next = { ...duplicate, duplicateOfRecordId: existing.id, duplicateReason: reason.trim(), forceCreateNew: true, notes: `ทำซ้ำ: ${reason.trim()}` };
+      upsertRecord(next);
+      addAudit({ recordId: next.id, action: 'force_create_duplicate', detail: reason.trim(), actor: activeStaff.employeeCode });
+      onCreated(next);
+      return;
     }
-    const record = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: barcode, hasDropTransfer });
+
+    const central = await findCentralRecordByKey({
+      date: getLocalDateString(),
+      hubCode: activeHub.hubCode,
+      responsibleEmployeeCode: activeStaff.employeeCode,
+      vehicleBarcode: normalizedBarcode,
+    });
+    if (central.found) {
+      const submitted = central.status === 'COMPLETE' || central.status === 'NEED_REVIEW';
+      const continueExisting = window.confirm(submitted
+        ? `บาร์นี้มีข้อมูลในระบบกลางแล้ว (${central.statusText || 'ส่งแล้ว'})\n\nกด OK เพื่อเปิดงานเดิม`
+        : 'พบงานเดิมในระบบกลาง ต้องการถ่ายรูปต่อหรือไม่?');
+      if (continueExisting) {
+        const resumed = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: normalizedBarcode, hasDropTransfer });
+        const record = {
+          ...resumed,
+          id: central.recordId || resumed.id,
+          status: central.status || resumed.status,
+          syncStatus: 'SYNCED' as const,
+          notes: 'ดึงงานเดิมจากระบบกลาง',
+        };
+        upsertRecord(record);
+        addAudit({ recordId: record.id, action: 'resume_existing_record', detail: 'central duplicate key', actor: activeStaff.employeeCode });
+        onCreated(record);
+        return;
+      }
+      const reason = window.prompt('กรุณาระบุเหตุผลที่ต้องทำซ้ำ');
+      if (!reason?.trim()) return;
+      const duplicate = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: normalizedBarcode, hasDropTransfer });
+      const next = { ...duplicate, duplicateOfRecordId: central.recordId, duplicateReason: reason.trim(), forceCreateNew: true, notes: `ทำซ้ำ: ${reason.trim()}` };
+      upsertRecord(next);
+      addAudit({ recordId: next.id, action: 'force_create_duplicate', detail: reason.trim(), actor: activeStaff.employeeCode });
+      onCreated(next);
+      return;
+    }
+    if (!central.ok) {
+      setMessage(central.message);
+    }
+    const record = createDraftRecord({ hub: activeHub, responsible: activeStaff, vehicleBarcode: normalizedBarcode, hasDropTransfer });
     upsertRecord(record);
     addAudit({ recordId: record.id, action: 'record_created', detail: `created from barcode ${record.vehicleBarcode}`, actor: activeStaff.employeeCode });
     onCreated(record);
@@ -554,7 +606,7 @@ function ScanScreen({ activeHub, activeStaff, onClose, onCreated }: {
           <button className={hasDropTransfer ? 'active' : ''} onClick={() => setHasDropTransfer(true)} type="button">พ่วงดรอป</button>
         </div>
         {message ? <p className="simple-message">{message}</p> : null}
-        <button className="primary-action jumbo" disabled={!activeHub || !activeStaff || !barcode} onClick={createRecord} type="button">ใช้บาร์โค้ดนี้</button>
+        <button className="primary-action jumbo" disabled={!activeHub || !activeStaff || !barcode} onClick={() => { void createRecord(); }} type="button">ใช้บาร์โค้ดนี้</button>
       </div>
     </section>
   );
@@ -901,6 +953,7 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
   const [deviceApprovalRequired, setDeviceApprovalRequiredState] = useState(false);
   const [deviceApprovalPin, setDeviceApprovalPin] = useState('');
   const [deviceApprovalMessage, setDeviceApprovalMessage] = useState('');
+  const [repairMessage, setRepairMessage] = useState('');
   const [employeeDeviceMode, setEmployeeDeviceModeState] = useState(isEmployeeDeviceMode());
   const save = () => {
     saveSettings(settings);
@@ -981,6 +1034,11 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
     setDeviceApprovalMessage(result.message);
     if (result.ok) setDeviceApprovalRequiredState(enabled);
   };
+  const repairStorage = async () => {
+    setRepairMessage('กำลังตรวจสอบชีท');
+    const result = await initOrRepairCentralStorage();
+    setRepairMessage(result.message);
+  };
   return (
     <section className="admin-stack">
       <h1>ตั้งค่า</h1>
@@ -1047,6 +1105,14 @@ function SettingsPanel({ onEmployeeModeChange, onLock, onReload }: { onEmployeeM
         </div>
         {pinMessage ? <p className="simple-message">{pinMessage}</p> : null}
       </article>
+      {getCentralBackendUrl() ? (
+        <article className="admin-detail-card">
+          <h2>ตรวจสอบชีท</h2>
+          <p>สร้างชีทที่ขาดและเติมหัวตารางที่หายไป โดยไม่ลบข้อมูลเดิม</p>
+          <button className="secondary-action" onClick={() => { void repairStorage(); }} type="button"><RefreshCcw size={18} /> ตรวจสอบและซ่อมชีท</button>
+          {repairMessage ? <p className="simple-message">{repairMessage}</p> : null}
+        </article>
+      ) : null}
       {getCentralBackendUrl() ? (
         <article className="admin-detail-card">
           <h2>โหมดจำกัดเครื่องแอดมิน</h2>
@@ -1191,10 +1257,10 @@ function StatusPill({ text, tone }: { text: string; tone: 'success' | 'warning' 
 }
 
 function statusText(status: ProofRecord['status']): string {
-  if (status === 'COMPLETE') return 'เสร็จแล้ว';
-  if (status === 'NEED_REVIEW') return 'รอตรวจสอบ';
+  if (status === 'COMPLETE') return 'ส่งครบแล้ว';
+  if (status === 'NEED_REVIEW') return 'ส่งแล้วแต่รูปไม่ครบ';
   if (status === 'VOIDED') return 'ยกเลิก';
-  return 'รอถ่ายรูป';
+  return 'เริ่มทำแต่ยังไม่ส่ง';
 }
 
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
