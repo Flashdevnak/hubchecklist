@@ -122,18 +122,22 @@ export interface SyncReport {
 }
 
 const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
-const API_URL = (import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL as string | undefined)?.trim() ?? '';
-const APP_VERSION = 'RESET-011';
+const API_URL = (
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)
+  || (import.meta.env.VITE_APPS_SCRIPT_WEB_APP_URL as string | undefined)
+  || '/api/hub-proof'
+).trim();
+const APP_VERSION = 'RESET-013';
 
 const KEYS = {
-  hubs: 'reset011.hubs',
-  staff: 'reset011.responsibleStaff',
-  records: 'reset011.records',
-  activeContext: 'reset011.activeContext',
-  bootstrap: 'reset011.bootstrap',
-  pending: 'reset011.pendingRecords',
-  deviceId: 'reset011.deviceId',
-  showSubmitted: 'reset011.showSubmitted',
+  hubs: 'reset013.hubs',
+  staff: 'reset013.responsibleStaff',
+  records: 'reset013.records',
+  activeContext: 'reset013.activeContext',
+  bootstrap: 'reset013.bootstrap',
+  pending: 'reset013.pendingRecords',
+  deviceId: 'reset013.deviceId',
+  showSubmitted: 'reset013.showSubmitted',
 };
 
 export const FALLBACK_HUB: Hub = {
@@ -155,7 +159,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   WATERMARK_ENABLED: 'true',
   REQUIRE_ADMIN_DEVICE_APPROVAL: 'false',
   MINIMUM_APP_VERSION: '0.1.0',
-  ADMIN_PIN_ENABLED: 'false',
+  ADMIN_PIN_ENABLED: 'true',
   ADMIN_PIN_SET: 'false',
 };
 
@@ -177,18 +181,11 @@ export function getDeviceId(): string {
 
 export async function bootstrapCentralData(): Promise<BootstrapData> {
   seedFallbackData();
-  if (!isCentralConfigured()) {
-    const local = localBootstrap('ยังไม่ได้ตั้งค่าระบบกลาง');
-    writeJson(KEYS.bootstrap, local);
-    return local;
-  }
-
   try {
     const response = await callCentral<{
       hubs?: unknown;
       responsibleStaff?: unknown;
       settings?: unknown;
-      appSettings?: unknown;
       serverTime?: string;
       apiVersion?: string;
       version?: string;
@@ -196,6 +193,7 @@ export async function bootstrapCentralData(): Promise<BootstrapData> {
     const data = response.data ?? {};
     const hubs = normalizeHubs(data.hubs);
     const responsibleStaff = normalizeResponsibleStaff(data.responsibleStaff);
+    const settings = normalizeSettings(data.settings);
     if (hubs.length) saveHubs(hubs);
     if (responsibleStaff.length) saveResponsibleStaff(responsibleStaff);
     const bootstrap: BootstrapData = {
@@ -206,7 +204,7 @@ export async function bootstrapCentralData(): Promise<BootstrapData> {
       apiVersion: data.apiVersion || data.version,
       hubs: hubs.length ? hubs : listHubs(),
       responsibleStaff: responsibleStaff.length ? responsibleStaff : listResponsibleStaff(),
-      settings: normalizeSettings(data.settings ?? data.appSettings),
+      settings,
       pulledAt: new Date().toISOString(),
     };
     writeJson(KEYS.bootstrap, bootstrap);
@@ -220,9 +218,6 @@ export async function bootstrapCentralData(): Promise<BootstrapData> {
 
 export async function pullCentralData(): Promise<CentralPullResult> {
   const bootstrap = await bootstrapCentralData();
-  if (!isCentralConfigured()) {
-    return { ok: false, message: bootstrap.message, recordsPulled: 0, bootstrap };
-  }
   try {
     const response = await callCentral<{ records?: unknown }>('getRecords', {}, true);
     const centralRecords = normalizeRecords(response.data?.records);
@@ -244,7 +239,7 @@ export function listHubs(): Hub[] {
 }
 
 export function saveHubs(hubs: Hub[]): void {
-  writeJson(KEYS.hubs, dedupeBy(hubs, (hub) => hub.hubCode.toUpperCase()));
+  writeJson(KEYS.hubs, dedupeBy(hubs.map(normalizeHub), (hub) => hub.hubCode.toUpperCase()));
 }
 
 export function listResponsibleStaff(): ResponsibleStaff[] {
@@ -253,7 +248,7 @@ export function listResponsibleStaff(): ResponsibleStaff[] {
 }
 
 export function saveResponsibleStaff(staff: ResponsibleStaff[]): void {
-  writeJson(KEYS.staff, dedupeBy(staff, (item) => `${item.employeeCode}|${item.hubCode}`.toUpperCase()));
+  writeJson(KEYS.staff, dedupeBy(staff.map(normalizeStaff), (item) => `${item.employeeCode}|${item.hubCode}`.toUpperCase()));
 }
 
 export function getActiveContext(): ActiveContext | null {
@@ -296,8 +291,7 @@ export async function findExistingWork(values: {
 }): Promise<ProofRecord | null> {
   const duplicateKey = buildDuplicateKey(values.date ?? todayBangkok(), values.hubCode, values.responsibleEmployeeCode, values.vehicleBarcode);
   const local = getRecordByDuplicateKey(duplicateKey);
-  if (local) return local;
-  if (!isCentralConfigured()) return null;
+  if (local && ['SYNCED', 'COMPLETE', 'NEED_REVIEW', 'PENDING_SYNC', 'SYNC_FAILED', 'IN_PROGRESS', 'DRAFT'].includes(local.status)) return local;
   try {
     const response = await callCentral<{ found?: boolean; record?: unknown }>('findRecordByKey', {
       date: values.date ?? todayBangkok(),
@@ -311,9 +305,9 @@ export async function findExistingWork(values: {
       return record;
     }
   } catch {
-    return null;
+    return local ?? null;
   }
-  return null;
+  return local ?? null;
 }
 
 export function createDraftRecord(values: {
@@ -327,9 +321,12 @@ export function createDraftRecord(values: {
   const barcode = normalizeVehicleBarcode(values.vehicleBarcode);
   const dropCount = values.dropType === 'DROP' ? Math.max(2, values.dropCount ?? 2) : 0;
   const date = todayBangkok();
+  const duplicateKey = buildDuplicateKey(date, values.hub.hubCode, values.responsible.employeeCode, barcode);
+  const existing = getRecordByDuplicateKey(duplicateKey);
+  if (existing && !['COMPLETE', 'SYNCED', 'VOIDED'].includes(existing.status)) return existing;
   const record: ProofRecord = {
     recordId: crypto.randomUUID?.() ?? `${Date.now()}`,
-    duplicateKey: buildDuplicateKey(date, values.hub.hubCode, values.responsible.employeeCode, barcode),
+    duplicateKey,
     date,
     hubCode: values.hub.hubCode,
     hubName: values.hub.hubName,
@@ -370,7 +367,7 @@ export async function capturePhoto(record: ProofRecord, slotId: string, file: Fi
     ...item,
     captured: true,
     imageLocalData,
-    fileName: `${record.date}_${record.vehicleBarcode}_${item.slotType.toLowerCase()}.jpg`,
+    fileName: `${record.date}_${record.vehicleBarcode}_${item.slotId}.jpg`,
     capturedAt,
     latitude: location.latitude,
     longitude: location.longitude,
@@ -389,22 +386,16 @@ export async function capturePhoto(record: ProofRecord, slotId: string, file: Fi
 
 export async function submitRecord(record: ProofRecord, allowMissing: boolean): Promise<{ record: ProofRecord; message: string }> {
   const missing = getMissingPhotoSlots(record);
-  if (missing.length && !allowMissing) {
-    return { record, message: 'ยังมีรูปที่ต้องถ่าย กรุณาตรวจสอบก่อนส่ง' };
-  }
+  if (missing.length && !allowMissing) return { record, message: 'ยังมีรูปที่ต้องถ่าย กรุณาตรวจสอบก่อนส่ง' };
   const now = new Date().toISOString();
   const localStatus: ProofStatus = missing.length ? 'NEED_REVIEW' : 'COMPLETE';
   const prepared = upsertLocalRecord({
     ...record,
-    status: isCentralConfigured() ? 'SYNCING' : 'PENDING_SYNC',
+    status: 'SYNCING',
     missingPhotoLabels: missing.map((slot) => slot.label),
     submittedAt: now,
     updatedAt: now,
   });
-  if (!isCentralConfigured()) {
-    queuePending({ ...prepared, status: localStatus, updatedAt: now });
-    return { record: upsertLocalRecord({ ...prepared, status: 'PENDING_SYNC' }), message: 'รอซิงก์' };
-  }
   return syncOneRecord({ ...prepared, status: localStatus, updatedAt: now });
 }
 
@@ -415,16 +406,17 @@ export async function syncOneRecord(record: ProofRecord): Promise<{ record: Proo
       photoMetadata: record.photoSlots.filter((slot) => slot.captured).map((slot) => toCentralPhoto(record, slot)),
     });
     const centralRecord = response.data?.record ? normalizeRecordFromAny(response.data.record) : null;
+    const finalStatus: ProofStatus = record.status === 'NEED_REVIEW' ? 'NEED_REVIEW' : 'SYNCED';
     const synced = upsertLocalRecord({
       ...record,
       ...(centralRecord ?? {}),
-      status: 'SYNCED',
+      status: finalStatus,
       syncedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     removePending(record.recordId);
     await pullCentralData();
-    return { record: synced, message: response.message || 'ซิงก์แล้ว' };
+    return { record: synced, message: response.message || 'ส่งข้อมูลแล้ว' };
   } catch (error) {
     const failed = upsertLocalRecord({ ...record, status: 'SYNC_FAILED', updatedAt: new Date().toISOString() });
     queuePending(failed);
@@ -438,19 +430,14 @@ export async function retryPendingSync(): Promise<SyncReport> {
   let failed = 0;
   for (const record of pending) {
     const result = await syncOneRecord(record);
-    if (result.record.status === 'SYNCED') synced += 1;
+    if (result.record.status === 'SYNCED' || result.record.status === 'NEED_REVIEW') synced += 1;
     else failed += 1;
   }
-  return {
-    attempted: pending.length,
-    synced,
-    failed,
-    message: failed ? 'ยังมีงานซิงก์ไม่สำเร็จ' : 'ซิงก์งานค้างเรียบร้อย',
-  };
+  return { attempted: pending.length, synced, failed, message: failed ? 'ยังมีงานซิงก์ไม่สำเร็จ' : 'ซิงก์งานค้างเรียบร้อย' };
 }
 
 export function getPendingRecords(): ProofRecord[] {
-  return readJson<ProofRecord[]>(KEYS.pending, []);
+  return mergeRecords(readJson<ProofRecord[]>(KEYS.pending, []), []);
 }
 
 export function getPendingSyncCount(): number {
@@ -462,9 +449,7 @@ export function getPendingPhotoCount(): number {
 }
 
 export function canClearLocalCache(): { ok: boolean; message: string } {
-  if (getPendingSyncCount() > 0) {
-    return { ok: false, message: 'ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้' };
-  }
+  if (getPendingSyncCount() > 0) return { ok: false, message: 'ยังมีงานรอซิงก์อยู่ ไม่สามารถล้างแคชได้' };
   return { ok: true, message: 'ล้างแคชได้' };
 }
 
@@ -479,12 +464,10 @@ export async function clearSafeLocalCache(): Promise<{ ok: boolean; message: str
 }
 
 export async function testCentralHealth(): Promise<ApiResult<{ serverTime?: string; apiVersion?: string }>> {
-  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
   return callCentral('health', { deviceId: getDeviceId() }, true);
 }
 
 export async function verifyAdminPin(pin: string): Promise<ApiResult> {
-  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่า PIN หลังบ้าน กรุณาติดต่อผู้ดูแล' };
   return callCentral('verifyAdminAccess', { pin, deviceId: getDeviceId() }, true);
 }
 
@@ -493,7 +476,6 @@ export async function setCentralAdminPin(pin: string, currentPin?: string): Prom
 }
 
 export async function getAdminAuthStatus(): Promise<ApiResult<{ adminPinSet?: boolean; adminPinEnabled?: boolean }>> {
-  if (!isCentralConfigured()) return { ok: false, message: 'ยังไม่ได้ตั้งค่าระบบกลาง' };
   return callCentral('getAdminAuthStatus', { deviceId: getDeviceId() }, true);
 }
 
@@ -527,14 +509,9 @@ export async function deactivateResponsibleCentral(employeeCode: string, hubCode
 
 export async function updateSettingsCentral(settings: Partial<AppSettings>): Promise<ApiResult<{ settings: AppSettings }>> {
   const allowed = ['GPS_REQUIRED', 'GPS_MANDATORY', 'WATERMARK_ENABLED', 'REQUIRE_ADMIN_DEVICE_APPROVAL', 'MINIMUM_APP_VERSION'] as const;
-  const payload = allowed
-    .filter((key) => settings[key] !== undefined)
-    .map((key) => ({ key, value: settings[key] }));
-  const response = await callCentral<{ settings?: unknown; appSettings?: unknown }>('updateSettingsBatch', {
-    settings: payload,
-    actor: getDeviceId(),
-  });
-  return { ok: response.ok, message: response.message, data: { settings: normalizeSettings(response.data?.settings ?? response.data?.appSettings) } };
+  const payload = allowed.filter((key) => settings[key] !== undefined).map((key) => ({ key, value: settings[key] }));
+  const response = await callCentral<{ settings?: unknown }>('updateSettingsBatch', { settings: payload, actor: getDeviceId() });
+  return { ok: response.ok, message: response.message, data: { settings: normalizeSettings(response.data?.settings) } };
 }
 
 export async function getHistory(filters: {
@@ -545,7 +522,6 @@ export async function getHistory(filters: {
   vehicleBarcode?: string;
   status?: string;
 }): Promise<ProofRecord[]> {
-  if (!isCentralConfigured()) return listRecords();
   const response = await callCentral<{ records?: unknown }>('getHistory', filters, true);
   return normalizeRecords(response.data?.records);
 }
@@ -565,13 +541,7 @@ export function formatBangkok(iso?: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: BANGKOK_TIME_ZONE }).format(date);
-  const time = new Intl.DateTimeFormat('th-TH', {
-    timeZone: BANGKOK_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(date);
+  const time = new Intl.DateTimeFormat('th-TH', { timeZone: BANGKOK_TIME_ZONE, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(date);
   return `${day} ${time}`;
 }
 
@@ -608,30 +578,12 @@ export function statusText(status: ProofStatus): string {
 }
 
 export function statusRank(record: ProofRecord): number {
-  const ranks: Record<ProofStatus, number> = {
-    SYNCED: 90,
-    COMPLETE: 80,
-    NEED_REVIEW: 70,
-    SYNC_FAILED: 60,
-    PENDING_SYNC: 50,
-    SYNCING: 45,
-    IN_PROGRESS: 40,
-    DRAFT: 30,
-    VOIDED: 10,
-  };
+  const ranks: Record<ProofStatus, number> = { SYNCED: 90, COMPLETE: 80, NEED_REVIEW: 70, SYNC_FAILED: 60, PENDING_SYNC: 50, SYNCING: 45, IN_PROGRESS: 40, DRAFT: 30, VOIDED: 10 };
   return ranks[record.status] ?? 0;
 }
 
 function localBootstrap(message: string): BootstrapData {
-  return {
-    ok: false,
-    source: 'local',
-    message,
-    hubs: listHubs(),
-    responsibleStaff: listResponsibleStaff(),
-    settings: DEFAULT_SETTINGS,
-    pulledAt: new Date().toISOString(),
-  };
+  return { ok: false, source: 'local', message, hubs: listHubs(), responsibleStaff: listResponsibleStaff(), settings: DEFAULT_SETTINGS, pulledAt: new Date().toISOString() };
 }
 
 function seedFallbackData(): void {
@@ -640,32 +592,16 @@ function seedFallbackData(): void {
 }
 
 function createPhotoSlots(dropType: DropType, dropCount: number): PhotoSlot[] {
-  if (dropType === 'NO_DROP') {
-    return [
-      makeSlot('rear', 'REAR', 'รูปหลังรถ'),
-      makeSlot('dropFront', 'DROP_FRONT', 'รูปหน้าดรอป'),
-    ];
-  }
+  if (dropType === 'NO_DROP') return [makeSlot('rear', 'REAR', 'รูปหลังรถ'), makeSlot('dropFront', 'DROP_FRONT', 'รูปหน้าดรอป')];
   const slots: PhotoSlot[] = [makeSlot('mainRear', 'MAIN_REAR', 'รูปหลังรถหลัก')];
   for (let index = 1; index <= Math.max(2, dropCount); index += 1) {
-    slots.push(makeSlot(
-      index <= 2 ? `trailerRear${index}` : `trailerRearExtra${index}`,
-      index <= 2 ? 'TRAILER_REAR' : 'TRAILER_REAR_EXTRA',
-      `รูปหลังรถพ่วง ${index}`,
-    ));
+    slots.push(makeSlot(index <= 2 ? `trailerRear${index}` : `trailerRearExtra${index}`, index <= 2 ? 'TRAILER_REAR' : 'TRAILER_REAR_EXTRA', `รูปหลังรถพ่วง ${index}`));
   }
   return slots;
 }
 
 function makeSlot(slotId: string, slotType: SlotType, label: string): PhotoSlot {
-  return {
-    slotId,
-    slotType,
-    label,
-    required: true,
-    captured: false,
-    gpsStatus: 'unknown',
-  };
+  return { slotId, slotType, label, required: true, captured: false, gpsStatus: 'unknown' };
 }
 
 function carryExistingPhotos(existing: PhotoSlot[], next: PhotoSlot[]): PhotoSlot[] {
@@ -674,9 +610,7 @@ function carryExistingPhotos(existing: PhotoSlot[], next: PhotoSlot[]): PhotoSlo
 
 function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]): ProofRecord[] {
   const groups = new Map<string, ProofRecord[]>();
-  [...localRecords, ...centralRecords].map(normalizeRecord).forEach((record) => {
-    groups.set(record.duplicateKey, [...(groups.get(record.duplicateKey) ?? []), record]);
-  });
+  [...localRecords, ...centralRecords].map(normalizeRecord).forEach((record) => groups.set(record.duplicateKey, [...(groups.get(record.duplicateKey) ?? []), record]));
   return Array.from(groups.values()).map((records) => records.sort((a, b) => {
     const rank = statusRank(b) - statusRank(a);
     if (rank !== 0) return rank;
@@ -687,13 +621,9 @@ function mergeRecords(localRecords: ProofRecord[], centralRecords: ProofRecord[]
 }
 
 function normalizeRecord(record: ProofRecord): ProofRecord {
-  return {
-    ...record,
-    vehicleBarcode: normalizeVehicleBarcode(record.vehicleBarcode),
-    duplicateKey: record.duplicateKey || buildDuplicateKey(record.date, record.hubCode, record.responsibleEmployeeCode, record.vehicleBarcode),
-    photoSlots: record.photoSlots ?? [],
-    missingPhotoLabels: record.missingPhotoLabels ?? [],
-  };
+  const date = record.date || todayBangkok();
+  const barcode = normalizeVehicleBarcode(record.vehicleBarcode);
+  return { ...record, date, vehicleBarcode: barcode, duplicateKey: record.duplicateKey || buildDuplicateKey(date, record.hubCode, record.responsibleEmployeeCode, barcode), photoSlots: record.photoSlots ?? [], missingPhotoLabels: record.missingPhotoLabels ?? [] };
 }
 
 function normalizeRecordFromAny(raw: unknown): ProofRecord | null {
@@ -706,6 +636,7 @@ function normalizeRecordFromAny(raw: unknown): ProofRecord | null {
   if (!date || !hubCode || !responsibleEmployeeCode || !vehicleBarcode) return null;
   const status = normalizeStatus(text(row.statusInternal ?? row.status ?? row['สถานะ']));
   const duplicateKey = text(row.duplicateKey) || buildDuplicateKey(date, hubCode, responsibleEmployeeCode, vehicleBarcode);
+  const photoSlots = Array.isArray(row.photoSlots) ? (row.photoSlots as unknown[]).map(normalizeSlotFromAny).filter((slot): slot is PhotoSlot => Boolean(slot)) : createPhotoSlots(text(row.dropType ?? row['พ่วงดรอปหรือไม่']).includes('พ่วง') ? 'DROP' : 'NO_DROP', Number(row.dropCount ?? row['จำนวนดรอป'] ?? 0) || 0);
   return {
     recordId: text(row.recordId ?? row.id) || duplicateKey,
     duplicateKey,
@@ -718,9 +649,9 @@ function normalizeRecordFromAny(raw: unknown): ProofRecord | null {
     dropType: text(row.dropType ?? row['พ่วงดรอปหรือไม่']).includes('พ่วง') ? 'DROP' : 'NO_DROP',
     dropCount: Number(row.dropCount ?? row['จำนวนดรอป'] ?? 0) || 0,
     status,
-    photoSlots: [],
-    missingPhotoLabels: text(row['รายการรูปที่ขาด']).split(',').map((item) => item.trim()).filter(Boolean),
-    submittedAt: parseCentralTime(row.submittedAt),
+    photoSlots,
+    missingPhotoLabels: Array.isArray(row.missingPhotoLabels) ? row.missingPhotoLabels.map(text).filter(Boolean) : text(row['รายการรูปที่ขาด']).split(',').map((item) => item.trim()).filter(Boolean),
+    submittedAt: parseCentralTime(row.submittedAt ?? row['เวลาส่งข้อมูล']),
     syncedAt: parseCentralTime(row.syncedAt),
     createdAt: parseCentralTime(row.createdAt) || new Date().toISOString(),
     updatedAt: parseCentralTime(row.updatedAt) || parseCentralTime(row.syncedAt) || new Date().toISOString(),
@@ -733,6 +664,34 @@ function normalizeRecordFromAny(raw: unknown): ProofRecord | null {
 function normalizeRecords(raw: unknown): ProofRecord[] {
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizeRecordFromAny).filter((record): record is ProofRecord => Boolean(record));
+}
+
+function normalizeSlotFromAny(raw: unknown): PhotoSlot | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const slotId = text(row.slotId ?? row.photoSlot);
+  const slotType = normalizeSlotType(text(row.slotType));
+  const label = text(row.label ?? row.labelThai ?? row.photoType ?? row['ประเภทรูป']);
+  if (!slotId || !label) return null;
+  return {
+    slotId,
+    slotType,
+    label,
+    required: true,
+    captured: Boolean(text(row.driveUrl ?? row.imagePreviewUrl ?? row.imageLocalData ?? row.fileName)),
+    fileName: text(row.fileName) || undefined,
+    driveFileId: text(row.driveFileId) || undefined,
+    driveUrl: text(row.driveUrl) || undefined,
+    imagePreviewUrl: text(row.imagePreviewUrl) || undefined,
+    imageFormula: text(row.imageFormula) || undefined,
+    capturedAt: parseCentralTime(row.capturedAt),
+    latitude: numberOrUndefined(row.latitude ?? row.gpsLat),
+    longitude: numberOrUndefined(row.longitude ?? row.gpsLng),
+    accuracy: numberOrUndefined(row.accuracy ?? row.gpsAccuracy),
+    addressText: text(row.addressText) || undefined,
+    watermarkText: text(row.watermarkText) || undefined,
+    gpsStatus: normalizeGpsStatus(text(row.gpsStatus)),
+  };
 }
 
 function toCentralRecord(record: ProofRecord): Record<string, unknown> {
@@ -752,6 +711,7 @@ function toCentralRecord(record: ProofRecord): Record<string, unknown> {
     photoDoneCount: record.photoSlots.filter((slot) => slot.captured).length,
     missingPhotoLabels: record.missingPhotoLabels,
     submittedAt: record.submittedAt,
+    syncedAt: record.syncedAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     note: record.note ?? '',
@@ -767,11 +727,9 @@ function toCentralPhoto(record: ProofRecord, slot: PhotoSlot): Record<string, un
     hubCode: record.hubCode,
     responsibleEmployeeCode: record.responsibleEmployeeCode,
     vehicleBarcode: record.vehicleBarcode,
-    photoSlot: slot.slotId,
     slotId: slot.slotId,
     slotType: slot.slotType,
     labelThai: slot.label,
-    photoType: slot.label,
     fileName: slot.fileName ?? '',
     driveFileId: slot.driveFileId ?? '',
     driveUrl: slot.driveUrl ?? '',
@@ -779,9 +737,6 @@ function toCentralPhoto(record: ProofRecord, slot: PhotoSlot): Record<string, un
     imageFormula: slot.imageFormula ?? '',
     imageLocalData: slot.imageLocalData ?? '',
     capturedAt: slot.capturedAt ?? '',
-    latitude: slot.latitude ?? '',
-    longitude: slot.longitude ?? '',
-    accuracy: slot.accuracy ?? '',
     gpsLat: slot.latitude ?? '',
     gpsLng: slot.longitude ?? '',
     gpsAccuracy: slot.accuracy ?? '',
@@ -806,15 +761,8 @@ async function callCentral<T>(action: string, payload: unknown, allowPublic = fa
   if (!API_URL) throw new Error('ยังไม่ได้ตั้งค่าระบบกลาง');
   const response = await fetch(API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action,
-      payload,
-      allowPublic,
-      client: 'hub-photo-proof-reset011',
-      appVersion: APP_VERSION,
-      sentAt: new Date().toISOString(),
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, payload, allowPublic, client: 'hub-photo-proof-reset013', appVersion: APP_VERSION, sentAt: new Date().toISOString() }),
   });
   const raw = await response.text();
   let parsed: Record<string, unknown> & { ok?: boolean; message?: string; error?: string; data?: unknown };
@@ -824,24 +772,14 @@ async function callCentral<T>(action: string, payload: unknown, allowPublic = fa
     throw new Error('ระบบกลางตอบกลับไม่ถูกต้อง');
   }
   if (!response.ok || parsed.ok === false) throw new Error(text(parsed.message ?? parsed.error) || 'ระบบกลางทำงานไม่สำเร็จ');
-  return {
-    ok: true,
-    message: text(parsed.message) || 'สำเร็จ',
-    data: (parsed.data ?? parsed) as T,
-  };
+  return { ok: true, message: text(parsed.message) || 'สำเร็จ', data: (parsed.data ?? {}) as T };
 }
 
 async function requestLocation(): Promise<{ status: GpsStatus; latitude?: number; longitude?: number; accuracy?: number; addressText?: string }> {
   if (!navigator.geolocation) return { status: 'unavailable', addressText: 'ไม่พบชื่อสถานที่' };
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({
-        status: 'granted',
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        addressText: 'ไม่พบชื่อสถานที่',
-      }),
+      (position) => resolve({ status: 'granted', latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, addressText: 'ไม่พบชื่อสถานที่' }),
       () => resolve({ status: 'denied', addressText: 'ไม่พบชื่อสถานที่' }),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
@@ -850,12 +788,8 @@ async function requestLocation(): Promise<{ status: GpsStatus; latitude?: number
 
 function buildWatermarkText(record: ProofRecord, label: string, capturedAt: string, location: { status: GpsStatus; latitude?: number; longitude?: number; accuracy?: number; addressText?: string }): string {
   const hasGps = typeof location.latitude === 'number' && typeof location.longitude === 'number';
-  const gps = hasGps
-    ? `${location.latitude?.toFixed(6)}, ${location.longitude?.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}`
-    : 'ไม่พบตำแหน่ง';
-  const place = location.addressText && location.addressText !== 'ไม่พบชื่อสถานที่'
-    ? location.addressText
-    : 'ไม่พบชื่อสถานที่';
+  const gps = hasGps ? `${location.latitude?.toFixed(6)}, ${location.longitude?.toFixed(6)}${typeof location.accuracy === 'number' ? ` ±${Math.round(location.accuracy)}m` : ''}` : 'ไม่พบตำแหน่ง';
+  const place = location.addressText && location.addressText !== 'ไม่พบชื่อสถานที่' ? location.addressText : 'ไม่พบชื่อสถานที่';
   return [
     `วันที่ ${todayBangkok(new Date(capturedAt))} เวลา ${formatBangkok(capturedAt).split(' ')[1] ?? ''}`,
     `พิกัด ${gps}`,
@@ -870,151 +804,162 @@ function buildWatermarkText(record: ProofRecord, label: string, capturedAt: stri
 function renderWatermarkedImage(file: File, watermarkText: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
     image.onload = () => {
-      const maxSize = 1600;
+      const maxSize = 1100;
       const scale = Math.min(1, maxSize / image.width, maxSize / image.height);
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        reject(new Error('ประมวลผลรูปไม่สำเร็จ'));
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('ไม่สามารถประมวลผลรูปได้'));
         return;
       }
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const fontSize = Math.max(18, Math.round(canvas.width / 48));
+      const lines = watermarkText.split('\n');
+      const fontSize = Math.max(18, Math.round(canvas.width * 0.026));
       const lineHeight = Math.round(fontSize * 1.32);
-      const padding = Math.max(18, Math.round(canvas.width / 60));
-      ctx.font = `700 ${fontSize}px "Segoe UI", Tahoma, sans-serif`;
-      ctx.textBaseline = 'top';
-      const lines = watermarkText.split('\n').flatMap((line) => wrapText(ctx, line, canvas.width - padding * 2));
-      const y = Math.max(padding, canvas.height - padding - lines.length * lineHeight);
+      const padding = Math.round(fontSize * 0.9);
+      ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+      ctx.textBaseline = 'bottom';
       lines.forEach((line, index) => {
-        const lineY = y + index * lineHeight;
-        ctx.lineWidth = Math.max(3, Math.round(fontSize / 7));
-        ctx.strokeStyle = 'rgba(0,0,0,.82)';
-        ctx.strokeText(line, padding, lineY);
-        ctx.fillStyle = index === 0 ? '#ffe044' : '#ffffff';
-        ctx.fillText(line, padding, lineY);
+        const y = canvas.height - padding - (lines.length - 1 - index) * lineHeight;
+        ctx.lineWidth = Math.max(3, Math.round(fontSize / 5));
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillStyle = index === 0 ? '#ffd54a' : '#ffffff';
+        ctx.strokeText(line, padding, y);
+        ctx.fillText(line, padding, y);
       });
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-      URL.revokeObjectURL(image.src);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL('image/jpeg', 0.72));
     };
-    image.onerror = () => reject(new Error('อ่านรูปไม่สำเร็จ'));
-    image.src = URL.createObjectURL(file);
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('เปิดรูปไม่สำเร็จ'));
+    };
+    image.src = objectUrl;
   });
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, line: string, maxWidth: number): string[] {
-  const words = line.split(' ');
-  const lines: string[] = [];
-  let current = '';
-  words.forEach((word) => {
-    const next = current ? `${current} ${word}` : word;
-    if (ctx.measureText(next).width <= maxWidth) current = next;
-    else {
-      if (current) lines.push(current);
-      current = word;
-    }
-  });
-  if (current) lines.push(current);
-  return lines.length ? lines : [line];
 }
 
 function normalizeHubs(raw: unknown): Hub[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((item) => item as Record<string, unknown>).map((item) => ({
-    hubCode: text(item.hubCode ?? item.HubCode),
-    hubName: text(item.hubName ?? item.HubName),
-    active: item.active === undefined ? true : item.active === true || text(item.active).toLowerCase() === 'true',
-    note: text(item.note) || undefined,
-    updatedAt: text(item.updatedAt) || undefined,
-  })).filter((hub) => hub.hubCode);
+  return raw.map(normalizeHub).filter((hub) => hub.hubCode && hub.active);
+}
+
+function normalizeHub(raw: unknown): Hub {
+  const row = typeof raw === 'object' && raw ? raw as Record<string, unknown> : {};
+  const hubCode = text(row.hubCode ?? row['รหัสฮับ']).trim();
+  return { hubCode, hubName: text(row.hubName ?? row['ชื่อฮับ']) || hubCode, active: toBool(row.active, true), note: text(row.note) || undefined, updatedAt: text(row.updatedAt) || undefined };
 }
 
 function normalizeResponsibleStaff(raw: unknown): ResponsibleStaff[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((item) => item as Record<string, unknown>).map((item) => ({
-    employeeCode: text(item.employeeCode ?? item.EmployeeCode),
-    employeeName: text(item.employeeName ?? item.displayName ?? item.EmployeeName),
-    hubCode: text(item.hubCode ?? item.HubCode),
-    active: item.active === undefined ? true : item.active === true || text(item.active).toLowerCase() === 'true',
-    note: text(item.note) || undefined,
-    updatedAt: text(item.updatedAt) || undefined,
-  })).filter((staff) => staff.employeeCode && staff.hubCode);
+  return raw.map(normalizeStaff).filter((staff) => staff.employeeCode && staff.hubCode && staff.active);
+}
+
+function normalizeStaff(raw: unknown): ResponsibleStaff {
+  const row = typeof raw === 'object' && raw ? raw as Record<string, unknown> : {};
+  return { employeeCode: text(row.employeeCode ?? row['รหัสพนักงาน']).trim(), employeeName: text(row.employeeName ?? row['ชื่อพนักงาน']).trim(), hubCode: text(row.hubCode).trim(), active: toBool(row.active, true), note: text(row.note) || undefined, updatedAt: text(row.updatedAt) || undefined };
 }
 
 function normalizeSettings(raw: unknown): AppSettings {
-  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  return {
-    ...DEFAULT_SETTINGS,
-    GPS_REQUIRED: text(data.GPS_REQUIRED ?? data.GPS_MANDATORY ?? DEFAULT_SETTINGS.GPS_REQUIRED),
-    GPS_MANDATORY: text(data.GPS_MANDATORY ?? data.GPS_REQUIRED ?? DEFAULT_SETTINGS.GPS_MANDATORY),
-    WATERMARK_ENABLED: text(data.WATERMARK_ENABLED ?? DEFAULT_SETTINGS.WATERMARK_ENABLED),
-    REQUIRE_ADMIN_DEVICE_APPROVAL: text(data.REQUIRE_ADMIN_DEVICE_APPROVAL ?? DEFAULT_SETTINGS.REQUIRE_ADMIN_DEVICE_APPROVAL),
-    MINIMUM_APP_VERSION: text(data.MINIMUM_APP_VERSION ?? DEFAULT_SETTINGS.MINIMUM_APP_VERSION),
-    ADMIN_PIN_ENABLED: text(data.ADMIN_PIN_ENABLED ?? DEFAULT_SETTINGS.ADMIN_PIN_ENABLED),
-    ADMIN_PIN_SET: text(data.ADMIN_PIN_SET ?? DEFAULT_SETTINGS.ADMIN_PIN_SET),
-  };
+  const settings = { ...DEFAULT_SETTINGS };
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (item && typeof item === 'object') {
+        const row = item as Record<string, unknown>;
+        const key = text(row.key).trim();
+        if (key) (settings as Record<string, string>)[key] = text(row.value);
+      }
+    });
+  } else if (raw && typeof raw === 'object') {
+    Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => { (settings as Record<string, string>)[key] = text(value); });
+  }
+  return settings;
 }
 
 function normalizeStatus(value: string): ProofStatus {
-  if (value === 'SYNCED' || value.includes('ซิงก์แล้ว')) return 'SYNCED';
-  if (value === 'SYNCING' || value.includes('กำลังซิงก์')) return 'SYNCING';
-  if (value === 'SYNC_FAILED' || value.includes('ซิงก์ไม่สำเร็จ')) return 'SYNC_FAILED';
-  if (value === 'PENDING_SYNC' || value.includes('รอซิงก์')) return 'PENDING_SYNC';
-  if (value === 'NEED_REVIEW' || value.includes('รูปไม่ครบ')) return 'NEED_REVIEW';
-  if (value === 'IN_PROGRESS' || value.includes('กำลังถ่าย')) return 'IN_PROGRESS';
-  if (value === 'DRAFT' || value.includes('เริ่ม')) return 'DRAFT';
-  if (value === 'VOIDED' || value.includes('ยกเลิก')) return 'VOIDED';
-  return 'COMPLETE';
+  const upper = value.toUpperCase();
+  if (['DRAFT', 'IN_PROGRESS', 'NEED_REVIEW', 'COMPLETE', 'PENDING_SYNC', 'SYNCING', 'SYNCED', 'SYNC_FAILED', 'VOIDED'].includes(upper)) return upper as ProofStatus;
+  if (value.includes('ซิงก์ไม่สำเร็จ')) return 'SYNC_FAILED';
+  if (value.includes('รอซิงก์')) return 'PENDING_SYNC';
+  if (value.includes('ซิงก์แล้ว')) return 'SYNCED';
+  if (value.includes('รูปไม่ครบ')) return 'NEED_REVIEW';
+  if (value.includes('ส่งครบ')) return 'COMPLETE';
+  if (value.includes('กำลัง')) return 'IN_PROGRESS';
+  return 'DRAFT';
 }
 
-function parseCentralTime(value: unknown): string {
-  const raw = text(value);
-  if (!raw) return '';
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+07:00`).toISOString();
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+function normalizeSlotType(value: string): SlotType {
+  if (['REAR', 'DROP_FRONT', 'MAIN_REAR', 'TRAILER_REAR', 'TRAILER_REAR_EXTRA'].includes(value)) return value as SlotType;
+  return 'REAR';
+}
+
+function normalizeGpsStatus(value: string): GpsStatus {
+  if (['granted', 'denied', 'unavailable', 'unknown'].includes(value)) return value as GpsStatus;
+  return 'unknown';
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function parseCentralTime(value: unknown): string | undefined {
+  const str = text(value);
+  if (!str) return undefined;
+  const normalized = str.includes('T') ? str : str.replace(' ', 'T') + '+07:00';
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? str : date.toISOString();
 }
 
 function splitCode(value: unknown): string {
-  return text(value).split(/[-\s]/)[0] ?? '';
+  return text(value).split(/\s|-/)[0] ?? '';
 }
 
 function splitName(value: unknown): string {
   const raw = text(value);
-  return raw.replace(splitCode(raw), '').replace(/^-/, '').trim();
-}
-
-function dedupeBy<T>(items: T[], keyFn: (item: T) => string): T[] {
-  const map = new Map<string, T>();
-  items.forEach((item) => map.set(keyFn(item), item));
-  return Array.from(map.values());
-}
-
-function part(parts: Intl.DateTimeFormatPart[], type: string): string {
-  return parts.find((item) => item.type === type)?.value ?? '';
-}
-
-function text(value: unknown): string {
-  return String(value ?? '').trim();
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'ดำเนินการไม่สำเร็จ';
+  const index = raw.indexOf(' ');
+  if (index >= 0) return raw.slice(index + 1).trim();
+  const dash = raw.indexOf('-');
+  return dash >= 0 ? raw.slice(dash + 1).trim() : '';
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
   try {
-    return JSON.parse(raw) as T;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as T : fallback;
   } catch {
     return fallback;
   }
 }
 
-function writeJson<T>(key: string, value: T): void {
+function writeJson(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function dedupeBy<T>(items: T[], keyer: (item: T) => string): T[] {
+  const map = new Map<string, T>();
+  items.forEach((item) => map.set(keyer(item), item));
+  return Array.from(map.values());
+}
+
+function text(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function toBool(value: unknown, fallback = false): boolean {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  return ['true', 'yes', '1', 'y', 'ใช่', 'active'].includes(String(value).trim().toLowerCase());
+}
+
+function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
+  return parts.find((item) => item.type === type)?.value ?? '';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'ระบบกลางทำงานไม่สำเร็จ';
 }
